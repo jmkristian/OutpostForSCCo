@@ -4,9 +4,8 @@ adding forms that are used for emergency communication by ARES in Los Altos, Cal
 It uses the [add-on interface](http://www.outpostpm.org/docs/Outpost320-AddonUG.pdf)
 to Outpost, and a web browser to display and edit forms.
 
-To install, download an OutpostForLAARES*.exe file from
-https://github.com/jmkristian/OutpostForLAARES/releases
-and execute it.
+Install Outpost before installing this software.
+Then, execute an OutpostForLAARES*.exe file downloaded from https://github.com/jmkristian/OutpostForLAARES/releases .
 After installation is complete, exit and restart Outpost.
 
 Uninstall as you would any program.
