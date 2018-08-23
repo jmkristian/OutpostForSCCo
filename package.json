@@ -1,0 +1,13 @@
+{
+  "name": "OutpostForLAARES",
+  "version": "0.0.4",
+  "description": "An add-on for Outpost Packet Message Manager.",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/jmkristian/Outpost-for-LAARES",
+  "dependencies": {
+    "body-parser": "1.18.3",
+    "concat-stream": "1.6.2",
+    "express": "4.16.3",
+    "morgan": "1.9.0"
+  }
+}

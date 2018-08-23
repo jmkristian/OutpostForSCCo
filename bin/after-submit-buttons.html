@@ -1,0 +1,57 @@
+<script type="text/javascript">
+    var formDefaultValues; // Initial values for form inputs.
+    // Monkey patch load_callprefix:
+    for (var i = startup_functions.length - 1; i >= 0; i--) {
+        if (startup_functions[i] === load_callprefix) {
+            startup_functions[i] = function(next) {
+                load_callprefix(function() {
+                    try {
+                        var message = {{message}};
+                        if (message) {
+                            set_form_data_div(message);
+                        }
+                        var queryDefaults = {{queryDefaults}};
+                        for (var i in queryDefaults) {
+                            if (query_object[i] == null) {
+                                query_object[i] = queryDefaults[i];
+                            }
+                        }
+                        if (query_object.submitURL) {
+                            document.querySelector('#form-data-form').action = query_object.submitURL;
+                        }
+                        if (query_object.pingURL && query_object.mode != 'readonly') {
+                            // Ping the server periodically, to keep it alive while the form is open.
+                            // But not for a read-only message.
+                            setInterval(function() {
+                                var img = new Image();
+                                img.src = query_object.pingURL;
+                                img = undefined;
+                            }, 30000); // call ping every 30 seconds
+                        }
+                        if (formDefaultValues) {
+                            for (var f = formDefaultValues.length - 1; f >= 0; f--) {
+                                init_form_from_fields(formDefaultValues[f], 'name');
+                            }
+                        }
+                        // Change the message header from PACF format to ADDON format:
+                        var messageHeader = document.querySelector("#message-header");
+                        var header = messageHeader.textContent;
+                        // The subject comes after !PACF! in the first line:
+                        var found = /^\s*![^!\r\n]*!\s*([^\r\n]*)/.exec(header);
+                        // Remove that first line:
+                        header = header.replace(/^\s*![^!\r\n]*![^\r\n]*[\r\n]*/, '');
+                        if (found) {
+                            // Add the subject in a comment:
+                            header = header.replace(/\s*$/, '\r\n# SUBJECT: ' + found[1]);
+                        }
+                        messageHeader.textContent = header;
+                    } catch(err) {
+                        // TODO: log the error
+                    }
+                    next();
+                });
+            };
+            break;
+        }
+    }
+</script>
