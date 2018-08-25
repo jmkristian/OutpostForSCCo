@@ -94,6 +94,9 @@ case 'open':
 case 'dry-run':
     openMessage();
     break;
+case 'stop':
+    stopServer();
+    break;
 default:
     console.error(process.argv[1] + ': unknown verb "' + process.argv[2] + '"');
 }
@@ -101,18 +104,12 @@ default:
 function install() {
     // This method must be idempotent, in part because Avira antivirus
     // might execute it repeatedly while scrutinizing the .exe for viruses.
-    stopServer(function() {
-        try {
-            process.stdout.write = process.stderr.write = writeToFile('install.log');
-            const myDirectory = process.cwd();
-            const addonNames = getAddonNames('addons');
-            console.log('addons ' + JSON.stringify(addonNames));
-            installConfigFiles(myDirectory, addonNames);
-            installIncludes(myDirectory, addonNames);
-        } catch(err) {
-            logAndAbort(err);
-        }
-    });
+    process.stdout.write = process.stderr.write = writeToFile('install.log');
+    const myDirectory = process.cwd();
+    const addonNames = getAddonNames('addons');
+    console.log('addons ' + JSON.stringify(addonNames));
+    installConfigFiles(myDirectory, addonNames);
+    installIncludes(myDirectory, addonNames);
 }
 
 function installConfigFiles(myDirectory, addonNames) {

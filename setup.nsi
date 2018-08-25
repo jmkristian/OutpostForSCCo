@@ -109,6 +109,10 @@ Section "Install"
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
 
+  # Stop the server (so it will release its lock on bin\launch.exe):
+  ExecShellWait open "bin\launch.exe" "stop" SW_SHOWMINIMIZED
+  ClearErrors
+
   # Files to install:
   File launch.cmd
   File README.md
@@ -142,7 +146,7 @@ Section "Install"
   CopyFiles "$OUTPOST_CODE\Aoclient.exe" "$INSTDIR\addons\Los_Altos\Aoclient.exe"
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
-  ExecShell open "bin\launch.exe" "dry-run" SW_SHOWMINIMIZED
+  ExecShell open ".\launch.cmd" "dry-run" SW_SHOWMINIMIZED
   ${If} ${Errors}
     Abort "bin\launch.exe dry-run failed"
   ${EndIf}
