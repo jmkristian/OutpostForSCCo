@@ -45,8 +45,10 @@ Most improvements to the web user interface will be done in
 You can experiment by cloning pack-it-forms into your clone of this repository (as a sub-folder).
 When you're done experimenting, release pack-it-forms and then use the new released version here.
 That is, commit changes to pack-it-forms, push them to GitHub, release pack-it-forms,
-remove your experimental pack-it-forms sub-folder, build a new installer, test it,
-push changes to GitHub and create a new release including the new installer.
+remove your experimental pack-it-forms sub-folder,
+update ./build.sh to refer to the new version of pack-it-forms,
+build a new installer, test it,
+commit and push changes to GitHub and create a new release including the new installer.
 
 To develop another add-on, create an Addon_Name.launch file in the addons sub-folder.
 Also, insert a line into setup.nsi like this:
