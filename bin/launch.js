@@ -73,7 +73,7 @@ const CHARSET = ENCODING; // for HTTP
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
 const NOT_FOUND = 404;
-const OpdFAIL = path.join('bin', 'OpdFAIL');
+const OpdFAIL = 'OpdFAIL';
 const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join('bin', 'server-port.txt');
@@ -625,7 +625,9 @@ function onSubmit(formId, buffer, res) {
                                 // This is described in the Outpost Add-on Implementation Guide version 1.2,
                                 // but Aoclient.exe doesn't appear to implement it.
                                 // Happily, it does pop up a window to explain what went wrong.
-                                throw (OpdFAIL + ': ' + fs.readFileSync(OpdFAIL, ENCODING));
+                                throw (OpdFAIL + ': ' + fs.readFileSync(OpdFAIL, ENCODING) + '\n'
+                                       + stdout.toString(ENCODING)
+                                       + stderr.toString(ENCODING));
                             } else {
                                 res.redirect('/form-' + formId + '?mode=readonly');
                                 /** At this point, the operator can click the browser 'back' button,
@@ -651,9 +653,9 @@ function onSubmit(formId, buffer, res) {
 
 function errorToHTML(err) {
     const message = encodeHTML((err && err.stack) ? err.stack : err);
-    return `<HTML><title>Warning</title><body>
+    return `<HTML><title>Problem</title><body>
   <h3><img src="icon-warning.png" alt="warning" style="${IconStyle}">&nbsp;&nbsp;Something went wrong.</h3>
-  This information may help isolate the problem:<pre>
+  This information might help resolve the problem:<pre>
 ${message}</pre>
 </body></HTML>`;
 }
