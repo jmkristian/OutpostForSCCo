@@ -21,13 +21,6 @@ The /D= option must be last, and the folder name must not be surrounded by quote
 Beware: a folder name that contains whitepsace won't work with Outpost version 3.2 c118.
 For a silent uninstall, execute `.\uninstall.exe /S` in the folder where the program was installed.
 
-Each time you create or open a "Los_Altos" message, Outpost version 3.2.0 c118 will pop up a question:
-
-    "Los_Altos" message detected... Do you want to view it in its original format?
-
-When creating a new message, click "Yes". After submitting a message, click "No".
-When opening an existing message, click which ever you please.
-
 Building
 --------
 
