@@ -627,7 +627,13 @@ function onSubmit(formId, buffer, res) {
                                 // Happily, it does pop up a window to explain what went wrong.
                                 throw (OpdFAIL + ': ' + fs.readFileSync(OpdFAIL, ENCODING));
                             } else {
-                                res.send(submittedMessage(stdout, stderr));
+                                res.redirect('/form-' + formId + '?mode=readonly');
+                                /** At this point, the operator can click the browser 'back' button,
+                                    edit the form and submit it to Outpost again. To prevent this:
+                                form.environment.mode = 'readonly';
+                                res.redirect('/form-' + formId);
+                                    ... which causes the 'back' button to display a read-only form.
+                                */
                                 console.log('form ' + formId + ' submitted');
                                 fs.unlinkSync(msgFileName);
                                 // Don't closeForm, in case the operator goes back and submits it again.
@@ -641,18 +647,6 @@ function onSubmit(formId, buffer, res) {
     } catch(err) {
         res.send(errorToHTML(err));
     }
-}
-
-function submittedMessage(stdout, stderr) {
-    const output = encodeHTML((stdout ? stdout.toString(ENCODING) : '') +
-                              (stderr ? stderr.toString(ENCODING) : ''));
-    return `<HTML><title>Submitted</title><body>
-  <img src="icon-check.png" alt="OK" style="${IconStyle}">
-    &nbsp;&nbsp;The message has been submitted to Outpost. You can close this page.
-    <pre>
-${output}</pre>
-  <script type="text/javascript">setTimeout(function(){window.open("","_self").close();},5000);</script>
-</body></HTML>`;
 }
 
 function errorToHTML(err) {

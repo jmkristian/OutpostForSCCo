@@ -45,6 +45,15 @@
                             header = header.replace(/\s*$/, '\r\n# SUBJECT: ' + found[1]);
                         }
                         messageHeader.textContent = header;
+                        if (query_object.message_status == 'new' && query_object.mode == 'readonly') {
+                            // This message was just submitted to Outpost. Let the operator know:
+                            var div = document.createElement('div');
+                            div.style="position:absolute;height:20pt;top:50%;margin-top:-10pt;margin-left:5pt;font-weight:bold;";
+                            div.innerHTML =
+                                '<img src="icon-check.png" alt="OK" style="width:20pt;height:20pt;vertical-align:middle;">' +
+                                '&nbsp;&nbsp;The message has been submitted to Outpost. You can close this page.';
+                            document.querySelector("#button-header").appendChild(div);
+                        }
                     } catch(err) {
                         // TODO: log the error
                     }
