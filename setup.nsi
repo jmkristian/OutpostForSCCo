@@ -130,7 +130,7 @@ Section "Install"
   WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "Outpost for LAARES"
   WriteRegStr   HKLM "${REG_SUBKEY}" UninstallString "$\"$INSTDIR\uninstall.exe$\""
   WriteRegStr   HKLM "${REG_SUBKEY}" Publisher "Los Altos ARES"
-  WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "https://github.com/jmkristian/Outpost-for-LAARES/blob/master/README.md"
+  WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "https://github.com/jmkristian/OutpostforLAARES/blob/master/README.md"
   WriteRegStr   HKLM "${REG_SUBKEY}" DisplayVersion "0.6"
   WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMajor 0
   WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMinor 6
