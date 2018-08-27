@@ -152,9 +152,9 @@ Section "Install"
   CopyFiles "$OUTPOST_CODE\Aoclient.exe" "$INSTDIR\addons\Los_Altos\Aoclient.exe"
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
-  ExecShell open "$WSCRIPT_EXE" ".\launch.vbs dry-run" SW_SHOWMINIMIZED
+  ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run" SW_SHOWMINIMIZED
   ${If} ${Errors}
-    Abort "bin\launch.vbs dry-run failed"
+    Abort "launch.vbs dry-run failed"
   ${EndIf}
 SectionEnd
 
