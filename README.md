@@ -11,6 +11,7 @@ After installation is complete, exit and restart Outpost.
 Uninstall as you would any program.
 For example on Windows 8, open the control panel "Programs and Features",
 right click "Outpost for LAARES" and click "Uninstall".
+If you don't see Outpost for LAARES, try closing and re-opening the control panel.
 After uninstallation is complete, exit and restart Outpost.
 
 For a
