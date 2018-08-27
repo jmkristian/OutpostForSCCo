@@ -23,9 +23,8 @@
 
   Any single execution does just one of those things,
   depending on the value of process.argv[2].
-  For example, "node bin/launch.js install C:/Outpost"
-  edits C:/Outpost/Launch.local and configuration files
-  in the current working directory.
+  For example, "node bin/launch.js uninstall C:/Outpost"
+  edits C:/Outpost/Launch.local.
 
   When an operator clicks a menu item to create a message
   or opens an existing message that belongs to this add-on,
@@ -82,7 +81,11 @@ const IconStyle = 'width:24pt;height:24pt;vertical-align:middle;';
 
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
-    switch(process.argv[2]) {
+    const verb = process.argv[2];
+    if (verb != 'serve') {
+        logToFile(path.join('bin', verb + '.log'))
+    }
+    switch(verb) {
     case 'install':
         install();
         break;
@@ -100,14 +103,13 @@ if (process.argv.length > 2) {
         stopServer();
         break;
     default:
-        console.error(process.argv[1] + ': unknown verb "' + process.argv[2] + '"');
+        console.error(process.argv[1] + ': unknown verb "' + verb + '"');
     }
 }
 
 function install() {
     // This method must be idempotent, in part because Avira antivirus
     // might execute it repeatedly while scrutinizing the .exe for viruses.
-    process.stdout.write = process.stderr.write = writeToFile('install.log');
     const myDirectory = process.cwd();
     const addonNames = getAddonNames('addons');
     console.log('addons ' + JSON.stringify(addonNames));
@@ -406,7 +408,7 @@ function serve() {
     const logFileName = path.resolve('bin', 'server-' + address.port + '.log');
     console.log('Detailed information about its activity can be seen in');
     console.log(logFileName);
-    process.stdout.write = writeToFile(logFileName);
+    logToFile(logFileName);
     console.log('Listening for HTTP requests on port ' + address.port + '...');
     const checkSilent = setInterval(function() {
         // Scan openForms and close any that have been quiet too long.
@@ -684,11 +686,7 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
     }
 }
 
-function writeToFile(fileName) {
-    if (!fs.existsSync(path.dirname(fileName))) {
-        fs.mkdirSync(path.dirname(fileName));
-    }
-    const fileStream = fs.createWriteStream(fileName, {autoClose: true});
+function logToFile(fileName) {
     const windowsEOL = new Transform({
         // Transform line endings from Unix style to Windows style.
         transform: function(chunk, encoding, output) {
@@ -703,8 +701,13 @@ function writeToFile(fileName) {
             }
         }
     });
+    if (!fs.existsSync(path.dirname(fileName))) {
+        fs.mkdirSync(path.dirname(fileName));
+    }
+    const fileStream = fs.createWriteStream(fileName, {autoClose: true});
     windowsEOL.pipe(fileStream);
-    return windowsEOL.write.bind(windowsEOL);
+    const writer = windowsEOL.write.bind(windowsEOL);
+    process.stdout.write = process.stderr.write = writer;
 }
 
 function expandVariablesInFile(variables, fromFile, intoFile) {
