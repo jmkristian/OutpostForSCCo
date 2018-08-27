@@ -285,9 +285,9 @@ function openForm(retry, args) {
 
 function openFormFailed(err, retry, args) {
     console.log(err);
-    if (retry >= 4) {
+    if (retry >= 6) {
         console.error(retry + ' attempts failed ' + JSON.stringify(args));
-        setTimeout(logAndAbort, 5000, 'Goodbye.');
+        logAndAbort('Goodbye.');
     } else {
         if (retry == 0 || retry == 3) {
             startServer(); // in case the old server died or stalled
