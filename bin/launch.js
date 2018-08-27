@@ -634,6 +634,7 @@ function onSubmit(formId, buffer, res) {
                                        + stdout.toString(ENCODING)
                                        + stderr.toString(ENCODING));
                             } else {
+                                form.message = message;
                                 res.redirect('/form-' + formId + '?mode=readonly');
                                 /** At this point, the operator can click the browser 'back' button,
                                     edit the form and submit it to Outpost again. To prevent this:
