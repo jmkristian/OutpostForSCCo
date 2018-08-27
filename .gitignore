@@ -2,7 +2,7 @@
 \#*#
 /bin/*.dll
 /bin/*.exe
-/bin/logs
+/bin/*.log
 /bin/server-port.txt
 /logs
 /Los_Altos

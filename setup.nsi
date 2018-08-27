@@ -27,6 +27,7 @@ UninstPage instfiles
 
 Var /GLOBAL OUTPOST_CODE
 Var /GLOBAL OUTPOST_DATA
+Var /GLOBAL WSCRIPT_EXE
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OutpostForLAARES"
 
 Function StrContainsSpace
@@ -74,8 +75,8 @@ Function ${un}FindOutpost
   ${EndIf}
 FunctionEnd
 
-# Set $OUTPOST_CODE = a folder that contains Outpost executables, and
-# set $OUTPOST_DATA = a space-separated list of folders that contain Outpost configuration files.
+# Set $OUTPOST_CODE = a folder that contains Outpost executables.
+# Set $OUTPOST_DATA = a space-separated list of folders that contain Outpost configuration files.
 # If no such folders are found, set both variables to "".
 # If Outpost and SCCo Packet are both installed, $OUTPOST_CODE will be SCCo Packet.
 Function ${un}FindOutposts
@@ -115,6 +116,7 @@ Section "Install"
 
   # Files to install:
   File launch.cmd
+  File launch.vbs
   File README.md
   SetOutPath "$INSTDIR\addons"
   File addons\*.launch
@@ -138,7 +140,11 @@ Section "Install"
   WriteRegDWORD HKLM "${REG_SUBKEY}" NoRepair 1
   WriteRegDWORD HKLM "${REG_SUBKEY}" EstimatedSize 15000
 
-  ExecShellWait open "bin\launch.exe" "install$OUTPOST_DATA" SW_SHOWMINIMIZED
+  StrCpy $WSCRIPT_EXE "$SYSDIR\wscript.exe"
+  IfFileExists $WSCRIPT_EXE +2
+    StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
+
+  ExecShellWait open "bin\launch.exe" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
   ${If} ${Errors}
     Abort "bin\launch.exe install$OUTPOST_DATA failed"
   ${EndIf}
@@ -146,9 +152,9 @@ Section "Install"
   CopyFiles "$OUTPOST_CODE\Aoclient.exe" "$INSTDIR\addons\Los_Altos\Aoclient.exe"
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
-  ExecShell open ".\launch.cmd" "dry-run" SW_SHOWMINIMIZED
+  ExecShell open "$WSCRIPT_EXE" ".\launch.vbs dry-run" SW_SHOWMINIMIZED
   ${If} ${Errors}
-    Abort "bin\launch.exe dry-run failed"
+    Abort "bin\launch.vbs dry-run failed"
   ${EndIf}
 SectionEnd
 

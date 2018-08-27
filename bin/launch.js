@@ -80,25 +80,28 @@ const PortFileName = path.join('bin', 'server-port.txt');
 const LogFileAgeLimitMs = 1000 * 60 * 60 * 24; // 24 hours
 const IconStyle = 'width:24pt;height:24pt;vertical-align:middle;';
 
-switch(process.argv[2]) {
-case 'install':
-    install();
-    break;
-case 'uninstall':
-    uninstall();
-    break;
-case 'serve':
-    serve();
-    break;
-case 'open':
-case 'dry-run':
-    openMessage();
-    break;
-case 'stop':
-    stopServer();
-    break;
-default:
-    console.error(process.argv[1] + ': unknown verb "' + process.argv[2] + '"');
+if (process.argv.length > 2) {
+    // With no arguments, do nothing quietly.
+    switch(process.argv[2]) {
+    case 'install':
+        install();
+        break;
+    case 'uninstall':
+        uninstall();
+        break;
+    case 'serve':
+        serve();
+        break;
+    case 'open':
+    case 'dry-run':
+        openMessage();
+        break;
+    case 'stop':
+        stopServer();
+        break;
+    default:
+        console.error(process.argv[1] + ': unknown verb "' + process.argv[2] + '"');
+    }
 }
 
 function install() {
@@ -115,7 +118,7 @@ function install() {
 function installConfigFiles(myDirectory, addonNames) {
     for (var n in addonNames) {
         var addonName = addonNames[n];
-        expandVariablesInFile({ADDON_NAME: addonName, INSTDIR: myDirectory},
+        expandVariablesInFile({ADDON_NAME: addonName, INSTDIR: myDirectory, WSCRIPT: process.argv[3]},
                               path.join('bin', 'addon.ini'),
                               path.join('addons', addonName + '.ini'));
         expandVariablesInFile({ADDON_NAME: addonName},
@@ -132,7 +135,7 @@ function installIncludes(myDirectory, addonNames) {
         myIncludes.push('INCLUDE ' + path.resolve(myDirectory, 'addons', addonNames[n] + '.launch'));
     }
     // Each of the process arguments names a directory that contains Outpost configuration data.
-    for (var a = 3; a < process.argv.length; a++) {
+    for (var a = 4; a < process.argv.length; a++) {
         var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
         // Upsert myIncludes into outpostLaunch:
         if (!fs.existsSync(outpostLaunch)) {
