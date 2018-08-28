@@ -609,6 +609,7 @@ function onSubmit(formId, buffer, res) {
         // Correct the FORMFILENAME:
         message = message.replace(/[\r\n]*(#\s*FORMFILENAME:\s*)[^\r\n]*[\r\n]*/,
                                   EOL + '$1' + formFileName.replace('$', '\\$') + EOL);
+        form.message = message;
         fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
             if (err) {
                 res.send(errorToHTML(err));
@@ -634,7 +635,6 @@ function onSubmit(formId, buffer, res) {
                                        + stdout.toString(ENCODING)
                                        + stderr.toString(ENCODING));
                             } else {
-                                form.message = message;
                                 res.redirect('/form-' + formId + '?mode=readonly');
                                 /** At this point, the operator can click the browser 'back' button,
                                     edit the form and submit it to Outpost again. To prevent this:
