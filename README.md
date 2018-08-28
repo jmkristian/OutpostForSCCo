@@ -4,6 +4,8 @@ adding forms that are used for emergency communication by ARES in Los Altos, Cal
 It uses the [add-on interface](http://www.outpostpm.org/docs/Outpost320-AddonUG.pdf)
 to Outpost, and a web browser to display and edit forms.
 
+### Installation
+
 Install Outpost before installing this software.
 Then, get an OutpostForLAARES*.exe file from the
 [downloads page](https://github.com/jmkristian/OutpostForLAARES/releases)
@@ -24,19 +26,31 @@ The /D= option must be last, and the folder name must not be surrounded by quote
 Beware: a folder name that contains whitepsace won't work with Outpost version 3.2 c118.
 For a silent uninstall, execute `.\uninstall.exe /S` in the folder where the program was installed.
 
+### Usage
+
+To create a new message, click an item in the 'Forms' menu of Outpost.
+A browser page will pop up; enter data and click the 'Submit to Outpost' button at the top.
+The text form of the message will pop up; enter the 'To' addresses and click 'Send'.
+
+Opening a message that's not ready to send will pop up the text form, only,
+where you can enter the 'To' addresses.
+Opening a message that's ready to send will pop up a browser page.
+Opening a message that's been sent or received will ask whether you want to view the
+'original format'; that is a browser page.
+
 ### In Case of Trouble
 
 If something's not right, please report it by creating a new issue in the
 [issues page](https://github.com/jmkristian/OutpostForLAARES/issues).
-To help isolate the problem, please attach all the files
-from the folder `OutpostForLAARES\bin` whose names end with `.log`.
+To help isolate the problem, please attach a screenshot of a browser page (if any)
+and all the files from the folder `OutpostForLAARES\bin` whose names end with `.log`.
 
 Power users might learn more by editing OutpostForLAARES\addons\\*.ini, changing
 each occurrence of ...\wscript.exe ...\OutpostForLAARES\launch.vbs
 to ...\OutpostForLAARES\launch.cmd and observing the console windows that pop up.
 The source code for bin\launch.exe is bin\launch.js.
 
-### Building
+### Developing
 
 Source code is stored in [this repository](https://github.com/jmkristian/OutpostForLAARES).
 To build it, you'll need
@@ -48,12 +62,10 @@ Don't use a more recent version of Node.js: it will build code that won't run on
 
 Clone this repository and then use bash to run ./build.sh in your clone.
 
-### Developing
-
 Most improvements to the web user interface will be done in
 [pack-it-forms](https://github.com/jmkristian/pack-it-forms/blob/LAARES/README.md)
-(not this repository).
-You can experiment by cloning pack-it-forms into your clone of this repository (as a sub-folder).
+(not this repository). You can experiment by replacing the pack-it-forms sub-folder
+with a clone of the pack-it-forms repository.
 When you're done experimenting, release pack-it-forms and then use the new released version here.
 That is, commit changes to pack-it-forms, push them to GitHub, release pack-it-forms,
 remove your experimental pack-it-forms sub-folder,
