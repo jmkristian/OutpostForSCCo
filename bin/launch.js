@@ -75,7 +75,7 @@ const NOT_FOUND = 404;
 const OpdFAIL = 'OpdFAIL';
 const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
-const PortFileName = path.join('bin', 'server-port.txt');
+const PortFileName = path.join('logs', 'server-port.txt');
 const LogFileAgeLimitMs = 1000 * 60 * 60 * 24; // 24 hours
 const IconStyle = 'width:24pt;height:24pt;vertical-align:middle;';
 
@@ -83,7 +83,7 @@ if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
     const verb = process.argv[2];
     if (verb != 'serve') {
-        logToFile(path.join('bin', verb + '.log'))
+        logToFile(path.join('logs', verb + '.log'))
     }
     switch(verb) {
     case 'install':
@@ -405,7 +405,7 @@ function serve() {
     const address = server.address();
     fs.writeFileSync(PortFileName, address.port + '', {encoding: ENCODING}); // advertise my port
     deleteOldFiles('bin', /^server-\d*\.log$/, LogFileAgeLimitMs);
-    const logFileName = path.resolve('bin', 'server-' + address.port + '.log');
+    const logFileName = path.resolve('logs', 'server-' + address.port + '.log');
     console.log('Detailed information about its activity can be seen in');
     console.log(logFileName);
     logToFile(logFileName);

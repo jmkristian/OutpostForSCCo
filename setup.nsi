@@ -170,10 +170,11 @@ Section "Uninstall"
   ExecShellWait open "bin\launch.exe" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
 
   Delete launch.cmd
+  Delete launch.vbs
   Delete README.md
-  Delete *.log
   RMDir /r "$INSTDIR\addons"
   RMDir /r "$INSTDIR\bin"
+  RMDir /r "$INSTDIR\logs"
   RMDir /r "$INSTDIR\pack-it-forms"
   RMDir "$INSTDIR" # Do nothing if the directory is not empty
 SectionEnd

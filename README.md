@@ -44,7 +44,7 @@ If something's not right, please report it by creating a new issue in the
 [issues page](https://github.com/jmkristian/OutpostForLAARES/issues).
 Please say what browser and what versions of OutpostForLAARES and Windows you used.
 To help isolate the problem, please attach a screenshot of a browser page (if any)
-and all the files from the folder `OutpostForLAARES\bin` whose names end with `.log`.
+and all the files from the folder `OutpostForLAARES\logs`.
 
 Power users might learn more by editing OutpostForLAARES\addons\\*.ini, changing
 each occurrence of ...\wscript.exe ...\OutpostForLAARES\launch.vbs
