@@ -418,7 +418,7 @@ function serve() {
             if (form) {
                 form.quietSeconds += 5;
                 // The client is expected to GET /ping-formId every 30 seconds.
-                if (form.quietSeconds >= 120) {
+                if (form.quietSeconds >= 300) {
                     closeForm(formId);
                 } else {
                     anyOpen = true;
