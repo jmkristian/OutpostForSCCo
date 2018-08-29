@@ -117,7 +117,7 @@ Section "Install"
   # Files to install:
   File launch.cmd
   File launch.vbs
-  File README.md
+  File README.html
   SetOutPath "$INSTDIR\addons"
   File addons\*.launch
   SetOutPath "$INSTDIR\bin"
@@ -171,7 +171,7 @@ Section "Uninstall"
 
   Delete launch.cmd
   Delete launch.vbs
-  Delete README.md
+  Delete README.*
   RMDir /r "$INSTDIR\addons"
   RMDir /r "$INSTDIR\bin"
   RMDir /r "$INSTDIR\logs"
