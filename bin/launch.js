@@ -445,12 +445,8 @@ function onOpen(formId, args) {
         addonName: args[0],
         quietSeconds: 0
     };
-    form.environment = getEnvironment(form.args);
-    form.environment.pingURL = '/ping-' + formId;
-    form.environment.submitURL = '/submit-' + formId;
     openForms[formId] = form;
     console.log('form ' + formId + ' opened');
-    console.log(form.environment);
 }
 
 function keepAlive(formId) {
@@ -473,13 +469,16 @@ function closeForm(formId) {
 
 function getEnvironment(args) {
     var environment = {};
-    if (args && args.length > 0) {
+    if (args && args.length > 1) {
         environment.message_status = args[1];
         for (var i = 2; i + 1 < args.length; i = i + 2) {
             environment[args[i]] = args[i+1];
         }
         if (environment.msgno == '-1') { // a sentinel value
             delete environment.msgno;
+        }
+        if (environment.rxmsgno == '-1') { // a sentinel value
+            delete environment.rxmsgno;
         }
     }
     return environment;
@@ -522,24 +521,26 @@ function onGetForm(formId, res) {
     } else {
         console.log('form ' + formId + ' viewed');
         try {
-            if (form.message == null) {
-                form.message = getMessage(form.environment);
+            if (!form.environment) {
+                form.environment = getEnvironment(form.args);
+                form.environment.pingURL = '/ping-' + formId;
+                form.environment.submitURL = '/submit-' + formId;
+                console.log(form.environment);
             }
-            res.send(getFormHTML(form.environment, form.message));
+            if (form.message == null) {
+                form.message = getMessage(form.environment); // may set environment.filename
+            }
+            if (!form.environment.filename) {
+                throw new Error('form filename is ' + form.environment.filename
+                                + ' from args ' + JSON.stringify(form.args));
+            }
+            var html = fs.readFileSync(path.join(PackItForms, form.environment.filename), ENCODING);
+            html = expandDataIncludes(html, form.environment, form.message);
+            res.send(html);
         } catch(err) {
             res.send(errorToHTML(err));
         }
     }
-}
-
-function getFormHTML(environment, message) {
-    if (!environment.filename) {
-        throw new Error('form filename is ' + environment.filename);
-    }
-    var formFileName = path.join(PackItForms, environment.filename);
-    var html = fs.readFileSync(formFileName, ENCODING);
-    html = expandDataIncludes(html, environment, message);
-    return html;
 }
 
 /* Expand data-include-html elements, for example:
