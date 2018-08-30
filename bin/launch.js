@@ -365,12 +365,12 @@ function serve() {
     app.post('/open', function(req, res, next) {
         if (req.body && req.body.length > 0) {
             const formId = '' + nextFormId++;
-            onOpen(formId, req.body);
+            onOpen(formId, req.body); // req.body is an array, thanks to bodyParser.json
             res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
             res.end(formId, CHARSET);
         } else {
-            res.end(); // with no body
-            // This tells the client not to open a browser page.
+            // This happens when doing a dry-run.
+            res.end(); // with no body tells the client not to open a browser page.
         }
     });
     app.get('/form-:formId', function(req, res, next) {
@@ -440,9 +440,10 @@ function serve() {
 }
 
 function onOpen(formId, args) {
+    // This code should be kept dead simple, since
+    // it can't show a problem to the operator.
     var form = {
         args: args,
-        addonName: args[0],
         quietSeconds: 0
     };
     openForms[formId] = form;
@@ -469,17 +470,18 @@ function closeForm(formId) {
 
 function getEnvironment(args) {
     var environment = {};
-    if (args && args.length > 1) {
-        environment.message_status = args[1];
-        for (var i = 2; i + 1 < args.length; i = i + 2) {
-            environment[args[i]] = args[i+1];
+    for (var i = 0; i < args.length; i++) {
+        var name = args[i];
+        if (name.startsWith('--')) {
+            value = args[++i];
+            environment[name.substring(2)] = value;
         }
-        if (environment.msgno == '-1') { // a sentinel value
-            delete environment.msgno;
-        }
-        if (environment.rxmsgno == '-1') { // a sentinel value
-            delete environment.rxmsgno;
-        }
+    }
+    if (environment.msgno == '-1') { // a sentinel value
+        delete environment.msgno;
+    }
+    if (environment.rxmsgno == '-1') { // a sentinel value
+        delete environment.rxmsgno;
     }
     return environment;
 }
@@ -530,15 +532,17 @@ function onGetForm(formId, res) {
             if (form.message == null) {
                 form.message = getMessage(form.environment); // may set environment.filename
             }
+            if (!form.environment.addon_name) {
+                throw new Error('addon_name is ' + form.environment.addon_name);
+            }
             if (!form.environment.filename) {
-                throw new Error('form filename is ' + form.environment.filename
-                                + ' from args ' + JSON.stringify(form.args));
+                throw new Error('filename is ' + form.environment.filename);
             }
             var html = fs.readFileSync(path.join(PackItForms, form.environment.filename), ENCODING);
             html = expandDataIncludes(html, form.environment, form.message);
             res.send(html);
         } catch(err) {
-            res.send(errorToHTML(err));
+            res.send(errorToHTML(err, form));
         }
     }
 }
@@ -581,7 +585,7 @@ function expandDataInclude(data, environment, message) {
                 {message: JSON.stringify(message), queryDefaults: JSON.stringify(environment)});
         }
         if (formDefaults) {
-            console.log(`default values: ${formDefaults}`);
+            console.log('formDefaultValues: ' + formDefaults);
             result += `<script type="text/javascript">
   var formDefaultValues;
   if (!formDefaultValues) {
@@ -613,7 +617,7 @@ function onSubmit(formId, buffer, res) {
         form.message = message;
         fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
             if (err) {
-                res.send(errorToHTML(err));
+                res.send(errorToHTML(err, form));
             } else {
                 try {
                     fs.unlinkSync(OpdFAIL);
@@ -622,8 +626,8 @@ function onSubmit(formId, buffer, res) {
                 }
                 console.log('form ' + formId + ' submitting');
                 child_process.execFile(
-                    path.join('addons', form.addonName, 'Aoclient.exe'),
-                    ['-a', form.addonName, '-f', msgFileName, '-s', subject],
+                    path.join('addons', form.environment.addon_name, 'Aoclient.exe'),
+                    ['-a', form.environment.addon_name, '-f', msgFileName, '-s', subject],
                     function(err, stdout, stderr) {
                         try {
                             if (err) {
@@ -648,18 +652,18 @@ function onSubmit(formId, buffer, res) {
                                 // Don't closeForm, in case the operator goes back and submits it again.
                             }
                         } catch(err) {
-                            res.send(errorToHTML(err));
+                            res.send(errorToHTML(err, form));
                         }
                     });
             }
         });
     } catch(err) {
-        res.send(errorToHTML(err));
+        res.send(errorToHTML(err, {formId: formId}));
     }
 }
 
-function errorToHTML(err) {
-    const message = encodeHTML((err && err.stack) ? err.stack : err);
+function errorToHTML(state, err) {
+    const message = encodeHTML(((err && err.stack) ? err.stack : err) + '\r\n' + JSON.stringify(state));
     return `<HTML><title>Problem</title><body>
   <h3><img src="icon-warning.png" alt="warning" style="${IconStyle}">&nbsp;&nbsp;Something went wrong.</h3>
   This information might help resolve the problem:<pre>
