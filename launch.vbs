@@ -1,4 +1,4 @@
-' Run bin/launch.exe with the arguments that were passed to this script,
+' Run bin\Outpost_for_LAARES.exe with the arguments that were passed to this script,
 ' the working directory that contains this script and no visible window.
 
 set FSO = CreateObject("Scripting.FileSystemObject")
@@ -7,7 +7,7 @@ my_folder = FSO.GetParentFolderName(Wscript.ScriptFullName)
 
 ' Construct a command line as a string:
 ReDim arguments(WScript.Arguments.Count)
-arguments(0) = FSO.BuildPath(FSO.BuildPath(my_folder, "bin"), "launch.exe")
+arguments(0) = FSO.BuildPath(FSO.BuildPath(my_folder, "bin"), "Outpost_for_LAARES.exe")
 For i = 0 To WScript.Arguments.Count-1
   If Len(WScript.Arguments(i)) = 0 Or InStr(WScript.Arguments(i), " ") > 0 Then
     arguments(i + 1) = Chr(34) & WScript.Arguments(i) & Chr(34)

@@ -5,8 +5,8 @@ if [ ! -e node_modules ]; then
     npm install # https://nodejs.org
     npm install -g pkg@4.2.6 # https://github.com/zeit/pkg
 fi
-pkg -t node4-win-x86 bin/launch.js || exit $?
-mv launch.exe bin/
+pkg -t node4-win-x86 bin/Outpost_for_LAARES.js || exit $?
+mv Outpost_for_LAARES.exe bin/
 
 if [ ! -e pack-it-forms/.git ]; then # Don't delete an experimental copy.
     rm -rf pack-it-forms

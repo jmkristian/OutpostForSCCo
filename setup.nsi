@@ -110,8 +110,8 @@ Section "Install"
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
 
-  # Stop the server (so it will release its lock on bin\launch.exe):
-  ExecShellWait open "bin\launch.exe" "stop" SW_SHOWMINIMIZED
+  # Stop the server (so it will release its lock on bin\Outpost_for_LAARES.exe):
+  ExecShellWait open "bin\Outpost_for_LAARES.exe" "stop" SW_SHOWMINIMIZED
   ClearErrors
 
   # Files to install:
@@ -144,9 +144,9 @@ Section "Install"
   IfFileExists $WSCRIPT_EXE +2
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
 
-  ExecShellWait open "bin\launch.exe" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
+  ExecShellWait open "bin\Outpost_for_LAARES.exe" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
   ${If} ${Errors}
-    Abort "bin\launch.exe install$OUTPOST_DATA failed"
+    Abort "bin\Outpost_for_LAARES.exe install$OUTPOST_DATA failed"
   ${EndIf}
 
   CopyFiles "$OUTPOST_CODE\Aoclient.exe" "$INSTDIR\addons\Los_Altos\Aoclient.exe"
@@ -167,7 +167,7 @@ Section "Uninstall"
 
   # Remove our line from Outpost configuration files
   Call un.FindOutposts
-  ExecShellWait open "bin\launch.exe" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
+  ExecShellWait open "bin\Outpost_for_LAARES.exe" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
 
   Delete launch.cmd
   Delete launch.vbs
