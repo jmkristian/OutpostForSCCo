@@ -103,7 +103,7 @@ if (process.argv.length > 2) {
         stopServer();
         break;
     default:
-        console.error(process.argv[1] + ': unknown verb "' + verb + '"');
+        log(process.argv[1] + ': unknown verb "' + verb + '"');
     }
 }
 
@@ -112,7 +112,7 @@ function install() {
     // might execute it repeatedly while scrutinizing the .exe for viruses.
     const myDirectory = process.cwd();
     const addonNames = getAddonNames('addons');
-    console.log('addons ' + JSON.stringify(addonNames));
+    log('addons ' + JSON.stringify(addonNames));
     installConfigFiles(myDirectory, addonNames);
     installIncludes(myDirectory, addonNames);
 }
@@ -143,15 +143,15 @@ function installIncludes(myDirectory, addonNames) {
         if (!fs.existsSync(outpostLaunch)) {
             fs.writeFile(outpostLaunch, myIncludes.join(EOL) + EOL, {encoding: ENCODING}, function(err) {
                 if (err) {
-                    console.error(err); // tolerable
+                    log(err); // tolerable
                 } else {
-                    console.log('included into ' + outpostLaunch);
+                    log('included into ' + outpostLaunch);
                 }
             });
         } else {
             fs.readFile(outpostLaunch, ENCODING, function(err, data) {
                 if (err) {
-                    console.error(err); // tolerable
+                    log(err); // tolerable
                 } else {
                     var oldLines = data.split(/[\r\n]+/);
                     var newLines = [];
@@ -172,13 +172,13 @@ function installIncludes(myDirectory, addonNames) {
                     }
                     var newData = newLines.join(EOL) + EOL;
                     if (newData == data) {
-                        console.log('already included into ' + outpostLaunch);
+                        log('already included into ' + outpostLaunch);
                     } else {
                         fs.writeFile(outpostLaunch, newData, {encoding: ENCODING}, function(err) {
                             if (err) {
-                                console.error(err); // tolerable
+                                log(err); // tolerable
                             } else {
-                                console.log('included into ' + outpostLaunch);
+                                log('included into ' + outpostLaunch);
                             }
                         }); 
                     }
@@ -191,7 +191,7 @@ function installIncludes(myDirectory, addonNames) {
 function uninstall() {
     stopServer(function() {
         const addonNames = getAddonNames('addons');
-        console.log('addons ' + JSON.stringify(addonNames));
+        log('addons ' + JSON.stringify(addonNames));
         for (a = 3; a < process.argv.length; a++) {
             var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
             if (fs.existsSync(outpostLaunch)) {
@@ -203,15 +203,15 @@ function uninstall() {
                     var myInclude = new RegExp('[\r\n]+INCLUDE\\s+' + myLaunch + '[\r\n]+', 'gi');
                     fs.readFile(outpostLaunch, ENCODING, function(err, data) {
                         if (err) {
-                            console.error(err);
+                            log(err);
                         } else {
                             var newData = data.replace(myInclude1, '').replace(myInclude, EOL);
                             if (newData != data) {
                                 fs.writeFile(outpostLaunch, newData, {encoding: ENCODING}, function(err) {
                                     if (err) {
-                                        console.error(err);
+                                        log(err);
                                     } else {
-                                        console.log('removed ' + addonName + ' from ' + outpostLaunch);
+                                        log('removed ' + addonName + ' from ' + outpostLaunch);
                                     }
                                 });
                             }
@@ -284,9 +284,9 @@ function openForm(retry, args) {
 }
 
 function openFormFailed(err, retry, args) {
-    console.log(err);
+    log(err);
     if (retry >= 6) {
-        console.error(retry + ' attempts failed ' + JSON.stringify(args));
+        log(retry + ' attempts failed ' + JSON.stringify(args));
         logAndAbort('Goodbye.');
     } else {
         if (retry == 0 || retry == 3) {
@@ -299,14 +299,14 @@ function openFormFailed(err, retry, args) {
 
 function startServer(andThen) {
     const command = 'start "Outpost for LAARES" /MIN bin\\launch.exe serve';
-    console.log(command);
+    log(command);
     child_process.exec(
         command,
         {windowsHide: true},
         function(err, stdout, stderr) {
             if (err) {
-                console.error(err);
-                console.error(stdout.toString(ENCODING) + stderr.toString(ENCODING));
+                log(err);
+                log(stdout.toString(ENCODING) + stderr.toString(ENCODING));
             }
             if (andThen) {
                 andThen();
@@ -338,14 +338,14 @@ function stopServer(andThen) {
 
 function startBrowserAndExit(port, path) {
     const command = 'start "Browse" /B http://127.0.0.1:' + port + path;
-    console.log(command);
+    log(command);
     child_process.exec(
         command,
         function(err, stdout, stderr) {
             if (err) {
-                console.error(err);
+                log(err);
             }
-            console.log(stdout.toString(ENCODING) + stderr.toString(ENCODING));
+            log(stdout.toString(ENCODING) + stderr.toString(ENCODING));
             process.exit(0);
         });
 }
@@ -360,7 +360,7 @@ function serve() {
     console.log('It will run as long as you have forms open, and stop a few minutes later.');
     const app = express();
     app.set('etag', false); // convenient for troubleshooting
-    app.use(morgan('tiny'));
+    app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
     app.use(bodyParser.json({type: JSON_TYPE}));
     app.post('/open', function(req, res, next) {
         if (req.body && req.body.length > 0) {
@@ -409,7 +409,7 @@ function serve() {
     console.log('Detailed information about its activity can be seen in');
     console.log(logFileName);
     logToFile(logFileName);
-    console.log('Listening for HTTP requests on port ' + address.port + '...');
+    log('Listening for HTTP requests on port ' + address.port + '...');
     const checkSilent = setInterval(function() {
         // Scan openForms and close any that have been quiet too long.
         var anyOpen = false;
@@ -426,7 +426,7 @@ function serve() {
             }
         }
         if (!anyOpen) {
-            console.log('forms are all closed');
+            log('forms are all closed');
             clearInterval(checkSilent);
             server.close();
             fs.readFile(PortFileName, {encoding: ENCODING}, function(err, data) {
@@ -447,7 +447,7 @@ function onOpen(formId, args) {
         quietSeconds: 0
     };
     openForms[formId] = form;
-    console.log('form ' + formId + ' opened');
+    log('form ' + formId + ' opened');
 }
 
 function keepAlive(formId) {
@@ -460,7 +460,7 @@ function keepAlive(formId) {
 function closeForm(formId) {
     var form = openForms[formId];
     if (form) {
-        console.log('form ' + formId + ' closed');
+        log('form ' + formId + ' closed');
         if (form.environment && form.environment.MSG_FILENAME) {
             fs.unlink(form.environment.MSG_FILENAME, function(err) {});
         }
@@ -518,16 +518,16 @@ function onGetForm(formId, res) {
     res.set({'Content-Type': 'text/html; charset=' + CHARSET});
     var form = openForms[formId];
     if (!form) {
-        console.log('form ' + formId + ' is not open');
+        log('form ' + formId + ' is not open');
         res.sendStatus(NOT_FOUND);
     } else {
-        console.log('form ' + formId + ' viewed');
+        log('form ' + formId + ' viewed');
         try {
             if (!form.environment) {
                 form.environment = getEnvironment(form.args);
                 form.environment.pingURL = '/ping-' + formId;
                 form.environment.submitURL = '/submit-' + formId;
-                console.log(form.environment);
+                log(form.environment);
             }
             if (form.message == null) {
                 form.message = getMessage(form.environment); // may set environment.filename
@@ -585,7 +585,7 @@ function expandDataInclude(data, environment, message) {
                 {message: JSON.stringify(message), queryDefaults: JSON.stringify(environment)});
         }
         if (formDefaults) {
-            console.log('formDefaultValues: ' + formDefaults);
+            log('formDefaultValues: ' + formDefaults);
             result += `<script type="text/javascript">
   var formDefaultValues;
   if (!formDefaultValues) {
@@ -624,7 +624,7 @@ function onSubmit(formId, buffer, res) {
                 } catch(err) {
                     // ignored
                 }
-                console.log('form ' + formId + ' submitting');
+                log('form ' + formId + ' submitting');
                 child_process.execFile(
                     path.join('addons', form.environment.addon_name, 'Aoclient.exe'),
                     ['-a', form.environment.addon_name, '-f', msgFileName, '-s', subject],
@@ -647,7 +647,7 @@ function onSubmit(formId, buffer, res) {
                                 res.redirect('/form-' + formId);
                                     ... which causes the 'back' button to display a read-only form.
                                 */
-                                console.log('form ' + formId + ' submitted');
+                                log('form ' + formId + ' submitted');
                                 fs.unlinkSync(msgFileName);
                                 // Don't closeForm, in case the operator goes back and submits it again.
                             }
@@ -681,7 +681,7 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
                 var fullName = path.join(directoryName, fileName);
                 fs.stat(fullName, function(err, stats) {
                     if (err) {
-                        console.log(err);
+                        log(err);
                     } else if (stats.isFile() && stats.mtimeMs < deadline) {
                         fs.unlink(fullName, function(err) {});
                     }
@@ -739,8 +739,29 @@ function expandVariables(data, values) {
     return data;
 }
 
+function log(data) {
+    var message;
+    switch(typeof data) {
+    case 'string':
+        message = data;
+        break;
+    case 'object':
+        if (data == null) {
+            message = 'null';
+        } else if (data instanceof Error && data.stack) {
+            message = data.stack;
+        } else {
+            message = JSON.stringify(data);
+        }
+        break;
+    default:
+        message = '' + data;
+    }
+    console.log('[' + new Date().toISOString() + '] ' + message);
+}
+
 function logAndAbort(err) {
-    console.log(err);
+    log(err);
     process.exit(1);
 }
 
