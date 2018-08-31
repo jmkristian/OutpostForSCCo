@@ -245,59 +245,59 @@ function openMessage() {
     for (var i = 3; i < process.argv.length; i++) {
         args.push(process.argv[i]);
     }
-    if (fs.existsSync(PortFileName)) {
-        openForm(0, args);
-    } else {
-        // There's definitely no server running. Start one now:
-        startServer(function() {setTimeout(openForm, 500, 0, args);});
+    var retries = 0;
+    function tryNow() {
+        try {
+            openForm(args, tryLater);
+        } catch(err) {
+            tryLater(err);
+        }
     }
+    function tryLater(err) {
+        if (err) log(err);
+        if (retries >= 6) {
+            log(retries + ' retries failed ' + JSON.stringify(args));
+            logAndAbort('Goodbye.');
+        } else {
+            ++retries;
+            if (retries == 1 || retries == 4) {
+                startServer(); // in case the old server died or stalled
+            }
+            setTimeout(tryNow, retries * 1000);
+        }
+    }
+    tryNow();
 }
 
-function openForm(retry, args) {
-    try {
+function openForm(args, tryLater) {
+    if (!fs.existsSync(PortFileName)) {
+        // There's definitely no server running. Start one now:
+        tryLater("Starting server...");
+    } else {
         var options = {host: LOCALHOST,
                        port: parseInt(fs.readFileSync(PortFileName, ENCODING)),
                        method: 'POST',
                        path: '/open',
                        headers: {'Content-Type': JSON_TYPE + '; charset=' + CHARSET}};
         var req = http.request(options, function(res) {
-            var data = '';
-            res.on('data', function(chunk) {
-                data += chunk.toString(CHARSET);
-            });
-            res.on('end', function() {
-                data = data.trim();
+            res.on('aborted', tryLater);
+            res.pipe(concat_stream(function(buffer) {
+                var data = buffer.toString(CHARSET).trim();
                 if (data) {
                     startBrowserAndExit(options.port, '/form-' + data);
                 } else {
                     process.exit(0); // This was just a dry run.
                 }
-            });
+            }));
         });
-        req.on('error', function(err) {
-            openFormFailed(err, retry, args);
-        });
+        req.on('abort', tryLater);
+        req.on('error', tryLater);
+        req.on('timeout', tryLater);
         req.end(JSON.stringify(args), CHARSET);
-    } catch(err) {
-        openFormFailed(err, retry, args);
     }
 }
 
-function openFormFailed(err, retry, args) {
-    log(err);
-    if (retry >= 6) {
-        log(retry + ' attempts failed ' + JSON.stringify(args));
-        logAndAbort('Goodbye.');
-    } else {
-        if (retry == 0 || retry == 3) {
-            startServer(); // in case the old server died or stalled
-        }
-        retry++;
-        setTimeout(openForm, retry * 1000, retry, args);
-    }
-}
-
-function startServer(andThen) {
+function startServer() {
     const command = 'start "Outpost for LAARES" /MIN '
           + path.join('bin', 'Outpost_for_LAARES.exe')
           + ' serve';
@@ -309,9 +309,6 @@ function startServer(andThen) {
             if (err) {
                 log(err);
                 log(stdout.toString(ENCODING) + stderr.toString(ENCODING));
-            }
-            if (andThen) {
-                andThen();
             }
         });
 }
@@ -664,8 +661,8 @@ function onSubmit(formId, buffer, res) {
     }
 }
 
-function errorToHTML(state, err) {
-    const message = encodeHTML(((err && err.stack) ? err.stack : err) + '\r\n' + JSON.stringify(state));
+function errorToHTML(err, state) {
+    const message = encodeHTML(errorToMessage(err) + '\r\n' + JSON.stringify(state));
     return `<HTML><title>Problem</title><body>
   <h3><img src="icon-warning.png" alt="warning" style="${IconStyle}">&nbsp;&nbsp;Something went wrong.</h3>
   This information might help resolve the problem:<pre>
@@ -741,24 +738,20 @@ function expandVariables(data, values) {
     return data;
 }
 
-function log(data) {
-    var message;
-    switch(typeof data) {
-    case 'string':
-        message = data;
-        break;
-    case 'object':
-        if (data == null) {
-            message = 'null';
-        } else if (data instanceof Error && data.stack) {
-            message = data.stack;
-        } else {
-            message = JSON.stringify(data);
-        }
-        break;
-    default:
-        message = '' + data;
+function errorToMessage(err) {
+    if (err == null) {
+        return 'null';
+    } else if (err instanceof Error && err.stack) {
+        return err.stack;
+    } else if (typeof err == 'string') {
+        return err;
+    } else {
+        return JSON.stringify(err);
     }
+}
+
+function log(data) {
+    var message = (typeof data == 'object') ? errorToMessage(data) : ('' + data);
     console.log('[' + new Date().toISOString() + '] ' + message);
 }
 
