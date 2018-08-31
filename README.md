@@ -7,8 +7,8 @@ to Outpost, and a web browser to display and edit forms.
 ### Installation
 
 Install Outpost before installing this software.
-Then, get an OutpostForLAARES*.exe file from the
-[downloads page](https://github.com/jmkristian/OutpostForLAARES/releases)
+Then, download an OutpostForLAARES*.exe file from the
+[releases page](https://github.com/jmkristian/OutpostForLAARES/releases)
 and execute it. After installation is complete, exit and restart Outpost.
 
 Uninstall as you would any program.
