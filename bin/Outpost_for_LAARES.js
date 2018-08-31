@@ -100,7 +100,7 @@ if (process.argv.length > 2) {
         openMessage();
         break;
     case 'stop':
-        stopServer();
+        stopServers(function() {});
         break;
     default:
         log(process.argv[1] + ': unknown verb "' + verb + '"');
@@ -142,11 +142,7 @@ function installIncludes(myDirectory, addonNames) {
         // Upsert myIncludes into outpostLaunch:
         if (!fs.existsSync(outpostLaunch)) {
             fs.writeFile(outpostLaunch, myIncludes.join(EOL) + EOL, {encoding: ENCODING}, function(err) {
-                if (err) {
-                    log(err); // tolerable
-                } else {
-                    log('included into ' + outpostLaunch);
-                }
+                log(err ? err : 'included into ' + outpostLaunch);
             });
         } else {
             fs.readFile(outpostLaunch, ENCODING, function(err, data) {
@@ -175,11 +171,7 @@ function installIncludes(myDirectory, addonNames) {
                         log('already included into ' + outpostLaunch);
                     } else {
                         fs.writeFile(outpostLaunch, newData, {encoding: ENCODING}, function(err) {
-                            if (err) {
-                                log(err); // tolerable
-                            } else {
-                                log('included into ' + outpostLaunch);
-                            }
+                            log(err ? err : ('included into ' + outpostLaunch));
                         }); 
                     }
                 }
@@ -189,7 +181,7 @@ function installIncludes(myDirectory, addonNames) {
 }
 
 function uninstall() {
-    stopServer(function() {
+    stopServers(function() {
         const addonNames = getAddonNames('addons');
         log('addons ' + JSON.stringify(addonNames));
         for (a = 3; a < process.argv.length; a++) {
@@ -208,11 +200,7 @@ function uninstall() {
                             var newData = data.replace(myInclude1, '').replace(myInclude, EOL);
                             if (newData != data) {
                                 fs.writeFile(outpostLaunch, newData, {encoding: ENCODING}, function(err) {
-                                    if (err) {
-                                        log(err);
-                                    } else {
-                                        log('removed ' + addonName + ' from ' + outpostLaunch);
-                                    }
+                                    log(err ? err : ('removed ' + addonName + ' from ' + outpostLaunch));
                                 });
                             }
                         }
@@ -254,7 +242,7 @@ function openMessage() {
         }
     }
     function tryLater(err) {
-        if (err) log(err);
+        log(err);
         if (retries >= 6) {
             log(retries + ' retries failed ' + JSON.stringify(args));
             logAndAbort('Goodbye.');
@@ -313,26 +301,55 @@ function startServer() {
         });
 }
 
-function stopServer(andThen) {
-    function next(err) {
-        if (andThen) {
-            andThen();
-        }
-    }
+
+function stopServers(andThen) {
     try {
-        var options = {host: LOCALHOST,
-                       port: parseInt(fs.readFileSync(PortFileName, ENCODING)),
-                       method: 'POST',
-                       path: '/stop'};
-        var req = http.request(options, function(res) {
-            res.on('data', function(chunk) {});
-            res.on('end', next);
-        });
-        req.on('error', next);
-        req.end();
+        // Find the port numbers of all servers (including stopped servers):
+        var ports = [];
+        const fileNames = fs.readdirSync('logs', {encoding: ENCODING});
+        for (var f in fileNames) {
+            var fileName = fileNames[f];
+            var found = /^server-(\d*)\.log$/.exec(fileName);
+            if (found && found[1]) {
+                ports.push(found[1]);
+            }
+        }
+        fs.unlink(PortFileName, log);
+        var forked = ports.length;
+        function join(err) {
+            log(err);
+            if (--forked <= 0) {
+                andThen();
+            }
+        }
+        for (var p in ports) {
+            try {
+                stopServer(parseInt(ports[p]), join);
+            } catch(err) {
+                join(err);
+            }
+        }
     } catch(err) {
-        next(err);
+        log(err);
+        andThen();
     }
+}
+
+function stopServer(port, next) {
+    var options = {host: LOCALHOST,
+                   port: port,
+                   method: 'GET',
+                   path: '/stopOutpostForLAARES'};
+    var req = http.request(options, function(res) {
+        res.on('data', function(chunk) {});
+        res.on('aborted', next);
+        res.on('end', next);
+    });
+    req.on('abort', next);
+    req.on('error', next);
+    req.on('timeout', next);
+    log('stopping server on port ' + port);
+    req.end();
 }
 
 function startBrowserAndExit(port, path) {
@@ -341,9 +358,7 @@ function startBrowserAndExit(port, path) {
     child_process.exec(
         command,
         function(err, stdout, stderr) {
-            if (err) {
-                log(err);
-            }
+            log(err);
             log(stdout.toString(ENCODING) + stderr.toString(ENCODING));
             process.exit(0);
         });
@@ -395,7 +410,9 @@ function serve() {
         res.statusCode = NOT_FOUND;
         res.end(); // with no body
     });
-    app.post('/stop', function(req, res, next) {
+    app.get('/stopOutpostForLAARES', function(req, res, next) {
+        res.end(); // with no body
+        log('stopped');
         process.exit(0);
     });
     app.get(/^\/.*/, express.static(PackItForms));
@@ -430,7 +447,7 @@ function serve() {
             server.close();
             fs.readFile(PortFileName, {encoding: ENCODING}, function(err, data) {
                 if (data.trim() == (address.port + '')) {
-                    fs.unlink(PortFileName, function(err) {});
+                    fs.unlink(PortFileName, log);
                 }
                 process.exit(0);
             });
@@ -461,7 +478,7 @@ function closeForm(formId) {
     if (form) {
         log('form ' + formId + ' closed');
         if (form.environment && form.environment.MSG_FILENAME) {
-            fs.unlink(form.environment.MSG_FILENAME, function(err) {});
+            fs.unlink(form.environment.MSG_FILENAME, log);
         }
     }
     delete openForms[formId];
@@ -682,7 +699,7 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
                     if (err) {
                         log(err);
                     } else if (stats.isFile() && stats.mtimeMs < deadline) {
-                        fs.unlink(fullName, function(err) {});
+                        fs.unlink(fullName, log);
                     }
                 });
             }
@@ -740,7 +757,7 @@ function expandVariables(data, values) {
 
 function errorToMessage(err) {
     if (err == null) {
-        return 'null';
+        return null;
     } else if (err instanceof Error && err.stack) {
         return err.stack;
     } else if (typeof err == 'string') {
@@ -751,8 +768,10 @@ function errorToMessage(err) {
 }
 
 function log(data) {
-    var message = (typeof data == 'object') ? errorToMessage(data) : ('' + data);
-    console.log('[' + new Date().toISOString() + '] ' + message);
+    if (data) {
+        var message = (typeof data == 'object') ? errorToMessage(data) : ('' + data);
+        console.log('[' + new Date().toISOString() + '] ' + message);
+    }
 }
 
 function logAndAbort(err) {
