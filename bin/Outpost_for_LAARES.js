@@ -406,7 +406,7 @@ function serve() {
     const server = app.listen(0);
     const address = server.address();
     fs.writeFileSync(PortFileName, address.port + '', {encoding: ENCODING}); // advertise my port
-    deleteOldFiles('bin', /^server-\d*\.log$/, LogFileAgeLimitMs);
+    deleteOldFiles('logs', /^server-\d*\.log$/, LogFileAgeLimitMs);
     const logFileName = path.resolve('logs', 'server-' + address.port + '.log');
     console.log('Detailed information about its activity can be seen in');
     console.log(logFileName);
