@@ -268,6 +268,7 @@ function openForm(args, tryLater) {
                    path: '/open',
                    headers: {'Content-Type': JSON_TYPE + '; charset=' + CHARSET}};
     request(options, function(err, data) {
+        data = data && data.trim();
         if (err) {
             tryLater(err);
         } else if (data) {
@@ -296,7 +297,7 @@ function startServer() {
         });
 }
 
-function stopServers(andThen) {
+function stopServers(next) {
     try {
         // Find the port numbers of all servers (including stopped servers):
         var ports = [];
@@ -313,7 +314,7 @@ function stopServers(andThen) {
         function join(err) {
             log(err);
             if (--forked <= 0) {
-                andThen();
+                next();
             }
         }
         for (var p in ports) {
@@ -325,7 +326,7 @@ function stopServers(andThen) {
         }
     } catch(err) {
         log(err);
-        andThen();
+        next();
     }
 }
 
