@@ -7,15 +7,33 @@ to Outpost, and a web browser to display and edit forms.
 ### Installation
 
 Install Outpost before installing this software.
-Then, download an OutpostForLAARES*.exe file from the
+Then, download an OutpostForLAARES*.exe installer from the
 [releases page](https://github.com/jmkristian/OutpostForLAARES/releases)
-and execute it. After installation is complete, exit and restart Outpost.
+and run it. After installation is complete, exit and restart Outpost.
+
+Antivirus or firewall products may resist installation, since
+OutpostForLAARES isn't in their databases of trusted software.
+Here's how to override them:
+
+* Windows Smart Screen may prevent an "unrecognized app" from starting.
+Click "More Info" and then "Run Anyway."
+
+* Norton Security may quarantine the installer. Open the Norton Security program,
+click "Security", click "History", select "Show Quarantine" and restore the installer.
+
+* Avast Antivirus may say "this file may contain something bad."
+After a minute, it might simply say "no problems found" and continue, without your intervention.
+Or it might show a link you can click to run the program anyway.
+
+* Comodo Firewall may ask whether to allow the software to do things.
+For the OutpostForLAARES_Setup.exe installer program, click "Treat as Installer or Updater."
+For the bin\\Outpost_for_LAARES.exe program, check "Remember my answer" and click "Allow."
 
 Uninstall as you would any program.
 For example on Windows 8, open the control panel "Programs and Features",
 select "Outpost for LAARES" and click "Uninstall".
 If you don't see Outpost for LAARES in the control panel, try closing and re-opening the control panel.
-If that fails, try running the program uninstall.exe in the OutpostForLAARES folder.
+If that fails, try runninng the program uninstall.exe in the OutpostForLAARES folder.
 After uninstallation is complete, exit and restart Outpost.
 
 For a
