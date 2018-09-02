@@ -3,10 +3,10 @@
 cd `dirname "$0"` || exit $?
 if [ ! -e node_modules ]; then
     npm install # https://nodejs.org
-    npm install -g pkg@4.2.6 # https://github.com/zeit/pkg
+    npm install --global pkg@4.2.6 # https://github.com/zeit/pkg
 fi
-pkg -t node4-win-x86 bin/Outpost_for_LAARES.js || exit $?
-mv Outpost_for_LAARES.exe bin/
+pkg.cmd -t node4-win-x86 bin/Outpost_for_LAARES.js || exit $?
+mv Outpost_for_LAARES.exe bin/ || exit $?
 
 if [ ! -e pack-it-forms/.git ]; then # Don't delete an experimental copy.
     rm -rf pack-it-forms
