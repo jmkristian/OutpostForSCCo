@@ -249,7 +249,7 @@ function openMessage() {
         } else {
             ++retries;
             if (retries == 1 || retries == 4) {
-                startServer(); // in case the old server died or stalled
+                startServer();
             }
             setTimeout(tryNow, retries * 1000);
         }
@@ -260,29 +260,22 @@ function openMessage() {
 function openForm(args, tryLater) {
     if (!fs.existsSync(PortFileName)) {
         // There's definitely no server running. Start one now:
-        tryLater("Starting server...");
-    } else {
-        var options = {host: LOCALHOST,
-                       port: parseInt(fs.readFileSync(PortFileName, ENCODING)),
-                       method: 'POST',
-                       path: '/open',
-                       headers: {'Content-Type': JSON_TYPE + '; charset=' + CHARSET}};
-        var req = http.request(options, function(res) {
-            res.on('aborted', tryLater);
-            res.pipe(concat_stream(function(buffer) {
-                var data = buffer.toString(CHARSET).trim();
-                if (data) {
-                    startBrowserAndExit(options.port, '/form-' + data);
-                } else {
-                    process.exit(0); // This was just a dry run.
-                }
-            }));
-        });
-        req.on('abort', tryLater);
-        req.on('error', tryLater);
-        req.on('timeout', tryLater);
-        req.end(JSON.stringify(args), CHARSET);
+        throw PortFileName + " doesn't exist";
     }
+    var options = {host: LOCALHOST,
+                   port: parseInt(fs.readFileSync(PortFileName, ENCODING)),
+                   method: 'POST',
+                   path: '/open',
+                   headers: {'Content-Type': JSON_TYPE + '; charset=' + CHARSET}};
+    request(options, function(err, data) {
+        if (err) {
+            tryLater(err);
+        } else if (data) {
+            startBrowserAndExit(options.port, '/form-' + data);
+        } else {
+            process.exit(0); // This was just a dry run.
+        }
+    }).end(JSON.stringify(args), CHARSET);
 }
 
 function startServer() {
@@ -294,13 +287,14 @@ function startServer() {
         command,
         {windowsHide: true},
         function(err, stdout, stderr) {
-            if (err) {
-                log(err);
-                log(stdout.toString(ENCODING) + stderr.toString(ENCODING));
-            }
+            // Sadly, this code is never executed.
+            // It appears that the underlying system call blocks until
+            // the server terminates, or perhaps a long time elapses.
+            // So, don't put code here that's needed to make progress.
+            log(err);
+            log('started server ' + stdout.toString(ENCODING) + stderr.toString(ENCODING));
         });
 }
-
 
 function stopServers(andThen) {
     try {
@@ -336,20 +330,33 @@ function stopServers(andThen) {
 }
 
 function stopServer(port, next) {
-    var options = {host: LOCALHOST,
-                   port: port,
-                   method: 'GET',
-                   path: '/stopOutpostForLAARES'};
-    var req = http.request(options, function(res) {
-        res.on('data', function(chunk) {});
-        res.on('aborted', next);
-        res.on('end', next);
-    });
-    req.on('abort', next);
-    req.on('error', next);
-    req.on('timeout', next);
     log('stopping server on port ' + port);
-    req.end();
+    request({host: LOCALHOST,
+             port: port,
+             method: 'GET',
+             path: '/stopOutpostForLAARES'},
+            next).end();
+}
+
+function request(options, callback) {
+    function onError(event) {
+        return function(err) {
+            (callback || log)(err || event);
+        }
+    }
+    var req = http.request(options, function(res) {
+        res.on('aborted', onError('aborted'));
+        res.pipe(concat_stream(function(buffer) {
+            var data = buffer.toString(CHARSET);
+            if (callback) {
+                callback(null, data);
+            }
+        }));
+    });
+    req.on('abort', onError('abort'));
+    req.on('error', onError('error'));
+    req.on('timeout', onError('timeout'));
+    return req;
 }
 
 function startBrowserAndExit(port, path) {
@@ -359,7 +366,7 @@ function startBrowserAndExit(port, path) {
         command,
         function(err, stdout, stderr) {
             log(err);
-            log(stdout.toString(ENCODING) + stderr.toString(ENCODING));
+            log('started browser ' + stdout.toString(ENCODING) + stderr.toString(ENCODING));
             process.exit(0);
         });
 }
