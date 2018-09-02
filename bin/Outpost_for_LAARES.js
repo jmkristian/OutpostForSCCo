@@ -66,18 +66,20 @@ const path = require('path');
 const querystring = require('querystring');
 const Transform = require('stream').Transform;
 
-const ENCODING = 'utf-8'; // for reading from files
+const CHARSET = 'utf-8'; // for HTTP
+const ENCODING = CHARSET; // for reading from files
 const EOL = '\r\n';
-const CHARSET = ENCODING; // for HTTP
+const IconStyle = 'width:24pt;height:24pt;vertical-align:middle;';
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
+const LogFileAgeLimitMs = 1000 * 60 * 60 * 24; // 24 hours
 const NOT_FOUND = 404;
 const OpdFAIL = 'OpdFAIL';
+const OpenOutpostMessge = '/openOutpostMessage';
 const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join('logs', 'server-port.txt');
-const LogFileAgeLimitMs = 1000 * 60 * 60 * 24; // 24 hours
-const IconStyle = 'width:24pt;height:24pt;vertical-align:middle;';
+const StopServer = '/stopOutpostForLAARES';
 
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
@@ -265,7 +267,7 @@ function openForm(args, tryLater) {
     var options = {host: LOCALHOST,
                    port: parseInt(fs.readFileSync(PortFileName, ENCODING)),
                    method: 'POST',
-                   path: '/open',
+                   path: OpenOutpostMessage,
                    headers: {'Content-Type': JSON_TYPE + '; charset=' + CHARSET}};
     request(options, function(err, data) {
         data = data && data.trim();
@@ -334,8 +336,8 @@ function stopServer(port, next) {
     log('stopping server on port ' + port);
     request({host: LOCALHOST,
              port: port,
-             method: 'GET',
-             path: '/stopOutpostForLAARES'},
+             method: 'POST',
+             path: StopServer},
             next).end();
 }
 
@@ -384,7 +386,7 @@ function serve() {
     app.set('etag', false); // convenient for troubleshooting
     app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
     app.use(bodyParser.json({type: JSON_TYPE}));
-    app.post('/open', function(req, res, next) {
+    app.post(OpenOutpostMessage, function(req, res, next) {
         if (req.body && req.body.length > 0) {
             const formId = '' + nextFormId++;
             onOpen(formId, req.body); // req.body is an array, thanks to bodyParser.json
@@ -418,7 +420,7 @@ function serve() {
         res.statusCode = NOT_FOUND;
         res.end(); // with no body
     });
-    app.get('/stopOutpostForLAARES', function(req, res, next) {
+    app.post(StopServer, function(req, res, next) {
         res.end(); // with no body
         log('stopped');
         process.exit(0);
