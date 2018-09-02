@@ -9,11 +9,11 @@ my_folder = FSO.GetParentFolderName(Wscript.ScriptFullName)
 ReDim arguments(WScript.Arguments.Count)
 arguments(0) = FSO.BuildPath(FSO.BuildPath(my_folder, "bin"), "Outpost_for_LAARES.exe")
 For i = 0 To WScript.Arguments.Count-1
-  If Len(WScript.Arguments(i)) = 0 Or InStr(WScript.Arguments(i), " ") > 0 Then
-    arguments(i + 1) = Chr(34) & WScript.Arguments(i) & Chr(34)
-  Else
-    arguments(i + 1) = WScript.Arguments(i)
+  arg = WScript.Arguments(i)
+  If Len(arg) = 0 Or InStr(arg, " ") > 0 Or InStr(arg, Chr(34)) > 0 Then
+    arg = Chr(34) & replace(arg, Chr(34), Chr(34) & Chr(34)) & Chr(34)
   End If
+  arguments(i + 1) = arg
 Next
 command_line = Join(arguments)
 ' WScript.Echo command_line
