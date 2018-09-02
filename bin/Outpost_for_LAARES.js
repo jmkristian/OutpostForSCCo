@@ -75,7 +75,7 @@ const LOCALHOST = '127.0.0.1';
 const LogFileAgeLimitMs = 1000 * 60 * 60 * 24; // 24 hours
 const NOT_FOUND = 404;
 const OpdFAIL = 'OpdFAIL';
-const OpenOutpostMessge = '/openOutpostMessage';
+const OpenOutpostMessage = '/openOutpostMessage';
 const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join('logs', 'server-port.txt');
@@ -269,6 +269,9 @@ function openForm(args, tryLater) {
                    method: 'POST',
                    path: OpenOutpostMessage,
                    headers: {'Content-Type': JSON_TYPE + '; charset=' + CHARSET}};
+    var postData = JSON.stringify(args);
+    log('http://' + options.host + ':' + options.port
+        + ' ' + options.method + ' ' + OpenOutpostMessage + ' ' + postData);
     request(options, function(err, data) {
         data = data && data.trim();
         if (err) {
@@ -278,7 +281,7 @@ function openForm(args, tryLater) {
         } else {
             process.exit(0); // This was just a dry run.
         }
-    }).end(JSON.stringify(args), CHARSET);
+    }).end(postData, CHARSET);
 }
 
 function startServer() {
