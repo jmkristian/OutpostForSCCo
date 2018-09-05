@@ -15,7 +15,7 @@
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
 Name "Los Altos ARES" "Outpost forms"
-OutFile "OutpostForLAARES_Setup-0.7.exe"
+OutFile "OutpostForLAARES_Setup-0.8.exe"
 
 Page directory
 Page instfiles
@@ -133,9 +133,9 @@ Section "Install"
   WriteRegStr   HKLM "${REG_SUBKEY}" UninstallString "$\"$INSTDIR\uninstall.exe$\""
   WriteRegStr   HKLM "${REG_SUBKEY}" Publisher "Los Altos ARES"
   WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "https://github.com/jmkristian/OutpostforLAARES/blob/master/README.md"
-  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayVersion "0.7"
+  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayVersion "0.8"
   WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMajor 0
-  WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMinor 7
+  WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMinor 8
   WriteRegDWORD HKLM "${REG_SUBKEY}" NoModify 1
   WriteRegDWORD HKLM "${REG_SUBKEY}" NoRepair 1
   WriteRegDWORD HKLM "${REG_SUBKEY}" EstimatedSize 15000
