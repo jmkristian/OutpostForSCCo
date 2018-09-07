@@ -523,30 +523,14 @@ function getMessage(environment) {
         // Outpost sometimes appends junk to the end of message.
         // One observed case was "You have new messages."
         message = message.replace(/[\r\n]\s*!\/ADDON!.*$/, '');
-        var found = /[\r\n]\s*MsgNo:\s*\[([^\]]*)\]/.exec(message);
-        if (found) {
-            // The MsgNo field is set by the sender.
-            if (isReceivedMessage(environment.message_status)) {
-                // Show MsgNo as "Sender's Message Number":
-                environment.txmsgno = found[1];
-                // environment.msgno is already set, thanks to addon.ini.
-            } else {
-                // Show MsgNo as "My Message Number":
-                environment.msgno = found[1];
-            }
-        }
         if (!environment.filename) {
-            found = /[\r\n]#\s*FORMFILENAME:([^\r\n]*)[\r\n]/.exec(message);
+            var found = /[\r\n]#\s*FORMFILENAME:([^\r\n]*)[\r\n]/.exec(message);
             if (found) {
                 environment.filename = found[1].trim();
             }
         }
     }
     return message;
-}
-
-function isReceivedMessage(status) {
-    return status == 'unread' || status == 'read';
 }
 
 /** Handle an HTTP GET /form-id request. */
