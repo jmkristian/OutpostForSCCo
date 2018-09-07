@@ -65,6 +65,7 @@ const morgan = require('morgan');
 const path = require('path');
 const querystring = require('querystring');
 const Transform = require('stream').Transform;
+const util = require('util');
 
 const CHARSET = 'utf-8'; // for HTTP
 const ENCODING = CHARSET; // for reading from files
@@ -265,7 +266,7 @@ function openForm(args, tryLater) {
         throw PortFileName + " doesn't exist";
     }
     var options = {host: LOCALHOST,
-                   port: parseInt(fs.readFileSync(PortFileName, ENCODING)),
+                   port: parseInt(fs.readFileSync(PortFileName, ENCODING), 10),
                    method: 'POST',
                    path: OpenOutpostMessage,
                    headers: {'Content-Type': JSON_TYPE + '; charset=' + CHARSET}};
@@ -324,7 +325,7 @@ function stopServers(next) {
         }
         for (var p in ports) {
             try {
-                stopServer(parseInt(ports[p]), join);
+                stopServer(parseInt(ports[p], 10), join);
             } catch(err) {
                 join(err);
             }
@@ -514,11 +515,27 @@ function parseArgs(args) {
     }
     if (envelope.oDateTime) {
         // TODO: parse date/time to separate ordate and ortime
-        const found = /([^\s]+)\s*(.*)/.exec(envelope.oDateTime);
+        var found = /([^\s]+)\s*(.*)/.exec(envelope.oDateTime);
         delete envelope.oDateTime;
         if (found) {
             envelope.ordate = found[1];
             envelope.ortime = found[2];
+            found = /(\d+):(\d+):(\d+)([^\d]*)/.exec(envelope.ortime);
+            if (found) {
+                // convert to 24 hour time
+                var hour = parseInt(found[1], 10);
+                const min = found[2];
+                const sec = found[3];
+                const PM  = found[4].trim().toLowerCase() == 'pm';
+                if (hour == 12) {
+                    if (!PM) {
+                        hour = 0;
+                    }
+                } else if (PM) {
+                    hour += 12;
+                }
+                envelope.ortime = (hour < 10 ? '0' : '') + hour + ':' + min + ':' + sec;
+            }
         }
     }
     if (environment.msgno == '-1') { // a sentinel value
