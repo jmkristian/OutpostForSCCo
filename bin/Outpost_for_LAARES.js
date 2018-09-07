@@ -705,26 +705,27 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
         const deadline = (new Date).getTime() - ageLimitMs;
         fs.readdir(directoryName, function(err, fileNames) {
             if (err) {
-                throw err;
-            }
-            for (var f in fileNames) {
-                var fileName = fileNames[f];
-                if (fileNamePattern.test(fileName)) {
-                    var fullName = path.join(directoryName, fileName);
-                    fs.stat(fullName, (function(fullName) {
-                        // fullName is constant in this function, not a var in deleteOldFiles.
-                        return function(err, stats) {
-                            // This is the callback from fs.stat.
-                            if (err) {
-                                log(err);
-                            } else if (stats.isFile()) {
-                                var fileTime = stats.mtime.getTime();
-                                if (fileTime < deadline) {
-                                    fs.unlink(fullName, log);
+                log(err);
+            } else {
+                for (var f in fileNames) {
+                    var fileName = fileNames[f];
+                    if (fileNamePattern.test(fileName)) {
+                        var fullName = path.join(directoryName, fileName);
+                        fs.stat(fullName, (function(fullName) {
+                            // fullName is constant in this function, not a var in deleteOldFiles.
+                            return function(err, stats) {
+                                // This is the callback from fs.stat.
+                                if (err) {
+                                    log(err);
+                                } else if (stats.isFile()) {
+                                    var fileTime = stats.mtime.getTime();
+                                    if (fileTime < deadline) {
+                                        fs.unlink(fullName, log);
+                                    }
                                 }
-                            }
-                        };
-                    })(fullName));
+                            };
+                        })(fullName));
+                    }
                 }
             }
         });
