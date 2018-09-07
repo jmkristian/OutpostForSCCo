@@ -11,8 +11,8 @@ Then, download an OutpostForLAARES*.exe installer from the
 [releases page](https://github.com/jmkristian/OutpostForLAARES/releases)
 and run it. After installation is complete, exit and restart Outpost.
 
-Antivirus or firewall products may resist installation, since
-OutpostForLAARES isn't in their databases of trusted software.
+Antivirus or firewall products may resist OutpostForLAARES,
+since it isn't in their databases of trusted software.
 Here's how to override them:
 
 * Windows Smart Screen may prevent an "unrecognized app" from starting.
@@ -20,6 +20,9 @@ Click "More Info" and then "Run Anyway."
 
 * Norton Security may quarantine the installer. Open the Norton Security program,
 click "Security", click "History", select "Show Quarantine" and restore the installer.
+When creating or opening a message, Norton may pop up a message,
+"Suspicious network activity has been detected."
+Select "Allow this instance", check "Do not notify me again" and click "OK".
 
 * Avast Antivirus may say "this file may contain something bad."
 After a minute, it might simply say "no problems found" and continue, without your intervention.
