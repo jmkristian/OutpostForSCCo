@@ -497,13 +497,28 @@ function closeForm(formId) {
     delete openForms[formId];
 }
 
-function getEnvironment(args) {
+function parseArgs(args) {
     var environment = {};
+    var envelope = {};
     for (var i = 0; i < args.length; i++) {
-        var name = args[i];
-        if (name.startsWith('--')) {
-            value = args[++i];
-            environment[name.substring(2)] = value;
+        var option = args[i];
+        if (option.startsWith('--')) {
+            var name = option.substring(2);
+            var value = args[++i];
+            if (name.startsWith('envelope.')) {
+                envelope[name.substring(9)] = value;
+            } else {
+                environment[name] = value;
+            }
+        }
+    }
+    if (envelope.oDateTime) {
+        // TODO: parse date/time to separate ordate and ortime
+        const found = /([^\s]+)\s*(.*)/.exec(envelope.oDateTime);
+        delete envelope.oDateTime;
+        if (found) {
+            envelope.ordate = found[1];
+            envelope.ortime = found[2];
         }
     }
     if (environment.msgno == '-1') { // a sentinel value
@@ -512,7 +527,7 @@ function getEnvironment(args) {
     if (environment.rxmsgno == '-1') { // a sentinel value
         delete environment.rxmsgno;
     }
-    return environment;
+    return {envelope: envelope, environment: environment};
 }
 
 function getMessage(environment) {
@@ -544,9 +559,12 @@ function onGetForm(formId, res) {
         log('form ' + formId + ' viewed');
         try {
             if (!form.environment) {
-                form.environment = getEnvironment(form.args);
+                var parsed = parseArgs(form.args);
+                form.envelope = parsed.envelope;
+                form.environment = parsed.environment;
                 form.environment.pingURL = '/ping-' + formId;
                 form.environment.submitURL = '/submit-' + formId;
+                log(form.envelope);
                 log(form.environment);
             }
             if (form.message == null) {
@@ -559,7 +577,7 @@ function onGetForm(formId, res) {
                 throw new Error('filename is ' + form.environment.filename);
             }
             var html = fs.readFileSync(path.join(PackItForms, form.environment.filename), ENCODING);
-            html = expandDataIncludes(html, form.environment, form.message);
+            html = expandDataIncludes(html, form);
             res.send(html);
         } catch(err) {
             res.send(errorToHTML(err, form));
@@ -575,10 +593,10 @@ function onGetForm(formId, res) {
     }
   </div>
 */
-function expandDataIncludes(data, environment, message) {
+function expandDataIncludes(data, form) {
     var oldData = data;
     while(true) {
-        var newData = expandDataInclude(oldData, environment, message);
+        var newData = expandDataInclude(oldData, form);
         if (newData == oldData) {
             return oldData;
         }
@@ -586,7 +604,7 @@ function expandDataIncludes(data, environment, message) {
     }
 }
 
-function expandDataInclude(data, environment, message) {
+function expandDataInclude(data, form) {
     const target = /<\s*div\s+data-include-html\s*=\s*"[^"]*"\s*>[^<]*<\/\s*div\s*>/gi;
     return data.replace(target, function(found) {
         var matches = found.match(/"([^"]*)"\s*>([^<]*)/);
@@ -602,7 +620,9 @@ function expandDataInclude(data, environment, message) {
             // Add some additional stuff:
             result += expandVariables(
                 fs.readFileSync(path.join('bin', 'after-submit-buttons.html'), ENCODING),
-                {message: JSON.stringify(message), queryDefaults: JSON.stringify(environment)});
+                {message: JSON.stringify(form.message),
+                 envelopeDefaults: JSON.stringify(form.envelope),
+                 queryDefaults: JSON.stringify(form.environment)});
         }
         if (formDefaults) {
             log('formDefaultValues: ' + formDefaults);

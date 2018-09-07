@@ -5,6 +5,7 @@
         if (startup_functions[i] === load_callprefix) {
             startup_functions[i] = function(next) {
                 load_callprefix(function() {
+                    outpost_envelope = {{envelopeDefaults}};
                     var message = {{message}};
                     if (message) {
                         set_form_data_div(message);
