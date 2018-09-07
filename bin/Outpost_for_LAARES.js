@@ -519,7 +519,10 @@ function getMessage(environment) {
     var message = null;
     if (environment.MSG_FILENAME) {
         var msgFileName = path.resolve(PackItMsgs, environment.MSG_FILENAME);
-        message = fs.readFileSync(msgFileName, ENCODING);
+        message = fs.readFileSync(msgFileName, {encoding: ENCODING});
+        // Outpost sometimes appends junk to the end of message.
+        // One observed case was "You have new messages."
+        message = message.replace(/[\r\n]\s*!\/ADDON!.*$/, '');
         if (!environment.msgno && isMyDraftMessage(environment.message_status)) {
             // The MsgNo field is set by the sender. For a draft message, the sender is me.
             // So pass it to the form as environment.msgno, shown as "My Message Number".
