@@ -433,12 +433,12 @@ function serve() {
     const server = app.listen(0);
     const address = server.address();
     fs.writeFileSync(PortFileName, address.port + '', {encoding: ENCODING}); // advertise my port
-    deleteOldFiles('logs', /^server-\d*\.log$/, LogFileAgeLimitMs);
     const logFileName = path.resolve('logs', 'server-' + address.port + '.log');
     console.log('Detailed information about its activity can be seen in');
     console.log(logFileName);
     logToFile(logFileName);
     log('Listening for HTTP requests on port ' + address.port + '...');
+    deleteOldFiles('logs', /^server-\d*\.log$/, LogFileAgeLimitMs);
     const checkSilent = setInterval(function() {
         // Scan openForms and close any that have been quiet too long.
         var anyOpen = false;
@@ -701,23 +701,35 @@ ${message}</pre>
 }
 
 function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
-    const deadline = (new Date).getTime() - ageLimitMs;
     try {
-        const fileNames = fs.readdirSync(directoryName, {encoding: ENCODING});
-        for (var f in fileNames) {
-            var fileName = fileNames[f];
-            if (fileNamePattern.test(fileName)) {
-                var fullName = path.join(directoryName, fileName);
-                fs.stat(fullName, function(err, stats) {
-                    if (err) {
-                        log(err);
-                    } else if (stats.isFile() && stats.mtimeMs < deadline) {
-                        fs.unlink(fullName, log);
-                    }
-                });
+        const deadline = (new Date).getTime() - ageLimitMs;
+        fs.readdir(directoryName, function(err, fileNames) {
+            if (err) {
+                throw err;
             }
-        }
+            for (var f in fileNames) {
+                var fileName = fileNames[f];
+                if (fileNamePattern.test(fileName)) {
+                    var fullName = path.join(directoryName, fileName);
+                    fs.stat(fullName, (function(fullName) {
+                        // fullName is constant in this function, not a var in deleteOldFiles.
+                        return function(err, stats) {
+                            // This is the callback from fs.stat.
+                            if (err) {
+                                log(err);
+                            } else if (stats.isFile()) {
+                                var fileTime = stats.mtime.getTime();
+                                if (fileTime < deadline) {
+                                    fs.unlink(fullName, log);
+                                }
+                            }
+                        };
+                    })(fullName));
+                }
+            }
+        });
     } catch(err) {
+        log(err);
     }
 }
 
