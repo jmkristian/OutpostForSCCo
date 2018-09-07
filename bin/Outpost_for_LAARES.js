@@ -518,16 +518,20 @@ function getEnvironment(args) {
 function getMessage(environment) {
     var message = null;
     if (environment.MSG_FILENAME) {
-        var msgFileName = path.resolve(PackItMsgs, environment.MSG_FILENAME);
+        const msgFileName = path.resolve(PackItMsgs, environment.MSG_FILENAME);
         message = fs.readFileSync(msgFileName, {encoding: ENCODING});
         // Outpost sometimes appends junk to the end of message.
         // One observed case was "You have new messages."
         message = message.replace(/[\r\n]\s*!\/ADDON!.*$/, '');
-        if (!environment.msgno && isMyDraftMessage(environment.message_status)) {
-            // The MsgNo field is set by the sender. For a draft message, the sender is me.
-            // So pass it to the form as environment.msgno, shown as "My Message Number".
-            var found = /[\r\n]\s*MsgNo:\s*\[([^\]]*)\]/.exec(message);
-            if (found) {
+        var found = /[\r\n]\s*MsgNo:\s*\[([^\]]*)\]/.exec(message);
+        if (found) {
+            // The MsgNo field is set by the sender.
+            if (isReceivedMessage(environment.message_status)) {
+                // Show MsgNo as "Sender's Message Number":
+                environment.txmsgno = found[1];
+                // environment.msgno is already set, thanks to addon.ini.
+            } else {
+                // Show MsgNo as "My Message Number":
                 environment.msgno = found[1];
             }
         }
@@ -541,8 +545,8 @@ function getMessage(environment) {
     return message;
 }
 
-function isMyDraftMessage(status) {
-    return status == 'new' || status == 'draft' || status == 'ready';
+function isReceivedMessage(status) {
+    return status == 'unread' || status == 'read';
 }
 
 /** Handle an HTTP GET /form-id request. */
