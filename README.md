@@ -71,7 +71,7 @@ and all the files from the folder `OutpostForLAARES\logs`.
 
 Power users might learn more by editing OutpostForLAARES\addons\\*.ini, changing
 each occurrence of ...\wscript.exe ...\OutpostForLAARES\launch.vbs
-to ...\OutpostForLAARES\launch.cmd and observing the console windows that pop up.
+to ...\OutpostForLAARES\launch-v.cmd and observing the console windows that pop up.
 The source code for bin\Outpost_for_LAARES.exe is bin\Outpost_for_LAARES.js.
 
 ### Developing

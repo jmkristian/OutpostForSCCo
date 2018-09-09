@@ -62,6 +62,7 @@ const express = require('express');
 const fs = require('fs');
 const http = require('http');
 const morgan = require('morgan');
+const os = require('os');
 const path = require('path');
 const querystring = require('querystring');
 const Transform = require('stream').Transform;
@@ -121,9 +122,18 @@ function install() {
 }
 
 function installConfigFiles(myDirectory, addonNames) {
+    var launch = process.argv[3] + ' ' + path.join(myDirectory, 'launch.vbs');
+    const version = os.release().split(/\./);
+    const majorVersion = parseInt(version[0], 10);
+    if (majorVersion < 6) {
+        // We're running on Windows XP or Windows Server 2003, per
+        // https://docs.microsoft.com/en-us/windows/desktop/api/winnt/ns-winnt-_osversioninfoa#remarks
+        // Use launch.cmd instead of launch.vbs:
+        launch = path.join(myDirectory, 'launch.cmd');
+    }
     for (var n in addonNames) {
         var addonName = addonNames[n];
-        expandVariablesInFile({ADDON_NAME: addonName, INSTDIR: myDirectory, WSCRIPT: process.argv[3]},
+        expandVariablesInFile({ADDON_NAME: addonName, INSTDIR: myDirectory, LAUNCH: launch},
                               path.join('bin', 'addon.ini'),
                               path.join('addons', addonName + '.ini'));
         expandVariablesInFile({ADDON_NAME: addonName},

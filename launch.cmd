@@ -1,6 +1,7 @@
-@echo This script is for troubleshooting. For normal operation, use launch.vbs.
+@echo Sorry, this is ugly on Windows XP. Newer versions of Windows work better.
+@rem This ugly substitute for launch.vbs is used only on Windows XP.
+@rem Why? Firefox on XP crashes when "lauch.vbs open" runs "start http://etc."
+@rem If you know how to prevent this, please contribute to
+@rem https://github.com/jmkristian/OutpostForLAARES/issues/1
 @cd "%~dp0"
-bin\Outpost_for_LAARES.exe %*
-@rem For development or debugging, it's convenient to install Node.js and do this instead:
-@rem node bin/Outpost_for_LAARES.js %*
-@pause
+@start /B bin\Outpost_for_LAARES.exe %*

@@ -1,5 +1,7 @@
 *~
 \#*#
+/addons/*.ini
+/addons/Los_Altos
 /bin/*.dll
 /bin/*.exe
 /bin/*.log
