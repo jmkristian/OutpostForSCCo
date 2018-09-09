@@ -130,8 +130,9 @@ Section "Install"
   ClearErrors
 
   # Files to install:
-  File launch.cmd
   File launch.vbs
+  File launch.cmd
+  File launch-v.cmd
   File README.html
   SetOutPath "$INSTDIR\addons"
   File addons\*.launch
