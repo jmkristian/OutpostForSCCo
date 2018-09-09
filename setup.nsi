@@ -98,6 +98,20 @@ FunctionEnd
 !insertmacro defineFindOutposts ""
 !insertmacro defineFindOutposts "un."
 
+!macro defineDeleteMyFiles un
+Function ${un}DeleteMyFiles
+  Delete launch.vbs
+  Delete launch.cmd
+  Delete launch-v.cmd
+  Delete README.*
+  RMDir /r "$INSTDIR\addons"
+  RMDir /r "$INSTDIR\bin"
+  RMDir /r "$INSTDIR\pack-it-forms"
+FunctionEnd
+!macroend
+!insertmacro defineDeleteMyFiles ""
+!insertmacro defineDeleteMyFiles "un."
+
 Section "Install"
   StrCpy $OUTPOST_DATA ""
   Call FindOutposts
@@ -112,6 +126,7 @@ Section "Install"
 
   # Stop the server (so it will release its lock on bin\Outpost_for_LAARES.exe):
   ExecShellWait open "bin\Outpost_for_LAARES.exe" "stop" SW_SHOWMINIMIZED
+  Call DeleteMyFiles
   ClearErrors
 
   # Files to install:
@@ -169,12 +184,7 @@ Section "Uninstall"
   Call un.FindOutposts
   ExecShellWait open "bin\Outpost_for_LAARES.exe" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
 
-  Delete launch.cmd
-  Delete launch.vbs
-  Delete README.*
-  RMDir /r "$INSTDIR\addons"
-  RMDir /r "$INSTDIR\bin"
+  Call un.DeleteMyFiles
   RMDir /r "$INSTDIR\logs"
-  RMDir /r "$INSTDIR\pack-it-forms"
   RMDir "$INSTDIR" # Do nothing if the directory is not empty
 SectionEnd
