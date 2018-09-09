@@ -26,7 +26,12 @@ Select "Allow this instance", check "Do not notify me again" and click "OK".
 
 * Avast antivirus might say "This file might be dangerous - It's been submitted for interrogation."
 Click "More details" and then "I trust this file."
-Or it might say "this file may contain something bad."
+Next, open Avast settings, select the "General" tab,
+check "allow me to decide" under "Enable CyberCapture"
+and try again to run the installer.
+Then you'll have to wait for a few minutes, until its interrogation is complete.
+Or Avast might say "this file may contain something bad,"
+or "CyberCapture has been activated. You've discovered a very rare file."
 After a minute, it might simply say "no problems found" and continue, without your intervention.
 Or it might show a link you can click to run the program anyway.
 
