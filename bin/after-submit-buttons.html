@@ -11,9 +11,9 @@
                         set_form_data_div(message);
                     }
                     var queryDefaults = {{queryDefaults}};
-                    for (var i in queryDefaults) {
-                        if (query_object[i] == null) {
-                            query_object[i] = queryDefaults[i];
+                    for (var q in queryDefaults) {
+                        if (query_object[q] == null) {
+                            query_object[q] = queryDefaults[q];
                         }
                     }
                     if (query_object.submitURL) {
@@ -28,10 +28,21 @@
                             img = undefined;
                         }, 30000); // call ping every 30 seconds
                     }
-                    if (formDefaultValues) {
-                        for (var f = formDefaultValues.length - 1; f >= 0; f--) {
-                            init_form_from_fields(formDefaultValues[f], 'name');
-                        }
+                    if (!formDefaultValues) {
+                        formDefaultValues = [];
+                    }
+                    var status = query_object.message_status;
+                    // Show Rec-Sent based on whether we received this message:
+                    formDefaultValues.push({'Rec-Sent': (status == 'unread' || status == 'read') ? 'Received' : 'Sent'});
+                    for (var f = formDefaultValues.length - 1; f >= 0; f--) {
+                        init_form_from_fields(formDefaultValues[f], 'name');
+                    }
+                    var recSents = document.getElementsByName('Rec-Sent');
+                    for (var r = 0; r < recSents.length; r++) {
+                        var recSent = recSents[r];
+                        recSent.disabled = true; // Don't include it in transmitted messages.
+                        recSent.classList.add('no-msg-init'); // Ignore it in received messages.
+                        // That is, init_form_from_fields won't affect this element any more.
                     }
                     // Change the message header from PACF format to ADDON format:
                     var messageHeader = document.querySelector("#message-header");
@@ -45,7 +56,7 @@
                         header = header.replace(/\s*$/, '\r\n# SUBJECT: ' + found[1]);
                     }
                     messageHeader.textContent = header;
-                    if (query_object.message_status == 'new' && query_object.mode == 'readonly') {
+                    if (status == 'new' && query_object.mode == 'readonly') {
                         // This message was just submitted to Outpost. Let the operator know:
                         var div = document.createElement('div');
                         div.style="position:absolute;height:20pt;top:50%;margin-top:-10pt;margin-left:5pt;font-weight:bold;";

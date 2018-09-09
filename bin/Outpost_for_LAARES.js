@@ -555,14 +555,28 @@ function getMessage(environment) {
         // Outpost sometimes appends junk to the end of message.
         // One observed case was "You have new messages."
         message = message.replace(/[\r\n]\s*!\/ADDON!.*$/, '');
-        if (!environment.filename) {
-            var found = /[\r\n]#\s*FORMFILENAME:([^\r\n]*)[\r\n]/.exec(message);
-            if (found) {
-                environment.filename = found[1].trim();
-            }
-        }
     }
     return message;
+}
+
+function parseMessage(message) {
+    var fields = {};
+    const lines = message.split(/[\r\n]+/);
+    for (var l = 0; l < lines.length; l++) {
+        var line = lines[l];
+        var found = /^([^!#:][^:]*):\s*\[(.*)/.exec(line);
+        if (found) {
+            var name = found[1];
+            var value = found[2];
+            while(l < lines.length - 1 && (!value.endsWith(']') || (value.endsWith('`]') && !value.endsWith('``]')))) {
+                value += EOL + lines[++l];
+            }
+            value = value.substring(0, value.length - 1); // remove the ']'
+            value = value.replace(/`([`\]])/g, '$1');
+            fields[name] = value;
+        }
+    }
+    return fields;
 }
 
 /** Handle an HTTP GET /form-id request. */
@@ -581,12 +595,30 @@ function onGetForm(formId, res) {
                 form.environment = parsed.environment;
                 form.environment.pingURL = '/ping-' + formId;
                 form.environment.submitURL = '/submit-' + formId;
-                log(form.envelope);
-                log(form.environment);
             }
             if (form.message == null) {
-                form.message = getMessage(form.environment); // may set environment.filename
+                form.message = getMessage(form.environment);
+                if (form.message) {
+                    if (!form.environment.filename) {
+                        var found = /[\r\n]#\s*FORMFILENAME:([^\r\n]*)[\r\n]/.exec(form.message);
+                        if (found) {
+                            form.environment.filename = found[1].trim();
+                        }
+                    }
+                    const status = form.environment.message_status;
+                    if (!(status == 'unread' || status == 'read' || (form.envelope.ocall && form.envelope.oname))) {
+                        const fields = parseMessage(form.message);
+                        if (!form.envelope.ocall && fields.OpCall) {
+                            form.envelope.ocall = fields.OpCall;
+                        }
+                        if (!form.envelope.oname && fields.OpName) {
+                            form.envelope.oname = fields.OpName;
+                        }
+                    }
+                }
             }
+            log(form.envelope);
+            log(form.environment);
             if (!form.environment.addon_name) {
                 throw new Error('addon_name is ' + form.environment.addon_name);
             }
