@@ -541,8 +541,10 @@ function parseArgs(args) {
     if (environment.msgno == '-1') { // a sentinel value
         delete environment.msgno;
     }
-    if (environment.rxmsgno == '-1') { // a sentinel value
-        delete environment.rxmsgno;
+    if (envelope.RCVNUM == '-1') { // a sentinel value
+        delete envelope.RCVNUM;
+    } else if (envelope.RCVNUM) {
+        environment.msgno = envelope.RCVNUM; // display it as My Msg #
     }
     return {envelope: envelope, environment: environment};
 }
