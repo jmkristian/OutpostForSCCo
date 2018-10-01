@@ -30,7 +30,7 @@
   or opens an existing message that belongs to this add-on,
   a fairly complex sequence of events ensues.
   - Outpost executes this program with arguments specified in addon.ini.
-  - This program POSTs the arguments to a server, and then
+  - This program POSTs the arguments to a server, which then
   - launches a browser, which GETs an HTML form from the server.
   - When the operator clicks "Submit", the browser POSTs a message to the server,
   - and the server runs Aoclient.exe, which submits the message to Outpost.
@@ -287,10 +287,8 @@ function openForm(args, tryLater) {
         data = data && data.trim();
         if (err) {
             tryLater(err);
-        } else if (data) {
-            startBrowserAndExit(options.port, '/form-' + data);
         } else {
-            process.exit(0); // This was just a dry run.
+            process.exit(0); // mission accomplished
         }
     }).end(postData, CHARSET);
 }
@@ -376,18 +374,6 @@ function request(options, callback) {
     return req;
 }
 
-function startBrowserAndExit(port, path) {
-    const command = 'start "Browse" /B http://127.0.0.1:' + port + path;
-    log(command);
-    child_process.exec(
-        command,
-        function(err, stdout, stderr) {
-            log(err);
-            log('started browser ' + stdout.toString(ENCODING) + stderr.toString(ENCODING));
-            process.exit(0);
-        });
-}
-
 var openForms = {'0': {quietSeconds: 0}}; // all the forms that are currently open
 // Form 0 is a hack to make sure the server doesn't shut down immediately after starting.
 var nextFormId = 1; // Forms are assigned sequence numbers when they're opened.
@@ -397,18 +383,17 @@ function serve() {
     console.log('It works with your browser to show forms and submit messages to Outpost.');
     console.log('It will run as long as you have forms open, and stop a few minutes later.');
     const app = express();
+    var port;
     app.set('etag', false); // convenient for troubleshooting
     app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
     app.use(bodyParser.json({type: JSON_TYPE}));
     app.post(OpenOutpostMessage, function(req, res, next) {
-        if (req.body && req.body.length > 0) {
+        // req.body is an array, thanks to bodyParser.json
+        const args = req.body;
+        res.end();
+        if (args && args.length > 0) {
             const formId = '' + nextFormId++;
-            onOpen(formId, req.body); // req.body is an array, thanks to bodyParser.json
-            res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
-            res.end(formId, CHARSET);
-        } else {
-            // This happens when doing a dry-run.
-            res.end(); // with no body tells the client not to open a browser page.
+            onOpen(formId, args, port);
         }
     });
     app.get('/form-:formId', function(req, res, next) {
@@ -443,12 +428,13 @@ function serve() {
 
     const server = app.listen(0);
     const address = server.address();
-    fs.writeFileSync(PortFileName, address.port + '', {encoding: ENCODING}); // advertise my port
-    const logFileName = path.resolve('logs', 'server-' + address.port + '.log');
+    port = address.port;
+    fs.writeFileSync(PortFileName, port + '', {encoding: ENCODING}); // advertise my port
+    const logFileName = path.resolve('logs', 'server-' + port + '.log');
     console.log('Detailed information about its activity can be seen in');
     console.log(logFileName);
     logToFile(logFileName);
-    log('Listening for HTTP requests on port ' + address.port + '...');
+    log('Listening for HTTP requests on port ' + port + '...');
     deleteOldFiles('logs', /^server-\d*\.log$/, LogFileAgeLimitMs);
     const checkSilent = setInterval(function() {
         // Scan openForms and close any that have been quiet too long.
@@ -470,7 +456,7 @@ function serve() {
             clearInterval(checkSilent);
             server.close();
             fs.readFile(PortFileName, {encoding: ENCODING}, function(err, data) {
-                if (data.trim() == (address.port + '')) {
+                if (data.trim() == (port + '')) {
                     fs.unlink(PortFileName, log);
                 }
                 process.exit(0);
@@ -479,15 +465,22 @@ function serve() {
     }, 5000);
 }
 
-function onOpen(formId, args) {
+function onOpen(formId, args, port) {
     // This code should be kept dead simple, since
     // it can't show a problem to the operator.
-    var form = {
+    openForms[formId] = {
         args: args,
         quietSeconds: 0
     };
-    openForms[formId] = form;
     log('form ' + formId + ' opened');
+    const command = 'start "Browse" /B http://' + LOCALHOST + ':' + port + '/form-' + formId;
+    log(command);
+    child_process.exec(
+        command,
+        function(err, stdout, stderr) {
+            log(err);
+            log('started browser ' + stdout.toString(ENCODING) + stderr.toString(ENCODING));
+        });
 }
 
 function keepAlive(formId) {
