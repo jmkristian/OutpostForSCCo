@@ -24,6 +24,7 @@ UninstPage instfiles
 
 !include LogicLib.nsh
 !include TextFunc.nsh
+!include WinVer.nsh
 
 Var /GLOBAL OUTPOST_CODE
 Var /GLOBAL OUTPOST_DATA
@@ -168,9 +169,13 @@ Section "Install"
   CopyFiles "$OUTPOST_CODE\Aoclient.exe" "$INSTDIR\addons\Los_Altos\Aoclient.exe"
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
-  ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run" SW_SHOWMINIMIZED
+  ${If} ${AtMostWinXP}
+    ExecShellWait open              ".\launch.cmd" "dry-run" SW_SHOWMINIMIZED
+  ${Else}
+    ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run" SW_SHOWMINIMIZED
+  ${EndIf}
   ${If} ${Errors}
-    Abort "launch.vbs dry-run failed"
+    Abort "launch dry-run failed"
   ${EndIf}
 SectionEnd
 
