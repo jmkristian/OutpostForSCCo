@@ -12,6 +12,6 @@
 /msgs/*.txt
 /node_modules
 /notes
-/OutpostForLAARES*.exe
+/*_Setup-*.exe
 /pack-it-forms
 /README.html

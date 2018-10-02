@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
-
-Name "Los Altos ARES" "Outpost forms"
-OutFile "OutpostForLAARES_Setup-0.9.exe"
+!define VersionMajor 1
+!define VersionMinor 0
 
 Page directory
 Page instfiles
@@ -29,7 +27,6 @@ UninstPage instfiles
 Var /GLOBAL OUTPOST_CODE
 Var /GLOBAL OUTPOST_DATA
 Var /GLOBAL WSCRIPT_EXE
-!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OutpostForLAARES"
 
 Function StrContainsSpace
   Pop $0
@@ -56,11 +53,11 @@ FunctionEnd
 
 Function .onInit
   ${If} $INSTDIR == ""
-    StrCpy $INSTDIR "$APPDATA\OutpostForLAARES\"
+    StrCpy $INSTDIR "$APPDATA\${INSTDIR_NAME}\"
     ${StrContainsSpace} $0 "$INSTDIR"
     ${If} $0 != false
       ReadEnvStr $0 SystemDrive
-      StrCpy $INSTDIR "$0\OutpostForLAARES\"
+      StrCpy $INSTDIR "$0\${INSTDIR_NAME}\"
     ${EndIf}
   ${EndIf}
 FunctionEnd
@@ -136,7 +133,7 @@ Section "Install"
   File launch-v.cmd
   File README.html
   SetOutPath "$INSTDIR\addons"
-  File addons\*.launch
+  File addons\${ADDON_NAME}.launch
   SetOutPath "$INSTDIR\bin"
   File /r /x "*~" /x server-port.txt /x *.log bin\*
   SetOutPath "$INSTDIR\pack-it-forms"
@@ -146,13 +143,13 @@ Section "Install"
 
   # define uninstaller:
   WriteUninstaller "$INSTDIR\uninstall.exe"
-  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "Outpost for LAARES"
+  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "${DisplayName}"
   WriteRegStr   HKLM "${REG_SUBKEY}" UninstallString "$\"$INSTDIR\uninstall.exe$\""
   WriteRegStr   HKLM "${REG_SUBKEY}" Publisher "Los Altos ARES"
   WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "https://github.com/jmkristian/OutpostforLAARES/blob/master/README.md"
-  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayVersion "0.9"
-  WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMajor 0
-  WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMinor 9
+  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayVersion "${VersionMajor}.${VersionMinor}"
+  WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMajor ${VersionMajor}
+  WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMinor ${VersionMinor}
   WriteRegDWORD HKLM "${REG_SUBKEY}" NoModify 1
   WriteRegDWORD HKLM "${REG_SUBKEY}" NoRepair 1
   WriteRegDWORD HKLM "${REG_SUBKEY}" EstimatedSize 15000
@@ -166,7 +163,7 @@ Section "Install"
     Abort "bin\Outpost_for_LAARES.exe install$OUTPOST_DATA failed"
   ${EndIf}
 
-  CopyFiles "$OUTPOST_CODE\Aoclient.exe" "$INSTDIR\addons\Los_Altos\Aoclient.exe"
+  CopyFiles "$OUTPOST_CODE\Aoclient.exe" "$INSTDIR\addons\${ADDON_NAME}\Aoclient.exe"
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ${If} ${AtMostWinXP}

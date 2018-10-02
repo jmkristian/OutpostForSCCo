@@ -18,4 +18,5 @@ if [ ! -e pack-it-forms ]; then
 fi
 
 node showdown.js README.md README.html
-"C:/Program Files (x86)/NSIS/makensis.exe" setup.nsi || exit $? # http://nsis.sourceforge.net
+"C:/Program Files (x86)/NSIS/makensis.exe" setup-LAARES.nsi || exit $?
+"C:/Program Files (x86)/NSIS/makensis.exe" setup-CERT.nsi   || exit $?
