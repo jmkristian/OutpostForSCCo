@@ -154,7 +154,9 @@ function installIncludes(myDirectory, addonNames) {
         var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
         // Upsert myIncludes into outpostLaunch:
         if (!fs.existsSync(outpostLaunch)) {
-            fs.writeFile(outpostLaunch, myIncludes.join(EOL) + EOL, {encoding: ENCODING}, function(err) {
+            // Work around a bug: Outpost might ignore the first line of Launch.local.
+            var data = EOL + myIncludes.join(EOL) + EOL;
+            fs.writeFile(outpostLaunch, data, {encoding: ENCODING}, function(err) {
                 log(err ? err : 'included into ' + outpostLaunch);
             });
         } else {
@@ -179,7 +181,8 @@ function installIncludes(myDirectory, addonNames) {
                     if (!included) {
                         newLines = newLines.concat(myIncludes); // append myIncludes
                     }
-                    var newData = newLines.join(EOL) + EOL;
+                    // Work around a bug: Outpost might ignore the first line of Launch.local.
+                    var newData = EOL + newLines.join(EOL) + EOL;
                     if (newData == data) {
                         log('already included into ' + outpostLaunch);
                     } else {
