@@ -23,7 +23,7 @@
 
   Any single execution does just one of those things,
   depending on the value of process.argv[2].
-  For example, "node bin/Outpost_for_LAARES.js uninstall C:/Outpost"
+  For example, "node bin/Outpost_Forms.js uninstall C:/Outpost"
   edits C:/Outpost/Launch.local.
 
   When an operator clicks a menu item to create a message
@@ -52,7 +52,7 @@
     them and operators who have to wait for Avast to scan them.
 
   To address the issue of operators waiting for antivirus scan, the
-  installation script runs "Outpost_for_LAARES.exe open dry-run", which runs this program
+  installation script runs "Outpost_Forms.exe open dry-run", which runs this program
   as though it were handling a message, but doesn't launch a browser.
 */
 const bodyParser = require('body-parser');
@@ -297,8 +297,8 @@ function openForm(args, tryLater) {
 }
 
 function startServer() {
-    const command = 'start "Outpost for LAARES" /MIN '
-          + path.join('bin', 'Outpost_for_LAARES.exe')
+    const command = 'start "Outpost Form Server" /MIN '
+          + path.join('bin', 'Outpost_Forms.exe')
           + ' serve';
     log(command);
     child_process.exec(

@@ -122,8 +122,8 @@ Section "Install"
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
 
-  # Stop the server (so it will release its lock on bin\Outpost_for_LAARES.exe):
-  ExecShellWait open "bin\Outpost_for_LAARES.exe" "stop" SW_SHOWMINIMIZED
+  # Stop the server (so it will release its lock on bin\Outpost_Forms.exe):
+  ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
   Call DeleteMyFiles
   ClearErrors
 
@@ -158,9 +158,9 @@ Section "Install"
   IfFileExists $WSCRIPT_EXE +2
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
 
-  ExecShellWait open "bin\Outpost_for_LAARES.exe" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
+  ExecShellWait open "bin\Outpost_Forms.exe" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
   ${If} ${Errors}
-    Abort "bin\Outpost_for_LAARES.exe install$OUTPOST_DATA failed"
+    Abort "bin\Outpost_Forms.exe install$OUTPOST_DATA failed"
   ${EndIf}
 
   CopyFiles "$OUTPOST_CODE\Aoclient.exe" "$INSTDIR\addons\${ADDON_NAME}\Aoclient.exe"
@@ -185,7 +185,7 @@ Section "Uninstall"
 
   # Remove our line from Outpost configuration files
   Call un.FindOutposts
-  ExecShellWait open "bin\Outpost_for_LAARES.exe" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
+  ExecShellWait open "bin\Outpost_Forms.exe" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
 
   Call un.DeleteMyFiles
   RMDir /r "$INSTDIR\logs"
