@@ -15,8 +15,8 @@
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
 Name "2018 CERT Drill" "Outpost forms"
-OutFile "CERT_Drill_Setup-1.0.exe"
 
+!define SetupFileName CERT_Drill
 !define DisplayName "Outpost for CERT"
 !define INSTDIR_NAME OutpostForCERT
 !define ADDON_NAME CERT

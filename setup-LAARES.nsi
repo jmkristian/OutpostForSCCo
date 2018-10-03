@@ -15,8 +15,8 @@
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
 Name "Los Altos ARES" "Outpost forms"
-OutFile "OutpostForLAARES_Setup-1.0.exe"
 
+!define SetupFileName OutpostForLAARES
 !define DisplayName "Outpost for LAARES"
 !define INSTDIR_NAME OutpostForLAARES
 !define ADDON_NAME Los_Altos
