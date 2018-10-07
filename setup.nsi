@@ -135,7 +135,7 @@ Section "Install"
   File launch-v.cmd
   File README.html
   SetOutPath "$INSTDIR\addons"
-  File addons\${ADDON_NAME}.launch
+  File addons\${addon_name}.launch
   SetOutPath "$INSTDIR\bin"
   File /r /x "*~" /x server-port.txt /x *.log bin\*
   SetOutPath "$INSTDIR\pack-it-forms"
@@ -165,7 +165,7 @@ Section "Install"
     Abort "bin\Outpost_Forms.exe install$OUTPOST_DATA failed"
   ${EndIf}
 
-  CopyFiles "$OUTPOST_CODE\Aoclient.exe" "$INSTDIR\addons\${ADDON_NAME}\Aoclient.exe"
+  CopyFiles "$OUTPOST_CODE\Aoclient.exe" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ${If} ${AtMostWinXP}

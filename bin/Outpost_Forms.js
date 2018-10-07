@@ -132,13 +132,13 @@ function installConfigFiles(myDirectory, addonNames) {
         launch = path.join(myDirectory, 'launch.cmd');
     }
     for (var n in addonNames) {
-        var addonName = addonNames[n];
-        expandVariablesInFile({ADDON_NAME: addonName, INSTDIR: myDirectory, LAUNCH: launch},
+        var addon_name = addonNames[n];
+        expandVariablesInFile({addon_name: addon_name, INSTDIR: myDirectory, LAUNCH: launch},
                               path.join('bin', 'addon.ini'),
-                              path.join('addons', addonName + '.ini'));
-        expandVariablesInFile({ADDON_NAME: addonName},
+                              path.join('addons', addon_name + '.ini'));
+        expandVariablesInFile({addon_name: addon_name},
                               path.join('bin', 'Aoclient.ini'),
-                              path.join('addons', addonName, 'Aoclient.ini'));
+                              path.join('addons', addon_name, 'Aoclient.ini'));
     }
 }
 
