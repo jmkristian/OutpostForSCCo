@@ -19,7 +19,7 @@ Name "2018 CERT Drill" "Outpost forms"
 !define SetupFileName CERT_Drill
 !define DisplayName "Outpost for CERT"
 !define INSTDIR_NAME OutpostForCERT
-!define ADDON_NAME CERT
+!define addon_name CERT
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OutpostForCERT"
 
 !include setup.nsi

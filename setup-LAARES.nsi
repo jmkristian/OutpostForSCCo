@@ -19,7 +19,7 @@ Name "Los Altos ARES" "Outpost forms"
 !define SetupFileName OutpostForLAARES
 !define DisplayName "Outpost for LAARES"
 !define INSTDIR_NAME OutpostForLAARES
-!define ADDON_NAME Los_Altos
+!define addon_name Los_Altos
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OutpostForLAARES"
 
 !include setup.nsi
