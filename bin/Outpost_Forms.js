@@ -432,6 +432,9 @@ function serve() {
     const server = app.listen(0);
     const address = server.address();
     port = address.port;
+    if (!fs.existsSync('logs')) {
+        fs.mkdirSync('logs');
+    }
     fs.writeFileSync(PortFileName, port + '', {encoding: ENCODING}); // advertise my port
     const logFileName = path.resolve('logs', 'server-' + port + '.log');
     console.log('Detailed information about its activity can be seen in');
@@ -591,9 +594,15 @@ function parseMessage(message) {
 function onGetForm(formId, res) {
     res.set({'Content-Type': 'text/html; charset=' + CHARSET});
     var form = openForms[formId];
-    if (!form) {
+    if (formId <= 0) {
+        res.status(400).send('Form numbers start with 1.');
+    } else if (!form) {
         log('form ' + formId + ' is not open');
-        res.sendStatus(NOT_FOUND);
+        if (formId < nextFormId) {
+            res.status(NOT_FOUND).send('Form ' + formId + ' was discarded, since the browser page was closed.');
+        } else {
+            res.status(NOT_FOUND).send('Form ' + formId + ' has not been opened.');
+        }
     } else {
         log('form ' + formId + ' viewed');
         try {
