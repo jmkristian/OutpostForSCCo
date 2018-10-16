@@ -4,7 +4,7 @@
     for (var i = startup_functions.length - 1; i >= 0; i--) {
         if (startup_functions[i] === load_callprefix) {
             startup_functions[i] = function(next) {
-                load_callprefix(function() {
+                try {
                     outpost_envelope = {{envelopeDefaults}};
                     var message = {{message}};
                     if (message) {
@@ -12,7 +12,7 @@
                     }
                     var queryDefaults = {{queryDefaults}};
                     for (var q in queryDefaults) {
-                        if (query_object[q] == null) {
+                        if (!(q in query_object)) {
                             query_object[q] = queryDefaults[q];
                         }
                     }
@@ -65,8 +65,10 @@
                             '&nbsp;&nbsp;The message has been submitted to Outpost. You can close this page.';
                         document.querySelector("#button-header").appendChild(div);
                     }
-                    next();
-                });
+                } catch(err) {
+                    logError(JSON.stringify(err));
+                }
+                next();
             };
             break;
         }
