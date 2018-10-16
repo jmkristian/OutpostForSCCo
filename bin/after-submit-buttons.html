@@ -5,6 +5,7 @@
         if (startup_functions[i] === load_callprefix) {
             startup_functions[i] = function(next) {
                 try {
+log_trace("after-submit-buttons");
                     outpost_envelope = {{envelopeDefaults}};
                     var message = {{message}};
                     if (message) {
