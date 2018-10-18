@@ -46,8 +46,7 @@ log_trace("after-submit-buttons");
                         // That is, init_form_from_fields won't affect this element any more.
                     }
                     // Change the message header from PACF format to ADDON format:
-                    var messageHeader = document.querySelector("#message-header");
-                    var header = messageHeader.textContent;
+                    var header = outpost_message_header;
                     // The subject comes after !PACF! in the first line:
                     var found = /^\s*![^!\r\n]*!\s*([^\r\n]*)/.exec(header);
                     // Remove that first line:
@@ -56,11 +55,16 @@ log_trace("after-submit-buttons");
                         // Add the subject in a comment:
                         header = header.replace(/\s*$/, '\r\n# SUBJECT: ' + found[1]);
                     }
-                    messageHeader.textContent = header;
+                    outpost_message_header = header;
                     if (status == 'new' && query_object.mode == 'readonly') {
                         // This message was just submitted to Outpost. Let the operator know:
                         var div = document.createElement('div');
-                        div.style="position:absolute;height:20pt;top:50%;margin-top:-10pt;margin-left:5pt;font-weight:bold;";
+                        var style="position:absolute;height:20pt;top:50%;margin-top:-10pt;margin-left:5pt;font-weight:bold;";
+                        if (is_MSIE(8)) {
+                            div.cssText = style;
+                        } else {
+                            div.style = style;
+                        }
                         div.innerHTML =
                             '<img src="icon-check.png" alt="OK" style="width:20pt;height:20pt;vertical-align:middle;">' +
                             '&nbsp;&nbsp;The message has been submitted to Outpost. You can close this page.';
@@ -68,6 +72,7 @@ log_trace("after-submit-buttons");
                     }
                 } catch(err) {
                     logError(JSON.stringify(err));
+                    throw err;
                 }
                 next();
             };
