@@ -58,7 +58,7 @@
                     // This message was just submitted to Outpost. Let the operator know:
                     var div = document.createElement('div');
                     var style="position:absolute;height:20pt;top:50%;margin-top:-10pt;margin-left:5pt;font-weight:bold;";
-                    if (is_MSIE(8)) {
+                    if (MSIE_version <= 8) {
                         div.cssText = style;
                     } else {
                         div.style = style;
