@@ -17,6 +17,9 @@ Here's how to overcome their resistance:
 * Windows Smart Screen may prevent an "unrecognized app" from starting.
 Click "More Info" and then "Run Anyway."
 
+* Windows Firewall may ask to allow Outpost_Forms.exe to communicate on a network.
+Check the box for "Private networks" and click "Allow access."
+
 * Norton Security may quarantine the installer. Open the Norton Security program,
 click "Security", click "History", select "Show Quarantine" and restore the installer.
 When creating or opening a message, Norton may pop up a message,
