@@ -70,17 +70,24 @@ Function ${un}FindOutpost
   ClearErrors
   ReadINIStr $1 "$0\Outpost.conf" DataDirectory DataDir
   ${IfNot} ${Errors}
-    StrCpy $OUTPOST_CODE "$0"
-    StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$1$\""
+    CopyFiles "$0\Aoclient.exe" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
+    ${If} ${Errors}
+      MessageBox MB_YESNO|MB_ICONEXCLAMATION "${DisplayName} won't work with $0, because it doesn't contain Aoclient.exe. Do you want to use a different copy of Outpost?" /SD IDNO IDYES goAhead
+        Abort "Can't copy Aoclient.exe from $0."
+      goAhead:
+    ${Else}
+      StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$0$\""
+      StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$1$\""
+    ${EndIf}
+    ClearErrors
   ${EndIf}
 FunctionEnd
 
-# Set $OUTPOST_CODE = a folder that contains Outpost executables.
 # Set $OUTPOST_DATA = a space-separated list of folders that contain Outpost configuration files.
-# If no such folders are found, set both variables to "".
-# If Outpost and SCCo Packet are both installed, $OUTPOST_CODE will be SCCo Packet.
+# If no such folders are found, set it to "".
 Function ${un}FindOutposts
   StrCpy $OUTPOST_CODE ""
+  StrCpy $OUTPOST_DATA ""
   Push "$PROGRAMFILES\Outpost"
   Call ${un}FindOutpost
   ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
@@ -113,16 +120,15 @@ FunctionEnd
 !insertmacro defineDeleteMyFiles "un."
 
 Section "Install"
-  StrCpy $OUTPOST_DATA ""
-  Call FindOutposts
-  ${If} "$OUTPOST_DATA" == ""
-    MessageBox MB_OK "Outpost Packet Message Manager isn't installed, it appears. Please install it before installing this software."
-    Abort "Please install Outpost PMM first."
-  ${EndIf}
-
   # Where to install files:
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
+
+  Call FindOutposts
+  ${If} "$OUTPOST_DATA" == ""
+    MessageBox MB_OK|MB_ICONSTOP "Please install Outpost Packet Message Manager first. No recent version is installed, it appears."
+    Abort "Outpost PMM not found."
+  ${EndIf}
 
   # Stop the server (so it will release its lock on bin\Outpost_Forms.exe):
   ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
@@ -164,8 +170,6 @@ Section "Install"
   ${If} ${Errors}
     Abort "bin\Outpost_Forms.exe install$OUTPOST_DATA failed"
   ${EndIf}
-
-  CopyFiles "$OUTPOST_CODE\Aoclient.exe" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ${If} ${AtMostWinXP}
