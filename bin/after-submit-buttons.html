@@ -7,9 +7,7 @@
                 try {
                     outpost_envelope = {{envelopeDefaults}};
                     var message = {{message}};
-                    if (message) {
-                        set_form_data_div(message);
-                    }
+                    set_form_data_div(message || '# A new message will go here.');
                     var queryDefaults = {{queryDefaults}};
                     for (var q in queryDefaults) {
                         if (!(q in query_object)) {
@@ -33,9 +31,12 @@
                     }
                     var status = query_object.message_status;
                     // Show Rec-Sent based on whether we received this message:
-                    formDefaultValues.push({'Rec-Sent': (status == 'unread' || status == 'read') ? 'Received' : 'Sent'});
-                    for (var f = formDefaultValues.length - 1; f >= 0; f--) {
-                        init_form_from_fields(formDefaultValues[f], 'name');
+                    init_form_from_fields({'Rec-Sent': (status == 'unread' || status == 'read') ? 'Received' : 'Sent'}, 'name');
+                    if (query_object.mode != 'readonly') {
+                        // A readonly form is initialized from the message, not default values.
+                        for (var f = formDefaultValues.length - 1; f >= 0; f--) {
+                            init_form_from_fields(formDefaultValues[f], 'name');
+                        }
                     }
                     var recSents = document.getElementsByName('Rec-Sent');
                     for (var r = 0; r < recSents.length; r++) {

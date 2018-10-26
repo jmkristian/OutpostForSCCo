@@ -65,6 +65,7 @@ const morgan = require('morgan');
 const os = require('os');
 const path = require('path');
 const querystring = require('querystring');
+const Soup = require('soup');
 const Transform = require('stream').Transform;
 const util = require('util');
 
@@ -388,7 +389,7 @@ function serve() {
     const app = express();
     var port;
     app.set('etag', false); // convenient for troubleshooting
-    app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
+    app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time msec'));
     app.use(bodyParser.json({type: JSON_TYPE}));
     app.post(OpenOutpostMessage, function(req, res, next) {
         // req.body is an array, thanks to bodyParser.json
@@ -643,7 +644,7 @@ function onGetForm(formId, res) {
                 throw new Error('filename is ' + form.environment.filename);
             }
             var html = fs.readFileSync(path.join(PackItForms, form.environment.filename), ENCODING);
-            html = expandDataIncludes(html, form);
+            html = expandIncludes(html, form);
             res.send(html);
         } catch(err) {
             res.send(errorToHTML(err, form));
@@ -651,7 +652,9 @@ function onGetForm(formId, res) {
     }
 }
 
-/* Expand data-include-html elements, for example:
+/* Expand stylesheets, scripts and data-include-html elements, for example:
+  <link rel="stylesheet" type="text/css" href="resources/css/pack-it-forms.css"/>
+  <script type="text/javascript" src="resources/js/pack-it-forms.js"></script>
   <div data-include-html="ics-header">
     {
       "5.": "PRIORITY",
@@ -659,50 +662,93 @@ function onGetForm(formId, res) {
     }
   </div>
 */
-function expandDataIncludes(data, form) {
-    var oldData = data;
-    while(true) {
-        var newData = expandDataInclude(oldData, form);
-        if (newData == oldData) {
-            return oldData;
-        }
-        oldData = newData; // and try it again, in case there are nested includes.
-    }
-}
-
-function expandDataInclude(data, form) {
-    const target = /<\s*div\s+data-include-html\s*=\s*"[^"]*"\s*>[^<]*<\/\s*div\s*>/gi;
-    return data.replace(target, function(found) {
-        var matches = found.match(/"([^"]*)"\s*>([^<]*)/);
-        var name = matches[1];
-        var formDefaults = matches[2].trim();
-        // Read a file from pack-it-forms:
-        var fileName = path.join(PackItForms, 'resources', 'html', name + '.html')
-        var result = fs.readFileSync(fileName, ENCODING);
-        // Remove the enclosing <div></div>:
-        result = result.replace(/^\s*<\s*div\s*>\s*(.*)/i, '$1');
-        result = result.replace(/(.*)<\/\s*div\s*>\s*$/i, '$1');
-        if (name == 'submit-buttons') {
-            // Add some additional stuff:
-            result += expandVariables(
-                fs.readFileSync(path.join('bin', 'after-submit-buttons.html'), ENCODING),
-                {message: JSON.stringify(form.message),
-                 envelopeDefaults: JSON.stringify(form.envelope),
-                 queryDefaults: JSON.stringify(form.environment)});
-        }
-        if (formDefaults) {
-            log('formDefaultValues: ' + formDefaults);
-            result += `<script type="text/javascript">
+function expandIncludes(html, form) {
+    var changes = [];
+    const getType = function(element) {
+        var matches = element.match(/^[^>]*(\s+type\s*=\s*"[^"]*")/i);
+        return matches ? matches[1] : '';
+    };
+    const getDataInclude = function(included, startAttribute, endAttribute, startElement, endElement) {
+        if (included) {
+            var element = html.substring(startElement, endElement);
+            var change = {start: startElement,
+                          end: endElement,
+                          file: path.join(PackItForms, 'resources', 'html', included + '.html')}
+            var matches = element.match(/[^>]*>([^<]*)</);
+            if (matches && matches[1]) {
+                var formDefaults = matches[1];
+                change.suffix = `<script type="text/javascript">
   var formDefaultValues;
   if (!formDefaultValues) {
       formDefaultValues = [];
   }
   formDefaultValues.push(${formDefaults});
-</script>
-`;
+</script>`;
+            }
+            changes.push(change);
         }
-        return result;
+    };
+    const getScript = function(src, startAttribute, endAttribute, startElement, endElement) {
+        if (src) {
+            var element = html.substring(startElement, endElement);
+            var change = {start: startElement,
+                          end: endElement,
+                          prefix: '<script' + getType(element) + '>' + EOL,
+                          file: path.join(PackItForms, src),
+                          suffix: '</script>'};
+            if (src == 'resources/js/pack-it-forms.js') {
+                // Add some additional stuff:
+                change.suffix += EOL + expandVariables(
+                    fs.readFileSync(path.join('bin', 'after-submit-buttons.html'), ENCODING),
+                    {message: JSON.stringify(form.message),
+                     envelopeDefaults: JSON.stringify(form.envelope),
+                     queryDefaults: JSON.stringify(form.environment)});
+            }
+            changes.push(change);
+        }
+    };
+    const getStyleSheet = function(href, startAttribute, endAttribute, startElement, endElement) {
+        if (href) {
+            var element = html.substring(startElement, endElement);
+            var matches = element.match(/^[^>]*\s+rel\s*=\s*"([^"]*)"/i);
+            if (matches && matches[1].toLowerCase() == 'stylesheet') {
+                var change = {start: startElement,
+                              end: endElement,
+                              prefix: '<style' + getType(element) + '>' + EOL,
+                              file: path.join(PackItForms, href),
+                              suffix: '</style>'};
+                changes.push(change);
+            }
+        }
+    };
+    const soup = new Soup(html);
+    soup.getAttribute('div', 'data-include-html', getDataInclude);
+    soup.getAttribute('link', 'href', getStyleSheet);
+    soup.getAttribute('script', 'src', getScript);
+    changes.sort(function(a, b) {
+        return a.start - b.start;
     });
+    var newHtml = '';
+    var htmlStart = 0;
+    changes.forEach(function(change) {
+        if (htmlStart < change.start) {
+            newHtml += html.substring(htmlStart, change.start);
+        }
+        if (change.prefix) {
+            newHtml += change.prefix;
+        }
+        if (change.file) {
+            newHtml += fs.readFileSync(change.file, ENCODING);
+        }
+        if (change.suffix) {
+            newHtml += change.suffix;
+        }
+        htmlStart = change.end;
+    });
+    if (htmlStart < html.length) {
+        newHtml += html.substring(htmlStart, html.length);
+    }
+    return newHtml;
 }
 
 function onSubmit(formId, buffer, res) {
