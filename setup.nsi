@@ -28,6 +28,7 @@ UninstPage instfiles
 
 Var /GLOBAL OUTPOST_CODE
 Var /GLOBAL OUTPOST_DATA
+Var /GLOBAL AOCLIENT_EXE
 Var /GLOBAL WSCRIPT_EXE
 
 Function StrContainsSpace
@@ -64,25 +65,36 @@ Function .onInit
   ${EndIf}
 FunctionEnd
 
-!macro defineFindOutposts un
-Function ${un}FindOutpost
+Function FindOutpost
   Pop $0
   ClearErrors
   ReadINIStr $1 "$0\Outpost.conf" DataDirectory DataDir
   ${IfNot} ${Errors}
-    CopyFiles "$0\Aoclient.exe" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
-    ${If} ${Errors}
+    ${IfNot} ${FileExists} "$0\Aoclient.exe"
       MessageBox MB_YESNO|MB_ICONEXCLAMATION "${DisplayName} won't work with $0, because it doesn't contain Aoclient.exe. Do you want to use a different copy of Outpost?" /SD IDNO IDYES goAhead
-        Abort "Can't copy Aoclient.exe from $0."
+        Abort "No Aoclient.exe in $0."
       goAhead:
     ${Else}
+      StrCpy $AOCLIENT_EXE "$0\Aoclient.exe"
       StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$0$\""
       StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$1$\""
     ${EndIf}
-    ClearErrors
   ${EndIf}
+  ClearErrors
 FunctionEnd
 
+Function un.FindOutpost
+  Pop $0
+  ClearErrors
+  ReadINIStr $1 "$0\Outpost.conf" DataDirectory DataDir
+  ${IfNot} ${Errors}
+    StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$0$\""
+    StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$1$\""
+  ${EndIf}
+  ClearErrors
+FunctionEnd
+
+!macro defineFindOutposts un
 # Set $OUTPOST_DATA = a space-separated list of folders that contain Outpost configuration files.
 # If no such folders are found, set it to "".
 Function ${un}FindOutposts
@@ -134,6 +146,12 @@ Section "Install"
   ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
   Call DeleteMyFiles
   ClearErrors
+
+  CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
+  ${If} ${Errors}
+    MessageBox MB_OK|MB_ICONSTOP "Can't copy $AOCLIENT_EXE."
+    Abort "Can't copy $AOCLIENT_EXE."
+  ${EndIf}
 
   # Files to install:
   File launch.vbs
