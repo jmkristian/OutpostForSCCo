@@ -7,9 +7,7 @@
                 try {
                     outpost_envelope = {{envelopeDefaults}};
                     var message = {{message}};
-                    if (message) {
-                        set_form_data_div(message);
-                    }
+                    set_form_data_div(message || '# A new message will go here.');
                     var queryDefaults = {{queryDefaults}};
                     for (var q in queryDefaults) {
                         if (!(q in query_object)) {
