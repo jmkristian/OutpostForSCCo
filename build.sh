@@ -13,7 +13,7 @@ if [ ! -e pack-it-forms/.git ]; then # Don't delete an experimental copy.
 fi
 if [ ! -e pack-it-forms ]; then
     git clone "https://github.com/jmkristian/pack-it-forms.git" || exit $?
-    (cd pack-it-forms && git checkout vLAARES.9)
+    (cd pack-it-forms && git checkout vCERT.4)
     rm -rf pack-it-forms/.git*
 fi
 
