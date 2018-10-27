@@ -696,15 +696,19 @@ function expandIncludes(html, form) {
                           prefix: '<script' + getType(element) + '>' + EOL,
                           file: path.join(PackItForms, src),
                           suffix: '</script>'};
+            changes.push(change);
             if (src == 'resources/js/pack-it-forms.js') {
                 // Add some additional stuff:
-                change.suffix += EOL + expandVariables(
-                    fs.readFileSync(path.join('bin', 'after-submit-buttons.html'), ENCODING),
-                    {message: JSON.stringify(form.message),
-                     envelopeDefaults: JSON.stringify(form.envelope),
-                     queryDefaults: JSON.stringify(form.environment)});
+                changes.push(
+                    {start: startElement + 1,
+                     end: endElement,
+                     prefix: EOL,
+                     suffix: expandVariables(
+                         fs.readFileSync(path.join('bin', 'after-submit-buttons.html'), ENCODING),
+                         {message: JSON.stringify(form.message),
+                          envelopeDefaults: JSON.stringify(form.envelope),
+                          queryDefaults: JSON.stringify(form.environment)})});;
             }
-            changes.push(change);
         }
     };
     const getStyleSheet = function(href, startAttribute, endAttribute, startElement, endElement) {
