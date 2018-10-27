@@ -147,6 +147,7 @@ Section "Install"
   Call DeleteMyFiles
   ClearErrors
 
+  CreateDirectory "$INSTDIR\addons\${addon_name}"
   CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
   ${If} ${Errors}
     MessageBox MB_OK|MB_ICONSTOP "Can't copy $AOCLIENT_EXE."
