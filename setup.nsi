@@ -13,7 +13,7 @@
 # limitations under the License.
 
 !define VersionMajor 1
-!define VersionMinor 4
+!define VersionMinor 6
 
 OutFile "${SetupFileName}_Setup-${VersionMajor}.${VersionMinor}.exe"
 
@@ -147,6 +147,7 @@ Section "Install"
   Call DeleteMyFiles
   ClearErrors
 
+  CreateDirectory "$INSTDIR\addons\${addon_name}"
   CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
   ${If} ${Errors}
     MessageBox MB_OK|MB_ICONSTOP "Can't copy $AOCLIENT_EXE."
