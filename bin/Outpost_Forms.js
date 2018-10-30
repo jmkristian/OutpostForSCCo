@@ -665,7 +665,15 @@ function onGetForm(formId, res) {
   Return a readable stream.
 */
 function expandIncludes(htmlFileName, form) {
-    const html = fs.readFileSync(htmlFileName, ENCODING);
+    const collector = new stream.PassThrough();
+    fs.createReadStream(htmlFileName)
+        .pipe(concat_stream(function(buffer) {
+            expandHtml(buffer.toString(ENCODING), form).pipe(collector);
+        }));
+    return collector;
+}
+
+function expandHtml(html, form) {
     var changes = [];
     const getType = function(element) {
         const matches = element.match(/^[^>]*(\s+type\s*=\s*"[^"]*")/i);
@@ -674,13 +682,7 @@ function expandIncludes(htmlFileName, form) {
     const getDataInclude = function(included, startAttribute, endAttribute, startElement, endElement) {
         if (included) {
             const includedFile = path.join(PackItForms, 'resources', 'html', included + '.html');
-            var replacement = [function() {
-                // This crashes the server: return expandIncludes(includedFile, form);
-                // But this works:
-                var wrapper = new stream.PassThrough();
-                expandIncludes(includedFile, form).pipe(wrapper);
-                return wrapper;
-            }];
+            var replacement = [expandIncludes(includedFile, form)];
             const element = html.substring(startElement, endElement);
             const matches = element.match(/[^>]*>([^<]*)</);
             if (matches && matches[1]) {
@@ -700,21 +702,21 @@ function expandIncludes(htmlFileName, form) {
         if (src) {
             const element = html.substring(startElement, endElement);
             var replacement = ['<script' + getType(element) + '>' + EOL,
-                               function() {
-                                   return fs.createReadStream(path.join(PackItForms, src), ENCODING);
-                               },
+                               fs.createReadStream(path.join(PackItForms, src), ENCODING),
                                '</script>'];
             if (src == 'resources/js/pack-it-forms.js') {
                 // Add some additional stuff:
-                replacement.push(
-                    EOL,
-                    function() {
-                        return expandVariables(
-                            fs.readFileSync(path.join('bin', 'after-submit-buttons.html'), ENCODING),
+                const collector = new stream.PassThrough();
+                fs.createReadStream(path.join('bin', 'after-submit-buttons.html'))
+                    .pipe(concat_stream(function(buffer) {
+                        collector.write(expandVariables(
+                            buffer.toString(ENCODING),
                             {message: JSON.stringify(form.message),
                              envelopeDefaults: JSON.stringify(form.envelope),
-                             queryDefaults: JSON.stringify(form.environment)});
-                    });
+                             queryDefaults: JSON.stringify(form.environment)}));
+                        collector.end();
+                    }));
+                replacement.push(EOL, collector);
             }
             changes.push({start: startElement, end: endElement, replacement: replacement});
         }
@@ -725,9 +727,7 @@ function expandIncludes(htmlFileName, form) {
             var matches = element.match(/^[^>]*\s+rel\s*=\s*"([^"]*)"/i);
             if (matches && matches[1].toLowerCase() == 'stylesheet') {
                 var replacement = ['<style' + getType(element) + '>' + EOL,
-                                   function() {
-                                       return fs.createReadStream(path.join(PackItForms, href), ENCODING);
-                                   },
+                                   fs.createReadStream(path.join(PackItForms, href), ENCODING),
                                    '</style>'];
                 changes.push({start: startElement, end: endElement, replacement: replacement});
             }
