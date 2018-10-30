@@ -65,7 +65,9 @@ const morgan = require('morgan');
 const os = require('os');
 const path = require('path');
 const querystring = require('querystring');
+const stream = require('stream');
 const Soup = require('soup');
+const StreamConcat = require('stream-concat');
 const Transform = require('stream').Transform;
 const util = require('util');
 
@@ -643,9 +645,8 @@ function onGetForm(formId, res) {
             if (!form.environment.filename) {
                 throw new Error('filename is ' + form.environment.filename);
             }
-            var html = fs.readFileSync(path.join(PackItForms, form.environment.filename), ENCODING);
-            html = expandIncludes(html, form);
-            res.send(html);
+            expandIncludes(path.join(PackItForms, form.environment.filename), form)
+                .pipe(res);
         } catch(err) {
             res.send(errorToHTML(err, form));
         }
@@ -661,54 +662,61 @@ function onGetForm(formId, res) {
       "9b.": "{{msgno|msgno2name}}"
     }
   </div>
+  Return a readable stream.
 */
-function expandIncludes(html, form) {
+function expandIncludes(htmlFileName, form) {
+    const html = fs.readFileSync(htmlFileName, ENCODING);
     var changes = [];
     const getType = function(element) {
-        var matches = element.match(/^[^>]*(\s+type\s*=\s*"[^"]*")/i);
+        const matches = element.match(/^[^>]*(\s+type\s*=\s*"[^"]*")/i);
         return matches ? matches[1] : '';
     };
     const getDataInclude = function(included, startAttribute, endAttribute, startElement, endElement) {
         if (included) {
-            var element = html.substring(startElement, endElement);
-            var change = {start: startElement,
-                          end: endElement,
-                          file: path.join(PackItForms, 'resources', 'html', included + '.html')}
-            var matches = element.match(/[^>]*>([^<]*)</);
+            const includedFile = path.join(PackItForms, 'resources', 'html', included + '.html');
+            var replacement = [function() {
+                // This crashes the server: return expandIncludes(includedFile, form);
+                // But this works:
+                var wrapper = new stream.PassThrough();
+                expandIncludes(includedFile, form).pipe(wrapper);
+                return wrapper;
+            }];
+            const element = html.substring(startElement, endElement);
+            const matches = element.match(/[^>]*>([^<]*)</);
             if (matches && matches[1]) {
-                var formDefaults = matches[1];
-                change.suffix = `<script type="text/javascript">
+                const formDefaults = matches[1];
+                replacement.push(`<script type="text/javascript">
   var formDefaultValues;
   if (!formDefaultValues) {
       formDefaultValues = [];
   }
   formDefaultValues.push(${formDefaults});
-</script>`;
+</script>`);
             }
-            changes.push(change);
+            changes.push({start: startElement, end: endElement, replacement: replacement});
         }
     };
     const getScript = function(src, startAttribute, endAttribute, startElement, endElement) {
         if (src) {
-            var element = html.substring(startElement, endElement);
-            var change = {start: startElement,
-                          end: endElement,
-                          prefix: '<script' + getType(element) + '>' + EOL,
-                          file: path.join(PackItForms, src),
-                          suffix: '</script>'};
-            changes.push(change);
+            const element = html.substring(startElement, endElement);
+            var replacement = ['<script' + getType(element) + '>' + EOL,
+                               function() {
+                                   return fs.createReadStream(path.join(PackItForms, src), ENCODING);
+                               },
+                               '</script>'];
             if (src == 'resources/js/pack-it-forms.js') {
                 // Add some additional stuff:
-                changes.push(
-                    {start: startElement + 1,
-                     end: endElement,
-                     prefix: EOL,
-                     suffix: expandVariables(
-                         fs.readFileSync(path.join('bin', 'after-submit-buttons.html'), ENCODING),
-                         {message: JSON.stringify(form.message),
-                          envelopeDefaults: JSON.stringify(form.envelope),
-                          queryDefaults: JSON.stringify(form.environment)})});;
+                replacement.push(
+                    EOL,
+                    function() {
+                        return expandVariables(
+                            fs.readFileSync(path.join('bin', 'after-submit-buttons.html'), ENCODING),
+                            {message: JSON.stringify(form.message),
+                             envelopeDefaults: JSON.stringify(form.envelope),
+                             queryDefaults: JSON.stringify(form.environment)});
+                    });
             }
+            changes.push({start: startElement, end: endElement, replacement: replacement});
         }
     };
     const getStyleSheet = function(href, startAttribute, endAttribute, startElement, endElement) {
@@ -716,12 +724,12 @@ function expandIncludes(html, form) {
             var element = html.substring(startElement, endElement);
             var matches = element.match(/^[^>]*\s+rel\s*=\s*"([^"]*)"/i);
             if (matches && matches[1].toLowerCase() == 'stylesheet') {
-                var change = {start: startElement,
-                              end: endElement,
-                              prefix: '<style' + getType(element) + '>' + EOL,
-                              file: path.join(PackItForms, href),
-                              suffix: '</style>'};
-                changes.push(change);
+                var replacement = ['<style' + getType(element) + '>' + EOL,
+                                   function() {
+                                       return fs.createReadStream(path.join(PackItForms, href), ENCODING);
+                                   },
+                                   '</style>'];
+                changes.push({start: startElement, end: endElement, replacement: replacement});
             }
         }
     };
@@ -732,27 +740,46 @@ function expandIncludes(html, form) {
     changes.sort(function(a, b) {
         return a.start - b.start;
     });
-    var newHtml = '';
+    var sources = [];
     var htmlStart = 0;
     changes.forEach(function(change) {
         if (htmlStart < change.start) {
-            newHtml += html.substring(htmlStart, change.start);
+            sources.push(streamFromString(html, htmlStart, change.start));
         }
-        if (change.prefix) {
-            newHtml += change.prefix;
-        }
-        if (change.file) {
-            newHtml += fs.readFileSync(change.file, ENCODING);
-        }
-        if (change.suffix) {
-            newHtml += change.suffix;
-        }
+        sources.push.apply(sources, change.replacement);
         htmlStart = change.end;
     });
     if (htmlStart < html.length) {
-        newHtml += html.substring(htmlStart, html.length);
+        sources.push(streamFromString(html, htmlStart, html.length));
     }
-    return newHtml;
+    var sourceNext = 0;
+    return new StreamConcat(function() {
+        if (sourceNext >= sources.length) {
+            return null; // end of stream
+        }
+        var source = sources[sourceNext++];
+        while ((typeof source) == 'function') {
+            source = source();
+        }
+        return ((typeof source) == 'string') ? streamFromString(source) : source;
+    });
+}
+
+/** Create a readable stream that produces a slice of the given string. */
+function streamFromString(from, first, end) {
+    const reader = new stream.Readable();
+    if (first === undefined) first = 0;
+    if (end === undefined) end = from.length;
+    reader._read = function(size) {
+        size = Math.min(end - first, Math.max(1, size));
+        if (size <= 0) {
+            this.push(null); // end of stream
+        } else {
+            this.push(from.substring(first, first + size));
+            first += size;
+        }
+    }
+    return reader;
 }
 
 function onSubmit(formId, buffer, res) {

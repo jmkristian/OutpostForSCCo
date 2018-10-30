@@ -10,6 +10,7 @@
     "express": "4.16.3",
     "morgan": "1.9.0",
     "showdown": "^1.8.6",
-    "soup": "0.1.4"
+    "soup": "0.1.4",
+    "stream-concat": "0.3.0"
   }
 }
