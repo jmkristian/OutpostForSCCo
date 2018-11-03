@@ -49,13 +49,18 @@
                 var header = messageHeader.textContent;
                 // The subject comes after !PACF! in the first line:
                 var found = /^\s*![^!\r\n]*!\s*([^\r\n]*)/.exec(header);
-                // Remove that first line:
-                header = header.replace(/^\s*![^!\r\n]*![^\r\n]*[\r\n]*/, '');
                 if (found) {
                     // Add the subject in a comment:
                     header = header.replace(/\s*$/, '\r\n# SUBJECT: ' + found[1]);
                 }
+                // Correct FORMFILENAME:
+                header = header.replace(/([\r\n]#\s*FORMFILENAME\s*:)[^\r\n]*/,
+                                        "$1 " + query_object.filename);
+                // Replace that first line:
+                header = header.replace(/^[\r\n]*![^!\r\n]*![^\r\n]*([\r\n])/,
+                                        "!" + query_object.addon_name + "!$1");
                 messageHeader.textContent = header;
+                outpost_message_footer = "!/ADDON!\r\n";
                 if (status == 'new' && query_object.mode == 'readonly') {
                     // This message was just submitted to Outpost. Let the operator know:
                     var div = document.createElement('div');

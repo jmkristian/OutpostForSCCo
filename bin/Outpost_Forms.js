@@ -715,12 +715,10 @@ function onSubmit(formId, buffer, res) {
         const subject = foundSubject ? foundSubject[1] : '';
         const formFileName = form.environment.filename;
         const msgFileName = path.resolve(PackItMsgs, 'form-' + formId + '.txt');
-        // Convert the message from PACF format to ADDON format:
-        message = message.replace(/[\r\n]*#EOF/, EOL + '!/ADDON!');
-        // Correct the FORMFILENAME:
-        message = message.replace(/[\r\n]*(#\s*FORMFILENAME:\s*)[^\r\n]*[\r\n]*/,
-                                  EOL + '$1' + formFileName.replace('$', '\\$') + EOL);
         form.message = message;
+        // Remove the first line of the Outpost message header:
+        // Aoclient.exe will insert !addon_name!.
+        message = message.replace(/^[\r\n]*![^\r\n]*[\r\n]+/, '');
         fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
             if (err) {
                 res.send(errorToHTML(err, form));
