@@ -122,6 +122,7 @@ Function ${un}DeleteMyFiles
   Delete launch.vbs
   Delete launch.cmd
   Delete launch-v.cmd
+  Delete manual.cmd
   Delete README.*
   RMDir /r "$INSTDIR\addons"
   RMDir /r "$INSTDIR\bin"
@@ -158,6 +159,7 @@ Section "Install"
   File launch.vbs
   File launch.cmd
   File launch-v.cmd
+  File manual.cmd
   File README.html
   SetOutPath "$INSTDIR\addons"
   File addons\${addon_name}.launch
