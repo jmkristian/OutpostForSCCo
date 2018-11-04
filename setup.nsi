@@ -119,10 +119,10 @@ FunctionEnd
 
 !macro defineDeleteMyFiles un
 Function ${un}DeleteMyFiles
+  Delete browse.cmd
   Delete launch.vbs
   Delete launch.cmd
   Delete launch-v.cmd
-  Delete manual.cmd
   Delete README.*
   RMDir /r "$INSTDIR\addons"
   RMDir /r "$INSTDIR\bin"
@@ -156,10 +156,10 @@ Section "Install"
   ${EndIf}
 
   # Files to install:
+  File browse.cmd
   File launch.vbs
   File launch.cmd
   File launch-v.cmd
-  File manual.cmd
   File README.html
   SetOutPath "$INSTDIR\addons"
   File addons\${addon_name}.launch
