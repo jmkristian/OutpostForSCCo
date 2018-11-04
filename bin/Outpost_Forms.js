@@ -601,7 +601,7 @@ function getMessage(environment) {
     if (message) {
         // Outpost sometimes appends junk to the end of message.
         // One observed case was "You have new messages."
-        message = message.replace(/[\r\n]\s*!\/ADDON!.*$/, '');
+        message = message.replace(/[\r\n]\s*!\/ADDON![\s\S]*$/, '');
     }
     return message;
 }
