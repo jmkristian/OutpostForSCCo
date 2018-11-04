@@ -64,7 +64,6 @@ const http = require('http');
 const morgan = require('morgan');
 const os = require('os');
 const path = require('path');
-const querystring = require('querystring');
 const Transform = require('stream').Transform;
 const util = require('util');
 
@@ -115,7 +114,7 @@ function install() {
     // This method must be idempotent, in part because Avira antivirus
     // might execute it repeatedly while scrutinizing the .exe for viruses.
     const myDirectory = process.cwd();
-    const addonNames = getAddonNames('addons');
+    const addonNames = getAddonNames();
     log('addons ' + JSON.stringify(addonNames));
     installConfigFiles(myDirectory, addonNames);
     installIncludes(myDirectory, addonNames);
@@ -198,7 +197,7 @@ function installIncludes(myDirectory, addonNames) {
 
 function uninstall() {
     stopServers(function() {
-        const addonNames = getAddonNames('addons');
+        const addonNames = getAddonNames();
         log('addons ' + JSON.stringify(addonNames));
         for (a = 3; a < process.argv.length; a++) {
             var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
@@ -230,7 +229,7 @@ function uninstall() {
 /** Return a list of names, such that for each name there exists a <name>.launch file in the given directory. */
 function getAddonNames(directoryName) {
     var addonNames = [];
-    const fileNames = fs.readdirSync(directoryName, {encoding: ENCODING});
+    const fileNames = fs.readdirSync(directoryName || 'addons', {encoding: ENCODING});
     for (var f in fileNames) {
         var fileName = fileNames[f];
         var found = /^(.*)\.launch$/.exec(fileName);
@@ -390,13 +389,22 @@ function serve() {
     app.set('etag', false); // convenient for troubleshooting
     app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
     app.use(bodyParser.json({type: JSON_TYPE}));
+    app.use(bodyParser.urlencoded({extended: false}));
     app.post(OpenOutpostMessage, function(req, res, next) {
         // req.body is an array, thanks to bodyParser.json
         const args = req.body;
         res.end();
         if (args && args.length > 0) {
             const formId = '' + nextFormId++;
-            onOpen(formId, args, port);
+            onOpen(formId, args);
+            const command = 'start "Browse" /B http://' + LOCALHOST + ':' + port + '/form-' + formId;
+            log(command);
+            child_process.exec(
+                command,
+                function(err, stdout, stderr) {
+                    log(err);
+                    log('started browser ' + stdout.toString(ENCODING) + stderr.toString(ENCODING));
+                });
         }
     });
     app.get('/form-:formId', function(req, res, next) {
@@ -405,9 +413,7 @@ function serve() {
     });
     app.post('/submit-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
-        req.pipe(concat_stream(function(buffer) {
-            onSubmit(req.params.formId, buffer, res);
-        }));
+        onSubmit(req.params.formId, req.body, res);
     });
     app.get('/ping-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
@@ -426,6 +432,27 @@ function serve() {
         res.end(); // with no body
         log('stopped');
         process.exit(0);
+    });
+    app.get('/manual', function(req, res, next) {
+        onGetManual(res);
+    });
+    app.post('/manual-create', function(req, res, next) {
+        try {
+            const formId = '' + nextFormId++;
+            const form = req.body.form;
+            const space = form.indexOf(' ');
+            onOpen(formId, ['--message_status', 'manual',
+                            '--addon_name', form.substring(0, space),
+                            '--filename', form.substring(space + 1)]);
+            res.redirect('/form-' + formId);
+        } catch(err) {
+            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+            res.end(errorToHTML(err, JSON.stringify(req.body)));
+        }
+    });
+    app.post('/manual-view', function(req, res, next) {
+        res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
+        res.end(JSON.stringify(req.body));
     });
     app.get(/^\/.*/, express.static(PackItForms));
 
@@ -471,7 +498,7 @@ function serve() {
     }, 5000);
 }
 
-function onOpen(formId, args, port) {
+function onOpen(formId, args) {
     // This code should be kept dead simple, since
     // it can't show a problem to the operator.
     openForms[formId] = {
@@ -479,20 +506,14 @@ function onOpen(formId, args, port) {
         quietSeconds: 0
     };
     log('form ' + formId + ' opened');
-    const command = 'start "Browse" /B http://' + LOCALHOST + ':' + port + '/form-' + formId;
-    log(command);
-    child_process.exec(
-        command,
-        function(err, stdout, stderr) {
-            log(err);
-            log('started browser ' + stdout.toString(ENCODING) + stderr.toString(ENCODING));
-        });
 }
 
 function keepAlive(formId) {
     form = openForms[formId];
     if (form) {
         form.quietSeconds = 0;
+    } else if (formId == "0") {
+        openForms[formId] = {quietSeconds: 0};
     }
 }
 
@@ -705,10 +726,9 @@ function expandDataInclude(data, form) {
     });
 }
 
-function onSubmit(formId, buffer, res) {
+function onSubmit(formId, q, res) {
     res.set({'Content-Type': 'text/html; charset=' + CHARSET});
     try {
-        const q = querystring.parse(buffer.toString(CHARSET));
         var message = q.formtext;
         const form = openForms[formId];
         const foundSubject = /[\r\n]#\s*SUBJECT:\s*([^\r\n]*)/.exec(message);
@@ -721,6 +741,11 @@ function onSubmit(formId, buffer, res) {
         message = message.replace(/[\r\n]*(#\s*FORMFILENAME:\s*)[^\r\n]*[\r\n]*/,
                                   EOL + '$1' + formFileName.replace('$', '\\$') + EOL);
         form.message = message;
+        if (form.environment.message_status == 'manual') {
+            message = '!' + form.environment.addon_name + '!' + EOL + message;
+            res.end('<html><body><pre>' + encodeHTML(message) + '</pre></body></html>');
+            return;
+        }
         fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
             if (err) {
                 res.send(errorToHTML(err, form));
@@ -766,6 +791,58 @@ function onSubmit(formId, buffer, res) {
     } catch(err) {
         res.send(errorToHTML(err, {formId: formId}));
     }
+}
+
+/** Handle an HTTP GET /manual request. */
+function onGetManual(res) {
+    keepAlive(0);
+    res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+    const template = path.join('bin', 'manual.html');
+    fs.readFile(template, {encoding: ENCODING}, function(err, data) {
+        if (err) {
+            res.send(errorToHTML(err, template));
+        } else {
+            try {
+                var forms = getAddonForms();
+                var form_options = forms
+                    .filter(function(form) {return !!form.a && !!form.t;})
+                    .map(function(form) {
+                        return EOL
+                            + '<option value="'
+                            + encodeHTML(form.a + ' ' + form.t)
+                            + '">'
+                            + encodeHTML(form.fn.replace(/_/g, ' ') || form.t)
+                            + '</option>';
+                    });
+                res.send(expandVariables(data, {form_options: form_options.join('')}));
+            } catch(err) {
+                res.send(errorToHTML(err, forms));
+            }
+        }
+        res.end();
+    });
+}
+
+function getAddonForms() {
+    var addonForms = [];
+    getAddonNames().forEach(function(addonName) {
+        fs.readFileSync(path.join('addons', addonName + '.launch'), {encoding: ENCODING})
+            .split(/[\r\n]+/).forEach(function(line) {
+                if (line.startsWith('ADDON ')) {
+                    var addonForm = {};
+                    var name = null;
+                    line.split(/\s+/).forEach(function(token) {
+                        if (token.startsWith('-')) {
+                            name = token.substring(1);
+                        } else if (name) {
+                            addonForm[name] = token;
+                        }
+                    });
+                    addonForms.push(addonForm);
+                }
+            });
+    });
+    return addonForms;
 }
 
 function errorToHTML(err, state) {
