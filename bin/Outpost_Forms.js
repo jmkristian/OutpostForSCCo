@@ -451,8 +451,19 @@ function serve() {
         }
     });
     app.post('/manual-view', function(req, res, next) {
-        res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
-        res.end(JSON.stringify(req.body));
+        try {
+            const formId = '' + nextFormId++;
+            const message = req.body.message;
+            const addon_name = message.match(/^[\r\n]*!([^!\r\n]*)!/)[1];
+            onOpen(formId, ['--message_status', 'unread',
+                            '--addon_name', addon_name,
+                            '--message', message,
+                            '--mode', 'readonly']);
+            res.redirect('/form-' + formId);
+        } catch(err) {
+            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+            res.end(errorToHTML(err, JSON.stringify(req.body)));
+        }
     });
     app.get(/^\/.*/, express.static(PackItForms));
 
@@ -581,9 +592,13 @@ function parseArgs(args) {
 
 function getMessage(environment) {
     var message = null;
-    if (environment.MSG_FILENAME) {
+    if (environment.message) {
+        message = environment.message;
+    } else if (environment.MSG_FILENAME) {
         const msgFileName = path.resolve(PackItMsgs, environment.MSG_FILENAME);
         message = fs.readFileSync(msgFileName, {encoding: ENCODING});
+    }
+    if (message) {
         // Outpost sometimes appends junk to the end of message.
         // One observed case was "You have new messages."
         message = message.replace(/[\r\n]\s*!\/ADDON!.*$/, '');
