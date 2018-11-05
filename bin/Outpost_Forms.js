@@ -52,7 +52,7 @@
     them and operators who have to wait for Avast to scan them.
 
   To address the issue of operators waiting for antivirus scan, the
-  installation script runs "Outpost_Forms.exe open dry-run", which runs this program
+  installation script runs "Outpost_Forms.exe dry-run", which runs this program
   as though it were handling a message, but doesn't launch a browser.
 */
 const bodyParser = require('body-parser');
@@ -325,7 +325,11 @@ function stopServers(next) {
                 ports.push(found[1]);
             }
         }
-        fs.unlink(PortFileName, log);
+        try {
+            fs.unlink(PortFileName, log);
+        } catch(err) {
+            log(err); // harmless
+        }
         var forked = ports.length;
         function join(err) {
             log(err);
@@ -938,6 +942,7 @@ function expandVariablesInFile(variables, fromFile, intoFile) {
         if (newData != data || intoFile != fromFile) {
             fs.writeFile(intoFile, newData, {encoding: ENCODING}, function(err) {
                 if (err) logAndAbort(err);
+                log('wrote ' + intoFile);
             });
         }
     });
