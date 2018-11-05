@@ -422,6 +422,9 @@ function serve() {
     app.get('/ping-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
         res.statusCode = NOT_FOUND;
+        res.set({'Cache-Control': 'no-cache, no-store, must-revalidate', // HTTP 1.1
+                 'Pragma': 'no-cache', // HTTP 1.0
+                 'Expires': '0'}); // proxies
         res.end(); // with no body. The client ignores this response.
     });
     app.get('/msgs/:msgno', function(req, res, next) {
