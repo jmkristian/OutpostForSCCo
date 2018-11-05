@@ -52,7 +52,7 @@
     them and operators who have to wait for Avast to scan them.
 
   To address the issue of operators waiting for antivirus scan, the
-  installation script runs "Outpost_Forms.exe open dry-run", which runs this program
+  installation script runs "Outpost_Forms.exe dry-run", which runs this program
   as though it were handling a message, but doesn't launch a browser.
 */
 const bodyParser = require('body-parser');
@@ -83,10 +83,29 @@ const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join('logs', 'server-port.txt');
 const StopServer = '/stopOutpostForLAARES';
 
+function toWindowsEOL(s) {
+    return s
+        .replace(/([^\r])\n/g, '$1' + EOL)
+        .replace(/^\n/, EOL);
+}
+
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
     const verb = process.argv[2];
-    if (verb != 'serve') {
+    if (verb == 'install' || verb == 'uninstall' || verb == 'stop') {
+        const stdwrite = process.stdout.write;
+        process.stdout.write = process.stderr.write = function(chunk, encoding, output) {
+            var args = Array.prototype.map.call(arguments, function(arg) {
+                return arg;
+            });
+            if (encoding == 'buffer') {
+                args[0] = new Buffer(toWindowsEOL(chunk.toString('binary')), 'binary');
+            } else if (typeof chunk == 'string') {
+                args[0] = toWindowsEOL(chunk);
+            }
+            stdwrite.apply(process.stdout, args);
+        };
+    } else if (verb != 'serve') {
         logToFile(path.join('logs', verb + '.log'))
     }
     switch(verb) {
@@ -112,13 +131,17 @@ if (process.argv.length > 2) {
 }
 
 function install() {
-    // This method must be idempotent, in part because Avira antivirus
+    // This method must be idempotent, in part because antivirus software
     // might execute it repeatedly while scrutinizing the .exe for viruses.
-    const myDirectory = process.cwd();
-    const addonNames = getAddonNames('addons');
-    log('addons ' + JSON.stringify(addonNames));
-    installConfigFiles(myDirectory, addonNames);
-    installIncludes(myDirectory, addonNames);
+    try {
+        const myDirectory = process.cwd();
+        const addonNames = getAddonNames('addons');
+        log('addons ' + JSON.stringify(addonNames));
+        installConfigFiles(myDirectory, addonNames);
+        installIncludes(myDirectory, addonNames);
+    } catch(err) {
+        logAndAbort(err);
+    }
 }
 
 function installConfigFiles(myDirectory, addonNames) {
@@ -131,67 +154,62 @@ function installConfigFiles(myDirectory, addonNames) {
         // Use launch.cmd instead of launch.vbs:
         launch = path.join(myDirectory, 'launch.cmd');
     }
-    for (var n in addonNames) {
-        var addon_name = addonNames[n];
+    addonNames.forEach(function(addon_name) {
         expandVariablesInFile({addon_name: addon_name, INSTDIR: myDirectory, LAUNCH: launch},
                               path.join('bin', 'addon.ini'),
                               path.join('addons', addon_name + '.ini'));
         expandVariablesInFile({addon_name: addon_name},
                               path.join('bin', 'Aoclient.ini'),
                               path.join('addons', addon_name, 'Aoclient.ini'));
-    }
+    });
 }
 
 /* Make sure Outpost's Launch.local files include addons/*.launch. */
 function installIncludes(myDirectory, addonNames) {
     const oldInclude = new RegExp('^INCLUDE\\s+' + enquoteRegex(myDirectory) + '[\\\\/]', 'i');
-    var myIncludes = [];
-    for (var n in addonNames) {
-        myIncludes.push('INCLUDE ' + path.resolve(myDirectory, 'addons', addonNames[n] + '.launch'));
-    }
+    var myIncludes = addonNames.map(function(addon_name) {
+        return'INCLUDE ' + path.resolve(myDirectory, 'addons', addon_name + '.launch');
+    });
     // Each of the process arguments names a directory that contains Outpost configuration data.
     for (var a = 4; a < process.argv.length; a++) {
-        var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
-        // Upsert myIncludes into outpostLaunch:
-        if (!fs.existsSync(outpostLaunch)) {
-            // Work around a bug: Outpost might ignore the first line of Launch.local.
-            var data = EOL + myIncludes.join(EOL) + EOL;
-            fs.writeFile(outpostLaunch, data, {encoding: ENCODING}, function(err) {
-                log(err ? err : 'included into ' + outpostLaunch);
-            });
-        } else {
-            fs.readFile(outpostLaunch, ENCODING, function(err, data) {
-                if (err) {
-                    log(err); // tolerable
-                } else {
-                    var oldLines = data.split(/[\r\n]+/);
-                    var newLines = [];
-                    var included = false;
-                    for (var i in oldLines) {
-                        var oldLine = oldLines[i];
-                        if (!oldLine) {
-                            // remove this line
-                        } else if (!oldInclude.test(oldLine)) {
-                            newLines.push(oldLine); // no change
-                        } else if (!included) {
-                            newLines = newLines.concat(myIncludes); // replace with myIncludes
-                            included = true;
-                        } // else remove this line
-                    }
-                    if (!included) {
-                        newLines = newLines.concat(myIncludes); // append myIncludes
-                    }
-                    // Work around a bug: Outpost might ignore the first line of Launch.local.
-                    var newData = EOL + newLines.join(EOL) + EOL;
-                    if (newData == data) {
-                        log('already included into ' + outpostLaunch);
-                    } else {
-                        fs.writeFile(outpostLaunch, newData, {encoding: ENCODING}, function(err) {
-                            log(err ? err : ('included into ' + outpostLaunch));
-                        }); 
-                    }
+        try {
+            var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
+            // Upsert myIncludes into outpostLaunch:
+            if (!fs.existsSync(outpostLaunch)) {
+                // Work around a bug: Outpost might ignore the first line of Launch.local.
+                var data = EOL + myIncludes.join(EOL) + EOL;
+                fs.writeFileSync(outpostLaunch, data, {encoding: ENCODING});
+                log('included into ' + outpostLaunch);
+            } else {
+                var data = fs.readFileSync(outpostLaunch, ENCODING);
+                var oldLines = data.split(/[\r\n]+/);
+                var newLines = [];
+                var included = false;
+                for (var i in oldLines) {
+                    var oldLine = oldLines[i];
+                    if (!oldLine) {
+                        // remove this line
+                    } else if (!oldInclude.test(oldLine)) {
+                        newLines.push(oldLine); // no change
+                    } else if (!included) {
+                        newLines = newLines.concat(myIncludes); // replace with myIncludes
+                        included = true;
+                    } // else remove this line
                 }
-            });
+                if (!included) {
+                    newLines = newLines.concat(myIncludes); // append myIncludes
+                }
+                // Work around a bug: Outpost might ignore the first line of Launch.local.
+                var newData = EOL + newLines.join(EOL) + EOL;
+                if (newData == data) {
+                    log('already included into ' + outpostLaunch);
+                } else {
+                    fs.writeFileSync(outpostLaunch, newData, {encoding: ENCODING});
+                    log('included into ' + outpostLaunch);
+                }
+            }
+        } catch (err) {
+            log(err);
         }
     }
 }
@@ -204,8 +222,7 @@ function uninstall() {
             var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
             if (fs.existsSync(outpostLaunch)) {
                 // Remove INCLUDEs from outpostLaunch:
-                for (var n in addonNames) {
-                    var addonName = addonNames[n];
+                addonNames.forEach(function(addonName) {
                     var myLaunch = enquoteRegex(path.resolve(process.cwd(), 'addons', addonName + '.launch'));
                     var myInclude1 = new RegExp('^INCLUDE\\s+' + myLaunch + '[\r\n]*', 'i');
                     var myInclude = new RegExp('[\r\n]+INCLUDE\\s+' + myLaunch + '[\r\n]+', 'gi');
@@ -221,7 +238,7 @@ function uninstall() {
                             }
                         }
                     });
-                }
+                });
             }
         }
     });
@@ -326,7 +343,11 @@ function stopServers(next) {
                 ports.push(found[1]);
             }
         }
-        fs.unlink(PortFileName, log);
+        try {
+            fs.unlink(PortFileName, log);
+        } catch(err) {
+            log(err); // harmless
+        }
         var forked = ports.length;
         function join(err) {
             log(err);
@@ -816,11 +837,9 @@ function logToFile(fileName) {
         // Transform line endings from Unix style to Windows style.
         transform: function(chunk, encoding, output) {
             if (encoding == 'buffer') {
-                output(null, new Buffer(chunk.toString('binary')
-                                             .replace(/([^\r])\n/g, '$1' + EOL),
-                                        'binary'));;
+                output(null, new Buffer(toWindowsEOL(chunk.toString('binary')), 'binary'));
             } else if (typeof chunk == 'string') {
-                output(null, chunk.replace(/([^\r])\n/g, '$1' + EOL));
+                output(null, toWindowsEOL(chunk));
             } else {
                 output(null, chunk); // no change to an object
             }
@@ -840,15 +859,12 @@ function expandVariablesInFile(variables, fromFile, intoFile) {
     if (!fs.existsSync(path.dirname(intoFile))) {
         fs.mkdirSync(path.dirname(intoFile));
     }
-    fs.readFile(fromFile, ENCODING, function(err, data) {
-        if (err) logAndAbort(err);
-        var newData = expandVariables(data, variables);
-        if (newData != data || intoFile != fromFile) {
-            fs.writeFile(intoFile, newData, {encoding: ENCODING}, function(err) {
-                if (err) logAndAbort(err);
-            });
-        }
-    });
+    var data = fs.readFileSync(fromFile, ENCODING);
+    var newData = expandVariables(data, variables);
+    if (newData != data || intoFile != fromFile) {
+        fs.writeFileSync(intoFile, newData, {encoding: ENCODING});
+        log("wrote " + intoFile);
+    }
 }
 
 function expandVariables(data, values) {

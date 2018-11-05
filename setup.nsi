@@ -17,6 +17,7 @@
 
 OutFile "${SetupFileName}_Setup-${VersionMajor}.${VersionMinor}.exe"
 
+# RequestExecutionLevel highest
 Page directory
 Page instfiles
 UninstPage uninstConfirm
@@ -64,6 +65,20 @@ Function .onInit
     ${EndIf}
   ${EndIf}
 FunctionEnd
+
+!macro ExecAndLog CMD LOG
+  DetailPrint `${CMD}`
+  ExpandEnvStrings $0 "%COMSPEC%"
+  nsExec::ExecToLog `"$0" /C ${CMD} > "${LOG}"`
+  Pop $0
+  ${If} $0 == 0
+    ClearErrors
+  ${Else}
+    SetErrors
+    DetailPrint "failed: $0"
+  ${EndIf}
+!macroend
+!define ExecAndLog '!insertmacro "ExecAndLog"'
 
 Function FindOutpost
   Pop $0
@@ -143,7 +158,7 @@ Section "Install"
   ${EndIf}
 
   # Stop the server (so it will release its lock on bin\Outpost_Forms.exe):
-  ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
+  ${ExecAndLog} "bin\Outpost_Forms.exe stop" "logs\stop.log"
   Call DeleteMyFiles
   ClearErrors
 
@@ -185,9 +200,9 @@ Section "Install"
   IfFileExists $WSCRIPT_EXE +2
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
 
-  ExecShellWait open "bin\Outpost_Forms.exe" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
+  ${ExecAndLog} 'bin\Outpost_Forms.exe install $WSCRIPT_EXE$OUTPOST_DATA' "logs\install.log"
   ${If} ${Errors}
-    Abort "bin\Outpost_Forms.exe install$OUTPOST_DATA failed"
+    Abort "install failed. See logs\install.log for more information."
   ${EndIf}
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
@@ -197,7 +212,7 @@ Section "Install"
     ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run" SW_SHOWMINIMIZED
   ${EndIf}
   ${If} ${Errors}
-    Abort "launch dry-run failed"
+    Abort "dry-run failed. See logs\dry-run.log for more information."
   ${EndIf}
 SectionEnd
 
@@ -210,7 +225,7 @@ Section "Uninstall"
 
   # Remove our line from Outpost configuration files
   Call un.FindOutposts
-  ExecShellWait open "bin\Outpost_Forms.exe" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
+  ${ExecAndLog} 'bin\Outpost_Forms.exe uninstall$OUTPOST_DATA' "logs\uninstall.log"
 
   Call un.DeleteMyFiles
   RMDir /r "$INSTDIR\logs"
