@@ -189,8 +189,6 @@ Function ${un}DeleteMyFiles
       StrCpy $R0 "$R0 To delete them, run this ${un}installer again as an administrator."
     ${EndIf}
     MessageBox MB_OK|MB_ICONEXCLAMATION "$R0"
-  ${Else}
-    MessageBox MB_OK "deleted my files"
   ${EndIf}
   Pop $R1
   Pop $R0
