@@ -17,6 +17,7 @@
 
 OutFile "${SetupFileName}_Setup-${VersionMajor}.${VersionMinor}.exe"
 
+RequestExecutionLevel highest
 Page directory
 Page instfiles
 UninstPage uninstConfirm
@@ -94,6 +95,30 @@ Function un.FindOutpost
   ClearErrors
 FunctionEnd
 
+Function IsUserAdmin
+  Push $R0
+  Push $R1
+  StrCpy $R0 true
+  ClearErrors
+  UserInfo::GetName
+  ${If} ${Errors}
+    # This is Windows 9x. Every user is an admin.
+  ${Else}
+    Pop $R1
+    UserInfo::GetAccountType
+    Pop $R1
+    ${If} "$R1" == ""
+      # This is Windows 9x. Every user is an admin.
+    ${ElseIf} "$R1" == "Admin"
+      # This user is an admin.
+    ${Else}
+      StrCpy $R0 false
+    ${EndIf}
+  ${EndIf}
+  Pop $R1
+  Exch $R0
+FunctionEnd
+
 !macro defineFindOutposts un
 # Set $OUTPOST_DATA = a space-separated list of folders that contain Outpost configuration files.
 # If no such folders are found, set it to "".
@@ -145,9 +170,9 @@ Section "Install"
   # Stop the server (so it will release its lock on bin\Outpost_Forms.exe):
   ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
   Call DeleteMyFiles
-  ClearErrors
 
   CreateDirectory "$INSTDIR\addons\${addon_name}"
+  ClearErrors
   CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
   ${If} ${Errors}
     MessageBox MB_OK|MB_ICONSTOP "Can't copy $AOCLIENT_EXE."
@@ -170,8 +195,20 @@ Section "Install"
 
   # define uninstaller:
   WriteUninstaller "$INSTDIR\uninstall.exe"
+  ClearErrors
   WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "${DisplayName}"
   WriteRegStr   HKLM "${REG_SUBKEY}" UninstallString "$\"$INSTDIR\uninstall.exe$\""
+  ${If} ${Errors}
+    DetailPrint "not registered"
+    StrCpy $0 "${DisplayName} isn't registered with Windows as a program."
+    Call IsUserAdmin
+    Pop $1
+    ${If} $1 != true
+      StrCpy $0 "$0 To register it, run this installer again as an administrator."
+    ${EndIf}
+    StrCpy $0 "$0 To uninstall it, run the uninstall.exe program in $INSTDIR\."
+    MessageBox MB_OK|MB_ICONEXCLAMATION "$0"
+  ${EndIf}
   WriteRegStr   HKLM "${REG_SUBKEY}" Publisher "Los Altos ARES"
   WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "https://github.com/jmkristian/OutpostforLAARES/blob/master/README.md"
   WriteRegStr   HKLM "${REG_SUBKEY}" DisplayVersion "${VersionMajor}.${VersionMinor}"
@@ -185,19 +222,21 @@ Section "Install"
   IfFileExists $WSCRIPT_EXE +2
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
 
+  ClearErrors
   ExecShellWait open "bin\Outpost_Forms.exe" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
   ${If} ${Errors}
-    Abort "bin\Outpost_Forms.exe install$OUTPOST_DATA failed"
+    Abort "install failed"
   ${EndIf}
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
+  ClearErrors
   ${If} ${AtMostWinXP}
     ExecShellWait open              ".\launch.cmd" "dry-run" SW_SHOWMINIMIZED
   ${Else}
     ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run" SW_SHOWMINIMIZED
   ${EndIf}
   ${If} ${Errors}
-    Abort "launch dry-run failed"
+    Abort "dry-run failed"
   ${EndIf}
 SectionEnd
 
