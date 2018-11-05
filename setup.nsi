@@ -33,20 +33,24 @@ Var /GLOBAL AOCLIENT_EXE
 Var /GLOBAL WSCRIPT_EXE
 
 Function StrContainsSpace
-  Pop $0
+  Exch $R0
+  Push $R1
   loop:
-    ${If} $0 == ""
+    ${If} $R0 == ""
       Push false
-      Return
+      GoTo end
     ${Endif}
-    StrCpy $1 $0 1 0
-    ${If} $1 == " "
+    StrCpy $R1 $R0 1 0
+    ${If} $R1 == " "
       Push true
-      Return
+      GoTo end
     ${Endif}
-    StrLen $1 $0
-    StrCpy $0 $0 $1 1
+    StrLen $R1 $R0
+    StrCpy $R0 $R0 $R1 1
     GoTo loop
+  end:
+    Pop $R1
+    Pop $R0
 FunctionEnd
 !macro StrContainsSpace OUT S
   Push `${S}`
@@ -67,35 +71,79 @@ Function .onInit
 FunctionEnd
 
 Function FindOutpost
-  Pop $0
+  Exch $R0
+  Push $R1
   ClearErrors
-  ReadINIStr $1 "$0\Outpost.conf" DataDirectory DataDir
+  ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
   ${IfNot} ${Errors}
-    ${IfNot} ${FileExists} "$0\Aoclient.exe"
-      MessageBox MB_YESNO|MB_ICONEXCLAMATION "${DisplayName} won't work with $0, because it doesn't contain Aoclient.exe. Do you want to use a different copy of Outpost?" /SD IDNO IDYES goAhead
-        Abort "No Aoclient.exe in $0."
+    ${IfNot} ${FileExists} "$R0\Aoclient.exe"
+      MessageBox MB_YESNO|MB_ICONEXCLAMATION "${DisplayName} won't work with $R0, because it doesn't contain Aoclient.exe. Do you want to use a different copy of Outpost?" /SD IDNO IDYES goAhead
+        Abort "No Aoclient.exe in $R0."
       goAhead:
     ${Else}
-      StrCpy $AOCLIENT_EXE "$0\Aoclient.exe"
-      StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$0$\""
-      StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$1$\""
+      StrCpy $AOCLIENT_EXE "$R0\Aoclient.exe"
+      StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
+      StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
     ${EndIf}
   ${EndIf}
   ClearErrors
+  Pop $R1
+  Pop $R0
 FunctionEnd
 
 Function un.FindOutpost
-  Pop $0
+  Exch $R0
+  Push $R1
   ClearErrors
-  ReadINIStr $1 "$0\Outpost.conf" DataDirectory DataDir
+  ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
   ${IfNot} ${Errors}
-    StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$0$\""
-    StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$1$\""
+    StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
+    StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
   ${EndIf}
   ClearErrors
+  Pop $R1
+  Pop $R0
 FunctionEnd
 
-Function IsUserAdmin
+!macro Delete NAME
+  IfFileExists `${NAME}` 0 +5
+  Delete `${NAME}`
+  IfFileExists `${NAME}` 0 +3
+  SetErrors
+  DetailPrint `Can't delete ${NAME}`
+!macroend
+!define Delete '!insertmacro "Delete"'
+
+!macro RMDir NAME
+  IfFileExists `${NAME}` 0 +5
+  RMDir /r `${NAME}`
+  IfFileExists `${NAME}` 0 +3
+  SetErrors
+  DetailPrint `Can't remove ${NAME}`
+!macroend
+!define RMDir '!insertmacro "RMDir"'
+
+!macro defineGlobalFunctions un
+# Set $OUTPOST_DATA = a space-separated list of folders that contain Outpost configuration files.
+# If no such folders are found, set it to "".
+Function ${un}FindOutposts
+  StrCpy $OUTPOST_CODE ""
+  StrCpy $OUTPOST_DATA ""
+  Push "$PROGRAMFILES\Outpost"
+  Call ${un}FindOutpost
+  ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
+    Push "$PROGRAMFILES64\Outpost"
+    Call ${un}FindOutpost
+  ${EndIf}
+  Push "$PROGRAMFILES\SCCo Packet"
+  Call ${un}FindOutpost
+  ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
+    Push "$PROGRAMFILES64\SCCo Packet"
+    Call ${un}FindOutpost
+  ${EndIf}
+FunctionEnd
+
+Function ${un}IsUserAdmin
   Push $R0
   Push $R1
   StrCpy $R0 true
@@ -119,42 +167,34 @@ Function IsUserAdmin
   Exch $R0
 FunctionEnd
 
-!macro defineFindOutposts un
-# Set $OUTPOST_DATA = a space-separated list of folders that contain Outpost configuration files.
-# If no such folders are found, set it to "".
-Function ${un}FindOutposts
-  StrCpy $OUTPOST_CODE ""
-  StrCpy $OUTPOST_DATA ""
-  Push "$PROGRAMFILES\Outpost"
-  Call ${un}FindOutpost
-  ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
-    Push "$PROGRAMFILES64\Outpost"
-    Call ${un}FindOutpost
-  ${EndIf}
-  Push "$PROGRAMFILES\SCCo Packet"
-  Call ${un}FindOutpost
-  ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
-    Push "$PROGRAMFILES64\SCCo Packet"
-    Call ${un}FindOutpost
-  ${EndIf}
-FunctionEnd
-!macroend
-!insertmacro defineFindOutposts ""
-!insertmacro defineFindOutposts "un."
-
-!macro defineDeleteMyFiles un
 Function ${un}DeleteMyFiles
-  Delete launch.vbs
-  Delete launch.cmd
-  Delete launch-v.cmd
-  Delete README.*
-  RMDir /r "$INSTDIR\addons"
-  RMDir /r "$INSTDIR\bin"
-  RMDir /r "$INSTDIR\pack-it-forms"
+  Push $R0
+  Push $R1
+  ClearErrors
+  ${Delete} launch.vbs
+  ${Delete} launch.cmd
+  ${Delete} launch-v.cmd
+  ${Delete} README.*
+  ${Delete} uninstall.exe
+  ${RMDir} "$INSTDIR\addons"
+  ${RMDir} "$INSTDIR\bin"
+  ${RMDir} "$INSTDIR\logs"
+  ${RMDir} "$INSTDIR\pack-it-forms"
+  ${If} ${Errors}
+    StrCpy $R0 "Some files were not deleted from $INSTDIR."
+    Call ${un}IsUserAdmin
+    Pop $R1
+    ${If} $R1 != true
+      StrCpy $R0 "$R0 To delete them, run this ${un}installer again as an administrator."
+    ${EndIf}
+    MessageBox MB_OK|MB_ICONEXCLAMATION "$R0"
+  ${EndIf}
+  Pop $R1
+  Pop $R0
 FunctionEnd
 !macroend
-!insertmacro defineDeleteMyFiles ""
-!insertmacro defineDeleteMyFiles "un."
+!insertmacro defineGlobalFunctions ""
+!insertmacro defineGlobalFunctions "un."
 
 Section "Install"
   # Where to install files:
@@ -200,7 +240,7 @@ Section "Install"
   WriteRegStr   HKLM "${REG_SUBKEY}" UninstallString "$\"$INSTDIR\uninstall.exe$\""
   ${If} ${Errors}
     DetailPrint "not registered"
-    StrCpy $0 "${DisplayName} isn't registered with Windows as a program."
+    StrCpy $0 "${DisplayName} wasn't registered with Windows as a program."
     Call IsUserAdmin
     Pop $1
     ${If} $1 != true
@@ -244,7 +284,7 @@ Section "Uninstall"
   SetOutPath "$INSTDIR"
 
   # Be sure to delete the uninstaller first.
-  Delete "$INSTDIR\uninstall.exe"
+  ${Delete} "$INSTDIR\uninstall.exe"
   DeleteRegKey HKLM "${REG_SUBKEY}"
 
   # Remove our line from Outpost configuration files
@@ -252,6 +292,5 @@ Section "Uninstall"
   ExecShellWait open "bin\Outpost_Forms.exe" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
 
   Call un.DeleteMyFiles
-  RMDir /r "$INSTDIR\logs"
   RMDir "$INSTDIR" # Do nothing if the directory is not empty
 SectionEnd
