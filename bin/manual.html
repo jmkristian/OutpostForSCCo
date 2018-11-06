@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript">
+      setInterval(function() {
+          var img = new Image();
+          img.src = "/ping-0";
+          img = undefined;
+      }, 30000); // call ping every 30 seconds
+    </script>
+  </head>
+  <body>
+    <form action="/manual-create" method="POST" target="_blank">
+      <input type="submit" value="Create a message:"/>
+      <select name="form">{{form_options}}
+      </select>
+    </form>
+    <br/>
+    <form action="/manual-view" method="POST" target="_blank">
+      <input type="submit" value="View a message:"/>
+      <br/>
+      <textarea rows="20" name="message"
+                style="width:100%;white-space:pre-wrap;font-family:monospace;"
+                placeholder="!addon_name!&#10;# FORMFILENAME: ...&#10;# SUBJECT: ...&#10;...&#10;!/ADDON!"
+                ></textarea>
+    </form>
+  </body>
+</html>

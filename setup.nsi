@@ -171,6 +171,7 @@ Function ${un}DeleteMyFiles
   Push $R0
   Push $R1
   ClearErrors
+  ${Delete} browse.cmd
   ${Delete} launch.vbs
   ${Delete} launch.cmd
   ${Delete} launch-v.cmd
@@ -220,6 +221,7 @@ Section "Install"
   ${EndIf}
 
   # Files to install:
+  File browse.cmd
   File launch.vbs
   File launch.cmd
   File launch-v.cmd
