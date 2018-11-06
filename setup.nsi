@@ -78,7 +78,7 @@ Function FindOutpost
   ${IfNot} ${Errors}
     ${IfNot} ${FileExists} "$R0\Aoclient.exe"
       MessageBox MB_YESNO|MB_ICONEXCLAMATION "${DisplayName} won't work with $R0, because it doesn't contain Aoclient.exe. Do you want to use a different copy of Outpost?" /SD IDNO IDYES goAhead
-        Abort "No Aoclient.exe in $R0."
+      Abort "No Aoclient.exe in $R0."
       goAhead:
     ${Else}
       StrCpy $AOCLIENT_EXE "$R0\Aoclient.exe"
@@ -188,7 +188,7 @@ Function ${un}DeleteMyFiles
     ${If} $R1 != true
       StrCpy $R0 "$R0 To delete them, run this ${un}installer again as an administrator."
     ${EndIf}
-    MessageBox MB_OK|MB_ICONEXCLAMATION "$R0"
+    MessageBox MB_OK|MB_ICONEXCLAMATION "$R0" /SD IDOK
   ${EndIf}
   Pop $R1
   Pop $R0
@@ -249,7 +249,7 @@ Section "Install"
       StrCpy $0 "$0 To register it, run this installer again as an administrator."
     ${EndIf}
     StrCpy $0 "$0 To uninstall it, run the uninstall.exe program in $INSTDIR\."
-    MessageBox MB_OK|MB_ICONEXCLAMATION "$0"
+    MessageBox MB_OK|MB_ICONEXCLAMATION "$0" /SD IDOK
   ${EndIf}
   WriteRegStr   HKLM "${REG_SUBKEY}" Publisher "Los Altos ARES"
   WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "https://github.com/jmkristian/OutpostforLAARES/blob/master/README.md"
