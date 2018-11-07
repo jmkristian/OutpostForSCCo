@@ -455,13 +455,17 @@ function serve() {
     });
     app.post('/manual-view', function(req, res, next) {
         try {
+            var args = ['--message_status', 'unread', '--mode', 'readonly'];
+            for (var name in req.body) {
+                args.push('--' + name);
+                args.push(req.body[name]);
+            }
+            if (req.body.message) {
+                args.push('--addon_name');
+                args.push(req.body.message.match(/^\s*!([^!\r\n]*)!/)[1])
+            }
             const formId = '' + nextFormId++;
-            const message = req.body.message;
-            const addon_name = message.match(/^[\r\n]*!([^!\r\n]*)!/)[1];
-            onOpen(formId, ['--message_status', 'unread',
-                            '--addon_name', addon_name,
-                            '--message', message,
-                            '--mode', 'readonly']);
+            onOpen(formId, args);
             res.redirect('/form-' + formId);
         } catch(err) {
             res.set({'Content-Type': 'text/html; charset=' + CHARSET});
