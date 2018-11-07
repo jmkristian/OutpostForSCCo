@@ -55,6 +55,7 @@
   installation script runs "Outpost_Forms.exe dry-run", which runs this program
   as though it were handling a message, but doesn't launch a browser.
 */
+const AllHtmlEntities = require('html-entities').AllHtmlEntities;
 const bodyParser = require('body-parser');
 const child_process = require('child_process');
 const concat_stream = require('concat-stream');
@@ -70,6 +71,7 @@ const util = require('util');
 const CHARSET = 'utf-8'; // for HTTP
 const ENCODING = CHARSET; // for reading from files
 const EOL = '\r\n';
+const htmlEntities = new AllHtmlEntities();
 const IconStyle = 'width:24pt;height:24pt;vertical-align:middle;';
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
@@ -718,7 +720,7 @@ function expandDataInclude(data, form) {
     return data.replace(target, function(found) {
         var matches = found.match(/"([^"]*)"\s*>([^<]*)/);
         var name = matches[1];
-        var formDefaults = matches[2].trim();
+        var formDefaults = htmlEntities.decode(matches[2].trim());
         // Read a file from pack-it-forms:
         var fileName = path.join(PackItForms, 'resources', 'html', name + '.html')
         var result = fs.readFileSync(fileName, ENCODING);
@@ -827,13 +829,13 @@ function onGetManual(res) {
             try {
                 var forms = getAddonForms();
                 var form_options = forms
-                    .filter(function(form) {return !!form.a && !!form.t;})
+                    .filter(function(form) {return !!(form.a && form.t);})
                     .map(function(form) {
                         return EOL
                             + '<option value="'
                             + encodeHTML(form.a + ' ' + form.t)
                             + '">'
-                            + encodeHTML(form.fn.replace(/_/g, ' ') || form.t)
+                            + encodeHTML(form.fn ? form.fn.replace(/_/g, ' ') : form.t)
                             + '</option>';
                     });
                 res.send(expandVariables(data, {form_options: form_options.join('')}));
@@ -868,11 +870,10 @@ function getAddonForms() {
 }
 
 function errorToHTML(err, state) {
-    const message = encodeHTML(errorToMessage(err) + '\r\n' + JSON.stringify(state));
+    const message = encodeHTML(EOL + errorToMessage(err) + EOL + JSON.stringify(state));
     return `<HTML><title>Problem</title><body>
   <h3><img src="icon-warning.png" alt="warning" style="${IconStyle}">&nbsp;&nbsp;Something went wrong.</h3>
-  This information might help resolve the problem:<pre>
-${message}</pre>
+  This information might help resolve the problem:<pre>${message}</pre>
 </body></HTML>`;
 }
 
@@ -983,8 +984,7 @@ function logAndAbort(err) {
 }
 
 function encodeHTML(text) {
-    // Crude but adequate:
-    return ('' + text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return htmlEntities.encode(text);
 }
 
 function enquoteRegex(text) {
