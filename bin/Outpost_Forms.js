@@ -143,7 +143,7 @@ function installConfigFiles(myDirectory, addonNames) {
 
 /* Make sure Outpost's Launch.local files include addons/*.launch. */
 function installIncludes(myDirectory, addonNames) {
-    const oldInclude = new RegExp('^INCLUDE\\s+' + enquoteRegex(myDirectory) + '[\\\\/]', 'i');
+    const oldInclude = new RegExp('^INCLUDE[ \\t]+' + enquoteRegex(myDirectory) + '[\\\\/]', 'i');
     var myIncludes = [];
     for (var n in addonNames) {
         myIncludes.push('INCLUDE ' + path.resolve(myDirectory, 'addons', addonNames[n] + '.launch'));
@@ -206,8 +206,8 @@ function uninstall() {
                 for (var n in addonNames) {
                     var addonName = addonNames[n];
                     var myLaunch = enquoteRegex(path.resolve(process.cwd(), 'addons', addonName + '.launch'));
-                    var myInclude1 = new RegExp('^INCLUDE\\s+' + myLaunch + '[\r\n]*', 'i');
-                    var myInclude = new RegExp('[\r\n]+INCLUDE\\s+' + myLaunch + '[\r\n]+', 'gi');
+                    var myInclude1 = new RegExp('^INCLUDE[ \\t]+' + myLaunch + '[\r\n]*', 'i');
+                    var myInclude = new RegExp('[\r\n]+INCLUDE[ \\t]+' + myLaunch + '[\r\n]+', 'gi');
                     fs.readFile(outpostLaunch, ENCODING, function(err, data) {
                         if (err) {
                             log(err);
@@ -563,7 +563,7 @@ function parseArgs(args) {
     }
     if (envelope.oDateTime) {
         // TODO: parse date/time to separate ordate and ortime
-        var found = /([^\s]+)\s*(.*)/.exec(envelope.oDateTime);
+        var found = /(\S+)\s*(.*)/.exec(envelope.oDateTime);
         delete envelope.oDateTime;
         if (found) {
             envelope.ordate = found[1];
@@ -608,7 +608,7 @@ function getMessage(environment) {
     if (message) {
         // Outpost sometimes appends junk to the end of message.
         // One observed case was "You have new messages."
-        message = message.replace(/[\r\n]\s*!\/ADDON![\s\S]*$/, '');
+        message = message.replace(/[\r\n][ \t]*!\/ADDON![\s\S]*$/, '');
     }
     return message;
 }
@@ -618,10 +618,10 @@ function parseMessage(message) {
     const lines = message.split(/[\r\n]+/);
     for (var l = 0; l < lines.length; l++) {
         var line = lines[l];
-        var found = /^([^!#:][^:]*):\s*\[(.*)/.exec(line);
-        if (found) {
-            var name = found[1];
-            var value = found[2];
+        var foundField = /^([^!#:][^:]*):\s*\[(.*)/.exec(line);
+        if (foundField) {
+            var name = foundField[1];
+            var value = foundField[2];
             while(l < lines.length - 1 && (!value.endsWith(']') || (value.endsWith('`]') && !value.endsWith('``]')))) {
                 value += EOL + lines[++l];
             }
@@ -660,9 +660,9 @@ function onGetForm(formId, res) {
                 form.message = getMessage(form.environment);
                 if (form.message) {
                     if (!form.environment.filename) {
-                        var found = /[\r\n]#\s*FORMFILENAME:([^\r\n]*)[\r\n]/.exec(form.message);
-                        if (found) {
-                            form.environment.filename = found[1].trim();
+                        var foundFilename = /[\r\n]#[ \t]*FORMFILENAME:([^\r\n]*)[\r\n]/.exec(form.message);
+                        if (foundFilename) {
+                            form.environment.filename = foundFilename[1].trim();
                         }
                     }
                     const status = form.environment.message_status;
@@ -753,12 +753,12 @@ function onSubmit(formId, q, res) {
     try {
         var message = q.formtext;
         const form = openForms[formId];
-        const foundSubject = /[\r\n]#\s*SUBJECT:\s*([^\r\n]*)/.exec(message);
+        const foundSubject = /[\r\n]#[ \t]*SUBJECT:[ \t]*([^\r\n]*)/.exec(message);
         const subject = foundSubject ? foundSubject[1] : '';
         const formFileName = form.environment.filename;
         const msgFileName = path.resolve(PackItMsgs, 'form-' + formId + '.txt');
         // Convert the message from PACF format to ADDON format:
-        message = message.replace(/[\r\n]+#EOF/, EOL + '!/ADDON!');
+        message = message.replace(/[\r\n]+#EOF.*/, EOL + '!/ADDON!' + EOL);
         form.message = message;
         if (form.environment.message_status == 'manual') {
             res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
@@ -766,8 +766,8 @@ function onSubmit(formId, q, res) {
             return;
         }
         // Remove the first line of the Outpost message header:
-        // Aoclient.exe will insert !addon_name!.
-        message = message.replace(/^[\r\n]*![^\r\n]*[\r\n]+/, '');
+        // Aoclient.exe or Outpost will insert !addon_name!.
+        message = message.replace(/^\s*![^\r\n]*[\r\n]+/, '');
         fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
             if (err) {
                 res.end(errorToHTML(err, form));
