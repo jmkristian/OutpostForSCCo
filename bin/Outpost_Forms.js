@@ -132,24 +132,22 @@ function installConfigFiles(myDirectory, addonNames) {
         // Use launch.cmd instead of launch.vbs:
         launch = path.join(myDirectory, 'launch.cmd');
     }
-    for (var n in addonNames) {
-        var addon_name = addonNames[n];
+    addonNames.forEach(function(addon_name) {
         expandVariablesInFile({addon_name: addon_name, INSTDIR: myDirectory, LAUNCH: launch},
                               path.join('bin', 'addon.ini'),
                               path.join('addons', addon_name + '.ini'));
         expandVariablesInFile({addon_name: addon_name},
                               path.join('bin', 'Aoclient.ini'),
                               path.join('addons', addon_name, 'Aoclient.ini'));
-    }
+    });
 }
 
 /* Make sure Outpost's Launch.local files include addons/*.launch. */
 function installIncludes(myDirectory, addonNames) {
     const oldInclude = new RegExp('^INCLUDE[ \\t]+' + enquoteRegex(myDirectory) + '[\\\\/]', 'i');
-    var myIncludes = [];
-    for (var n in addonNames) {
-        myIncludes.push('INCLUDE ' + path.resolve(myDirectory, 'addons', addonNames[n] + '.launch'));
-    }
+    var myIncludes = addonNames.map(function(addonName) {
+        myIncludes.push('INCLUDE ' + path.resolve(myDirectory, 'addons', addonName + '.launch'));
+    });
     // Each of the process arguments names a directory that contains Outpost configuration data.
     for (var a = 4; a < process.argv.length; a++) {
         var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
@@ -168,8 +166,7 @@ function installIncludes(myDirectory, addonNames) {
                     var oldLines = data.split(/[\r\n]+/);
                     var newLines = [];
                     var included = false;
-                    for (var i in oldLines) {
-                        var oldLine = oldLines[i];
+                    oldLines.forEach(function(oldLine) {
                         if (!oldLine) {
                             // remove this line
                         } else if (!oldInclude.test(oldLine)) {
@@ -178,7 +175,7 @@ function installIncludes(myDirectory, addonNames) {
                             newLines = newLines.concat(myIncludes); // replace with myIncludes
                             included = true;
                         } // else remove this line
-                    }
+                    });
                     if (!included) {
                         newLines = newLines.concat(myIncludes); // append myIncludes
                     }
@@ -205,8 +202,7 @@ function uninstall() {
             var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
             if (fs.existsSync(outpostLaunch)) {
                 // Remove INCLUDEs from outpostLaunch:
-                for (var n in addonNames) {
-                    var addonName = addonNames[n];
+                addonNames.forEach(function(addonName) {
                     var myLaunch = enquoteRegex(path.resolve(process.cwd(), 'addons', addonName + '.launch'));
                     var myInclude1 = new RegExp('^INCLUDE[ \\t]+' + myLaunch + '[\r\n]*', 'i');
                     var myInclude = new RegExp('[\r\n]+INCLUDE[ \\t]+' + myLaunch + '[\r\n]+', 'gi');
@@ -222,7 +218,7 @@ function uninstall() {
                             }
                         }
                     });
-                }
+                });
             }
         }
     });
@@ -232,13 +228,12 @@ function uninstall() {
 function getAddonNames(directoryName) {
     var addonNames = [];
     const fileNames = fs.readdirSync(directoryName || 'addons', {encoding: ENCODING});
-    for (var f in fileNames) {
-        var fileName = fileNames[f];
+    fileNames.forEach(function(fileName) {
         var found = /^(.*)\.launch$/.exec(fileName);
         if (found && found[1]) {
             addonNames.push(found[1]);
         }
-    }
+    });
     addonNames.sort(function (x, y) {
         return x.toLowerCase().localeCompare(y.toLowerCase());
     });
@@ -320,13 +315,12 @@ function stopServers(next) {
         // Find the port numbers of all servers (including stopped servers):
         var ports = [];
         const fileNames = fs.readdirSync('logs', {encoding: ENCODING});
-        for (var f in fileNames) {
-            var fileName = fileNames[f];
+        fileNames.forEach(function(fileName) {
             var found = /^server-(\d*)\.log$/.exec(fileName);
             if (found && found[1]) {
                 ports.push(found[1]);
             }
-        }
+        });
         try {
             fs.unlink(PortFileName, log);
         } catch(err) {
@@ -339,13 +333,13 @@ function stopServers(next) {
                 next();
             }
         }
-        for (var p in ports) {
+        ports.forEach(function(port) {
             try {
-                stopServer(parseInt(ports[p], 10), join);
+                stopServer(parseInt(port, 10), join);
             } catch(err) {
                 join(err);
             }
-        }
+        });
     } catch(err) {
         log(err);
         next();
@@ -884,8 +878,7 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
             if (err) {
                 log(err);
             } else {
-                for (var f in fileNames) {
-                    var fileName = fileNames[f];
+                fileNames.forEach(function(fileName) {
                     if (fileNamePattern.test(fileName)) {
                         var fullName = path.join(directoryName, fileName);
                         fs.stat(fullName, (function(fullName) {
@@ -903,7 +896,7 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
                             };
                         })(fullName));
                     }
-                }
+                });
             }
         });
     } catch(err) {

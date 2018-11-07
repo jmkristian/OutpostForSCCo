@@ -37,13 +37,11 @@
                         init_form_from_fields(formDefaultValues[f], 'name');
                     }
                 }
-                var recSents = document.getElementsByName('Rec-Sent');
-                for (var r = 0; r < recSents.length; r++) {
-                    var recSent = recSents[r];
+                array_for_each(document.getElementsByName('Rec-Sent'), function(recSent) {
                     recSent.disabled = true; // Don't include it in transmitted messages.
                     recSent.classList.add('no-msg-init'); // Ignore it in received messages.
                     // That is, init_form_from_fields won't affect this element any more.
-                }
+                });
                 // Change the message header from PACF format to ADDON format:
                 var messageHeader = document.getElementById('message-header');
                 var header = messageHeader.textContent;
