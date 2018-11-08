@@ -37,24 +37,33 @@
                         init_form_from_fields(formDefaultValues[f], 'name');
                     }
                 }
-                var recSents = document.getElementsByName('Rec-Sent');
-                for (var r = 0; r < recSents.length; r++) {
-                    var recSent = recSents[r];
+                array_for_each(document.getElementsByName('Rec-Sent'), function(recSent) {
                     recSent.disabled = true; // Don't include it in transmitted messages.
                     add_class(recSent, 'no-msg-init'); // Ignore it in received messages.
                     // That is, init_form_from_fields won't affect this element any more.
-                }
+                });
                 // Change the message header from PACF format to ADDON format:
                 var header = outpost_message_header;
                 // The subject comes after !PACF! in the first line:
-                var found = /^\s*![^!\r\n]*!\s*([^\r\n]*)/.exec(header);
-                // Remove that first line:
-                header = header.replace(/^\s*![^!\r\n]*![^\r\n]*[\r\n]*/, '');
-                if (found) {
+                var foundSubject = /^\s*![^!\r\n]*![ \t]*([^\r\n]*)/.exec(header);
+                if (foundSubject) {
                     // Add the subject in a comment:
-                    header = header.replace(/\s*$/, '\r\n# SUBJECT: ' + found[1]);
+                    header = header.replace(/\s*$/, '\r\n# SUBJECT: ' + foundSubject[1]);
+                    // Replace that first line:
+                    header = header.replace(/^\s*![^\r\n]*([\r\n])/,
+                                            "!" + query_object.addon_name + "!$1");
                 }
+                // Correct FORMFILENAME:
+                header = header.replace(/([\r\n]#[ \t]*FORMFILENAME[ \t]*:)[^\r\n]*/,
+                                        "$1 " + query_object.filename);
                 outpost_message_header = header;
+                outpost_message_footer = "!/ADDON!\r\n";
+                if (status == 'manual') {
+                    var submitButton = document.getElementById('opdirect-submit');
+                    if (submitButton) {
+                        submitButton.value = 'Show Message';
+                    }
+                }
                 if (status == 'new' && query_object.mode == 'readonly') {
                     // This message was just submitted to Outpost. Let the operator know:
                     var div = document.createElement('div');
@@ -67,7 +76,7 @@
                     div.innerHTML =
                         '<img src="icon-check.png" alt="OK" style="width:20pt;height:20pt;vertical-align:middle;">' +
                         '&nbsp;&nbsp;The message has been submitted to Outpost. You can close this page.';
-                    document.querySelector("#button-header").appendChild(div);
+                    document.getElementById('button-header').appendChild(div);
                 }
                 next();
             };

@@ -52,9 +52,10 @@
     them and operators who have to wait for Avast to scan them.
 
   To address the issue of operators waiting for antivirus scan, the
-  installation script runs "Outpost_Forms.exe open dry-run", which runs this program
+  installation script runs "Outpost_Forms.exe dry-run", which runs this program
   as though it were handling a message, but doesn't launch a browser.
 */
+const AllHtmlEntities = require('html-entities').AllHtmlEntities;
 const bodyParser = require('body-parser');
 const child_process = require('child_process');
 const concat_stream = require('concat-stream');
@@ -64,13 +65,13 @@ const http = require('http');
 const morgan = require('morgan');
 const os = require('os');
 const path = require('path');
-const querystring = require('querystring');
 const Transform = require('stream').Transform;
 const util = require('util');
 
 const CHARSET = 'utf-8'; // for HTTP
 const ENCODING = CHARSET; // for reading from files
 const EOL = '\r\n';
+const htmlEntities = new AllHtmlEntities();
 const IconStyle = 'width:24pt;height:24pt;vertical-align:middle;';
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
@@ -115,7 +116,7 @@ function install() {
     // This method must be idempotent, in part because Avira antivirus
     // might execute it repeatedly while scrutinizing the .exe for viruses.
     const myDirectory = process.cwd();
-    const addonNames = getAddonNames('addons');
+    const addonNames = getAddonNames();
     log('addons ' + JSON.stringify(addonNames));
     installConfigFiles(myDirectory, addonNames);
     installIncludes(myDirectory, addonNames);
@@ -131,24 +132,22 @@ function installConfigFiles(myDirectory, addonNames) {
         // Use launch.cmd instead of launch.vbs:
         launch = path.join(myDirectory, 'launch.cmd');
     }
-    for (var n in addonNames) {
-        var addon_name = addonNames[n];
+    addonNames.forEach(function(addon_name) {
         expandVariablesInFile({addon_name: addon_name, INSTDIR: myDirectory, LAUNCH: launch},
                               path.join('bin', 'addon.ini'),
                               path.join('addons', addon_name + '.ini'));
         expandVariablesInFile({addon_name: addon_name},
                               path.join('bin', 'Aoclient.ini'),
                               path.join('addons', addon_name, 'Aoclient.ini'));
-    }
+    });
 }
 
 /* Make sure Outpost's Launch.local files include addons/*.launch. */
 function installIncludes(myDirectory, addonNames) {
-    const oldInclude = new RegExp('^INCLUDE\\s+' + enquoteRegex(myDirectory) + '[\\\\/]', 'i');
-    var myIncludes = [];
-    for (var n in addonNames) {
-        myIncludes.push('INCLUDE ' + path.resolve(myDirectory, 'addons', addonNames[n] + '.launch'));
-    }
+    const oldInclude = new RegExp('^INCLUDE[ \\t]+' + enquoteRegex(myDirectory) + '[\\\\/]', 'i');
+    var myIncludes = addonNames.map(function(addonName) {
+        myIncludes.push('INCLUDE ' + path.resolve(myDirectory, 'addons', addonName + '.launch'));
+    });
     // Each of the process arguments names a directory that contains Outpost configuration data.
     for (var a = 4; a < process.argv.length; a++) {
         var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
@@ -167,8 +166,7 @@ function installIncludes(myDirectory, addonNames) {
                     var oldLines = data.split(/[\r\n]+/);
                     var newLines = [];
                     var included = false;
-                    for (var i in oldLines) {
-                        var oldLine = oldLines[i];
+                    oldLines.forEach(function(oldLine) {
                         if (!oldLine) {
                             // remove this line
                         } else if (!oldInclude.test(oldLine)) {
@@ -177,7 +175,7 @@ function installIncludes(myDirectory, addonNames) {
                             newLines = newLines.concat(myIncludes); // replace with myIncludes
                             included = true;
                         } // else remove this line
-                    }
+                    });
                     if (!included) {
                         newLines = newLines.concat(myIncludes); // append myIncludes
                     }
@@ -198,17 +196,16 @@ function installIncludes(myDirectory, addonNames) {
 
 function uninstall() {
     stopServers(function() {
-        const addonNames = getAddonNames('addons');
+        const addonNames = getAddonNames();
         log('addons ' + JSON.stringify(addonNames));
         for (a = 3; a < process.argv.length; a++) {
             var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
             if (fs.existsSync(outpostLaunch)) {
                 // Remove INCLUDEs from outpostLaunch:
-                for (var n in addonNames) {
-                    var addonName = addonNames[n];
+                addonNames.forEach(function(addonName) {
                     var myLaunch = enquoteRegex(path.resolve(process.cwd(), 'addons', addonName + '.launch'));
-                    var myInclude1 = new RegExp('^INCLUDE\\s+' + myLaunch + '[\r\n]*', 'i');
-                    var myInclude = new RegExp('[\r\n]+INCLUDE\\s+' + myLaunch + '[\r\n]+', 'gi');
+                    var myInclude1 = new RegExp('^INCLUDE[ \\t]+' + myLaunch + '[\r\n]*', 'i');
+                    var myInclude = new RegExp('[\r\n]+INCLUDE[ \\t]+' + myLaunch + '[\r\n]+', 'gi');
                     fs.readFile(outpostLaunch, ENCODING, function(err, data) {
                         if (err) {
                             log(err);
@@ -221,7 +218,7 @@ function uninstall() {
                             }
                         }
                     });
-                }
+                });
             }
         }
     });
@@ -230,14 +227,13 @@ function uninstall() {
 /** Return a list of names, such that for each name there exists a <name>.launch file in the given directory. */
 function getAddonNames(directoryName) {
     var addonNames = [];
-    const fileNames = fs.readdirSync(directoryName, {encoding: ENCODING});
-    for (var f in fileNames) {
-        var fileName = fileNames[f];
+    const fileNames = fs.readdirSync(directoryName || 'addons', {encoding: ENCODING});
+    fileNames.forEach(function(fileName) {
         var found = /^(.*)\.launch$/.exec(fileName);
         if (found && found[1]) {
             addonNames.push(found[1]);
         }
-    }
+    });
     addonNames.sort(function (x, y) {
         return x.toLowerCase().localeCompare(y.toLowerCase());
     });
@@ -319,14 +315,17 @@ function stopServers(next) {
         // Find the port numbers of all servers (including stopped servers):
         var ports = [];
         const fileNames = fs.readdirSync('logs', {encoding: ENCODING});
-        for (var f in fileNames) {
-            var fileName = fileNames[f];
+        fileNames.forEach(function(fileName) {
             var found = /^server-(\d*)\.log$/.exec(fileName);
             if (found && found[1]) {
                 ports.push(found[1]);
             }
+        });
+        try {
+            fs.unlink(PortFileName, log);
+        } catch(err) {
+            log(err); // harmless
         }
-        fs.unlink(PortFileName, log);
         var forked = ports.length;
         function join(err) {
             log(err);
@@ -334,13 +333,13 @@ function stopServers(next) {
                 next();
             }
         }
-        for (var p in ports) {
+        ports.forEach(function(port) {
             try {
-                stopServer(parseInt(ports[p], 10), join);
+                stopServer(parseInt(port, 10), join);
             } catch(err) {
                 join(err);
             }
-        }
+        });
     } catch(err) {
         log(err);
         next();
@@ -390,13 +389,22 @@ function serve() {
     app.set('etag', false); // convenient for troubleshooting
     app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
     app.use(bodyParser.json({type: JSON_TYPE}));
+    app.use(bodyParser.urlencoded({extended: false}));
     app.post(OpenOutpostMessage, function(req, res, next) {
         // req.body is an array, thanks to bodyParser.json
         const args = req.body;
         res.end();
         if (args && args.length > 0) {
             const formId = '' + nextFormId++;
-            onOpen(formId, args, port);
+            onOpen(formId, args);
+            const command = 'start "Browse" /B http://' + LOCALHOST + ':' + port + '/form-' + formId;
+            log(command);
+            child_process.exec(
+                command,
+                function(err, stdout, stderr) {
+                    log(err);
+                    log('started browser ' + stdout.toString(ENCODING) + stderr.toString(ENCODING));
+                });
         }
     });
     app.get('/form-:formId', function(req, res, next) {
@@ -405,13 +413,14 @@ function serve() {
     });
     app.post('/submit-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
-        req.pipe(concat_stream(function(buffer) {
-            onSubmit(req.params.formId, buffer, res);
-        }));
+        onSubmit(req.params.formId, req.body, res);
     });
     app.get('/ping-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
         res.statusCode = NOT_FOUND;
+        res.set({'Cache-Control': 'no-cache, no-store, must-revalidate', // HTTP 1.1
+                 'Pragma': 'no-cache', // HTTP 1.0
+                 'Expires': '0'}); // proxies
         res.end(); // with no body. The client ignores this response.
     });
     app.get('/msgs/:msgno', function(req, res, next) {
@@ -426,6 +435,42 @@ function serve() {
         res.end(); // with no body
         log('stopped');
         process.exit(0);
+    });
+    app.get('/manual', function(req, res, next) {
+        onGetManual(res);
+    });
+    app.post('/manual-create', function(req, res, next) {
+        try {
+            const formId = '' + nextFormId++;
+            const form = req.body.form;
+            const space = form.indexOf(' ');
+            onOpen(formId, ['--message_status', 'manual',
+                            '--addon_name', form.substring(0, space),
+                            '--filename', form.substring(space + 1)]);
+            res.redirect('/form-' + formId);
+        } catch(err) {
+            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+            res.end(errorToHTML(err, JSON.stringify(req.body)));
+        }
+    });
+    app.post('/manual-view', function(req, res, next) {
+        try {
+            var args = ['--message_status', 'unread', '--mode', 'readonly'];
+            for (var name in req.body) {
+                args.push('--' + name);
+                args.push(req.body[name]);
+            }
+            if (req.body.message) {
+                args.push('--addon_name');
+                args.push(req.body.message.match(/^\s*!([^!\r\n]*)!/)[1])
+            }
+            const formId = '' + nextFormId++;
+            onOpen(formId, args);
+            res.redirect('/form-' + formId);
+        } catch(err) {
+            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+            res.end(errorToHTML(err, JSON.stringify(req.body)));
+        }
     });
     app.get(/^\/.*/, express.static(PackItForms));
 
@@ -471,7 +516,7 @@ function serve() {
     }, 5000);
 }
 
-function onOpen(formId, args, port) {
+function onOpen(formId, args) {
     // This code should be kept dead simple, since
     // it can't show a problem to the operator.
     openForms[formId] = {
@@ -479,20 +524,14 @@ function onOpen(formId, args, port) {
         quietSeconds: 0
     };
     log('form ' + formId + ' opened');
-    const command = 'start "Browse" /B http://' + LOCALHOST + ':' + port + '/form-' + formId;
-    log(command);
-    child_process.exec(
-        command,
-        function(err, stdout, stderr) {
-            log(err);
-            log('started browser ' + stdout.toString(ENCODING) + stderr.toString(ENCODING));
-        });
 }
 
 function keepAlive(formId) {
     form = openForms[formId];
     if (form) {
         form.quietSeconds = 0;
+    } else if (formId == "0") {
+        openForms[formId] = {quietSeconds: 0};
     }
 }
 
@@ -524,7 +563,7 @@ function parseArgs(args) {
     }
     if (envelope.oDateTime) {
         // TODO: parse date/time to separate ordate and ortime
-        var found = /([^\s]+)\s*(.*)/.exec(envelope.oDateTime);
+        var found = /(\S+)\s*(.*)/.exec(envelope.oDateTime);
         delete envelope.oDateTime;
         if (found) {
             envelope.ordate = found[1];
@@ -560,12 +599,16 @@ function parseArgs(args) {
 
 function getMessage(environment) {
     var message = null;
-    if (environment.MSG_FILENAME) {
+    if (environment.message) {
+        message = environment.message;
+    } else if (environment.MSG_FILENAME) {
         const msgFileName = path.resolve(PackItMsgs, environment.MSG_FILENAME);
         message = fs.readFileSync(msgFileName, {encoding: ENCODING});
+    }
+    if (message) {
         // Outpost sometimes appends junk to the end of message.
         // One observed case was "You have new messages."
-        message = message.replace(/[\r\n]\s*!\/ADDON!.*$/, '');
+        message = message.replace(/[\r\n][ \t]*!\/ADDON![\s\S]*$/, '');
     }
     return message;
 }
@@ -575,10 +618,10 @@ function parseMessage(message) {
     const lines = message.split(/[\r\n]+/);
     for (var l = 0; l < lines.length; l++) {
         var line = lines[l];
-        var found = /^([^!#:][^:]*):\s*\[(.*)/.exec(line);
-        if (found) {
-            var name = found[1];
-            var value = found[2];
+        var foundField = /^([^!#:][^:]*):\s*\[(.*)/.exec(line);
+        if (foundField) {
+            var name = foundField[1];
+            var value = foundField[2];
             while(l < lines.length - 1 && (!value.endsWith(']') || (value.endsWith('`]') && !value.endsWith('``]')))) {
                 value += EOL + lines[++l];
             }
@@ -617,9 +660,9 @@ function onGetForm(formId, res) {
                 form.message = getMessage(form.environment);
                 if (form.message) {
                     if (!form.environment.filename) {
-                        var found = /[\r\n]#\s*FORMFILENAME:([^\r\n]*)[\r\n]/.exec(form.message);
-                        if (found) {
-                            form.environment.filename = found[1].trim();
+                        var foundFilename = /[\r\n]#[ \t]*FORMFILENAME:([^\r\n]*)[\r\n]/.exec(form.message);
+                        if (foundFilename) {
+                            form.environment.filename = foundFilename[1].trim();
                         }
                     }
                     const status = form.environment.message_status;
@@ -675,7 +718,7 @@ function expandDataInclude(data, form) {
     return data.replace(target, function(found) {
         var matches = found.match(/"([^"]*)"\s*>([^<]*)/);
         var name = matches[1];
-        var formDefaults = matches[2].trim();
+        var formDefaults = htmlEntities.decode(matches[2].trim());
         // Read a file from pack-it-forms:
         var fileName = path.join(PackItForms, 'resources', 'html', name + '.html')
         var result = fs.readFileSync(fileName, ENCODING);
@@ -705,25 +748,29 @@ function expandDataInclude(data, form) {
     });
 }
 
-function onSubmit(formId, buffer, res) {
+function onSubmit(formId, q, res) {
     res.set({'Content-Type': 'text/html; charset=' + CHARSET});
     try {
-        const q = querystring.parse(buffer.toString(CHARSET));
         var message = q.formtext;
         const form = openForms[formId];
-        const foundSubject = /[\r\n]#\s*SUBJECT:\s*([^\r\n]*)/.exec(message);
+        const foundSubject = /[\r\n]#[ \t]*SUBJECT:[ \t]*([^\r\n]*)/.exec(message);
         const subject = foundSubject ? foundSubject[1] : '';
         const formFileName = form.environment.filename;
         const msgFileName = path.resolve(PackItMsgs, 'form-' + formId + '.txt');
         // Convert the message from PACF format to ADDON format:
-        message = message.replace(/[\r\n]*#EOF/, EOL + '!/ADDON!');
-        // Correct the FORMFILENAME:
-        message = message.replace(/[\r\n]*(#\s*FORMFILENAME:\s*)[^\r\n]*[\r\n]*/,
-                                  EOL + '$1' + formFileName.replace('$', '\\$') + EOL);
+        message = message.replace(/[\r\n]+#EOF.*/, EOL + '!/ADDON!' + EOL);
         form.message = message;
+        if (form.environment.message_status == 'manual') {
+            res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
+            res.end(message);
+            return;
+        }
+        // Remove the first line of the Outpost message header:
+        // Aoclient.exe or Outpost will insert !addon_name!.
+        message = message.replace(/^\s*![^\r\n]*[\r\n]+/, '');
         fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
             if (err) {
-                res.send(errorToHTML(err, form));
+                res.end(errorToHTML(err, form));
             } else {
                 try {
                     fs.unlinkSync(OpdFAIL);
@@ -758,22 +805,73 @@ function onSubmit(formId, buffer, res) {
                                 // Don't closeForm, in case the operator goes back and submits it again.
                             }
                         } catch(err) {
-                            res.send(errorToHTML(err, form));
+                            res.end(errorToHTML(err, form));
                         }
                     });
             }
         });
     } catch(err) {
-        res.send(errorToHTML(err, {formId: formId}));
+        res.end(errorToHTML(err, {formId: formId}));
     }
 }
 
+/** Handle an HTTP GET /manual request. */
+function onGetManual(res) {
+    keepAlive(0);
+    res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+    const template = path.join('bin', 'manual.html');
+    fs.readFile(template, {encoding: ENCODING}, function(err, data) {
+        if (err) {
+            res.send(errorToHTML(err, template));
+        } else {
+            try {
+                var forms = getAddonForms();
+                var form_options = forms
+                    .filter(function(form) {return !!(form.a && form.t);})
+                    .map(function(form) {
+                        return EOL
+                            + '<option value="'
+                            + encodeHTML(form.a + ' ' + form.t)
+                            + '">'
+                            + encodeHTML(form.fn ? form.fn.replace(/_/g, ' ') : form.t)
+                            + '</option>';
+                    });
+                res.send(expandVariables(data, {form_options: form_options.join('')}));
+            } catch(err) {
+                res.send(errorToHTML(err, forms));
+            }
+        }
+        res.end();
+    });
+}
+
+function getAddonForms() {
+    var addonForms = [];
+    getAddonNames().forEach(function(addonName) {
+        fs.readFileSync(path.join('addons', addonName + '.launch'), {encoding: ENCODING})
+            .split(/[\r\n]+/).forEach(function(line) {
+                if (line.startsWith('ADDON ')) {
+                    var addonForm = {};
+                    var name = null;
+                    line.split(/\s+/).forEach(function(token) {
+                        if (token.startsWith('-')) {
+                            name = token.substring(1);
+                        } else if (name) {
+                            addonForm[name] = token;
+                        }
+                    });
+                    addonForms.push(addonForm);
+                }
+            });
+    });
+    return addonForms;
+}
+
 function errorToHTML(err, state) {
-    const message = encodeHTML(errorToMessage(err) + '\r\n' + JSON.stringify(state));
+    const message = encodeHTML(EOL + errorToMessage(err) + EOL + JSON.stringify(state));
     return `<HTML><title>Problem</title><body>
   <h3><img src="icon-warning.png" alt="warning" style="${IconStyle}">&nbsp;&nbsp;Something went wrong.</h3>
-  This information might help resolve the problem:<pre>
-${message}</pre>
+  This information might help resolve the problem:<pre>${message}</pre>
 </body></HTML>`;
 }
 
@@ -784,8 +882,7 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
             if (err) {
                 log(err);
             } else {
-                for (var f in fileNames) {
-                    var fileName = fileNames[f];
+                fileNames.forEach(function(fileName) {
                     if (fileNamePattern.test(fileName)) {
                         var fullName = path.join(directoryName, fileName);
                         fs.stat(fullName, (function(fullName) {
@@ -803,7 +900,7 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
                             };
                         })(fullName));
                     }
-                }
+                });
             }
         });
     } catch(err) {
@@ -846,6 +943,7 @@ function expandVariablesInFile(variables, fromFile, intoFile) {
         if (newData != data || intoFile != fromFile) {
             fs.writeFile(intoFile, newData, {encoding: ENCODING}, function(err) {
                 if (err) logAndAbort(err);
+                log('wrote ' + intoFile);
             });
         }
     });
@@ -883,8 +981,7 @@ function logAndAbort(err) {
 }
 
 function encodeHTML(text) {
-    // Crude but adequate:
-    return ('' + text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return htmlEntities.encode(text);
 }
 
 function enquoteRegex(text) {
