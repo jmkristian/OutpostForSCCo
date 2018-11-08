@@ -90,25 +90,29 @@ if (process.argv.length > 2) {
     if (verb != 'serve') {
         logToFile(path.join('logs', verb + '.log'))
     }
-    switch(verb) {
-    case 'install':
-        install();
-        break;
-    case 'uninstall':
-        uninstall();
-        break;
-    case 'serve':
-        serve();
-        break;
-    case 'open':
-    case 'dry-run':
-        openMessage();
-        break;
-    case 'stop':
-        stopServers(function() {});
-        break;
-    default:
-        log(process.argv[1] + ': unknown verb "' + verb + '"');
+    try {
+        switch(verb) {
+        case 'install':
+            install();
+            break;
+        case 'uninstall':
+            uninstall();
+            break;
+        case 'serve':
+            serve();
+            break;
+        case 'open':
+        case 'dry-run':
+            openMessage();
+            break;
+        case 'stop':
+            stopServers(function() {});
+            break;
+        default:
+            log(process.argv[1] + ': unknown verb "' + verb + '"');
+        }
+    } catch(err) {
+        log(err);
     }
 }
 
@@ -146,7 +150,7 @@ function installConfigFiles(myDirectory, addonNames) {
 function installIncludes(myDirectory, addonNames) {
     const oldInclude = new RegExp('^INCLUDE[ \\t]+' + enquoteRegex(myDirectory) + '[\\\\/]', 'i');
     var myIncludes = addonNames.map(function(addonName) {
-        myIncludes.push('INCLUDE ' + path.resolve(myDirectory, 'addons', addonName + '.launch'));
+        return 'INCLUDE ' + path.resolve(myDirectory, 'addons', addonName + '.launch');
     });
     // Each of the process arguments names a directory that contains Outpost configuration data.
     for (var a = 4; a < process.argv.length; a++) {
