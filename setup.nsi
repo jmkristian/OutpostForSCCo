@@ -37,20 +37,20 @@ Function StrContainsSpace
   Push $R1
   loop:
     ${If} $R0 == ""
-      Push false
+      StrCpy $R0 false
       GoTo end
     ${Endif}
     StrCpy $R1 $R0 1 0
     ${If} $R1 == " "
-      Push true
+      StrCpy $R0 true
       GoTo end
     ${Endif}
     StrLen $R1 $R0
     StrCpy $R0 $R0 $R1 1
     GoTo loop
-  end:
-    Pop $R1
-    Pop $R0
+end:
+  Pop $R1
+  Exch $R0
 FunctionEnd
 !macro StrContainsSpace OUT S
   Push `${S}`
