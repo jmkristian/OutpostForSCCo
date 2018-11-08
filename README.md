@@ -67,6 +67,14 @@ Opening a message that's ready to send will pop up a browser page.
 Opening a message that's been sent or received will ask whether you want to view the
 'original format'; that is a browser page.
 
+### When Outpost Fails
+
+If Outpost is unusable, it's still possible to use this program.
+Run browse.cmd in the folder where you installed the program.
+It should open a page in your browser, with buttons you can use to either
+open a form to create a message (which you could send via email),
+or view a received message as a form.
+
 ### In Case of Trouble
 
 If something's not right, please report it by creating or updating an issue in the
