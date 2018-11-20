@@ -52,13 +52,13 @@
                     header = header.replace(/\s*$/, '\r\n# SUBJECT: ' + foundSubject[1]);
                     // Replace that first line:
                     header = header.replace(/^\s*![^\r\n]*([\r\n])/,
-                                            "!" + query_object.addon_name + "!$1");
+                                            '!' + query_object.addon_name + '!$1');
                 }
                 // Correct FORMFILENAME:
                 header = header.replace(/([\r\n]#[ \t]*FORMFILENAME[ \t]*:)[^\r\n]*/,
-                                        "$1 " + query_object.filename);
+                                        '$1 ' + query_object.filename);
                 messageHeader.textContent = header;
-                outpost_message_footer = "!/ADDON!\r\n";
+                outpost_message_footer = '!/ADDON!\r\n';
                 if (status == 'manual') {
                     var submitButton = document.getElementById('opdirect-submit');
                     if (submitButton) {
