@@ -43,7 +43,7 @@ For the bin\\Outpost\_Forms.exe program, check "Remember my answer" and click "A
 
 Uninstall as you would any program.
 For example on Windows 8, open the control panel "Programs and Features",
-select "Outpost for LAARES" or "Outpost for CERT" and click "Uninstall".
+select "Outpost for LAARES" and click "Uninstall".
 If you don't see the program in the control panel, try closing and re-opening the control panel.
 If that fails, try running the program uninstall.exe in the folder where the program was installed.
 After uninstallation is complete, exit and restart Outpost.
