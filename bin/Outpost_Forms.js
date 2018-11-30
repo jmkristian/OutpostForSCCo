@@ -88,7 +88,7 @@ if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
     const verb = process.argv[2];
     if (verb != 'serve') {
-        logToFile(path.join('logs', verb + '.log'))
+        logToFile(path.join('logs', verb + '.log'));
     }
     try {
         switch(verb) {
@@ -297,7 +297,7 @@ function openForm(args, tryLater) {
 }
 
 function startServer() {
-    const command = 'start "Outpost Form Server" /MIN '
+    const command = 'start /B '
           + path.join('bin', 'Outpost_Forms.exe')
           + ' serve';
     log(command);
@@ -385,9 +385,6 @@ var openForms = {'0': {quietSeconds: 0}}; // all the forms that are currently op
 var nextFormId = 1; // Forms are assigned sequence numbers when they're opened.
 
 function serve() {
-    console.log("Let this program run in the background. There's no need to interact with it.");
-    console.log('It works with your browser to show forms and submit messages to Outpost.');
-    console.log('It will run as long as you have forms open, and stop a few minutes later.');
     const app = express();
     var port;
     app.set('etag', false); // convenient for troubleshooting
@@ -486,8 +483,6 @@ function serve() {
     }
     fs.writeFileSync(PortFileName, port + '', {encoding: ENCODING}); // advertise my port
     const logFileName = path.resolve('logs', 'server-' + port + '.log');
-    console.log('Detailed information about its activity can be seen in');
-    console.log(logFileName);
     logToFile(logFileName);
     log('Listening for HTTP requests on port ' + port + '...');
     deleteOldFiles('logs', /^server-\d*\.log$/, LogFileAgeLimitMs);
