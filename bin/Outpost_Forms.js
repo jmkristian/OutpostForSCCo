@@ -544,7 +544,7 @@ function closeForm(formId) {
     if (form) {
         log('form ' + formId + ' closed');
         if (form.environment && form.environment.MSG_FILENAME) {
-            fs.unlink(form.environment.MSG_FILENAME, log);
+            fs.unlink(path.resolve(PackItMsgs, form.environment.MSG_FILENAME), log);
         }
     }
     delete openForms[formId];
