@@ -612,7 +612,7 @@ function getMessage(environment) {
     if (message) {
         // Outpost sometimes appends junk to the end of message.
         // One observed case was "You have new messages."
-        message = message.replace(/[\r\n][ \t]*!\/ADDON![\s\S]*$/, '');
+        message = message.replace(/[\r\n]+[ \t]*!\/ADDON![\s\S]*$/, EOL + '!/ADDON!' + EOL);
     }
     return message;
 }
@@ -727,8 +727,8 @@ function expandDataInclude(data, form) {
         var fileName = path.join(PackItForms, 'resources', 'html', name + '.html')
         var result = fs.readFileSync(fileName, ENCODING);
         // Remove the enclosing <div></div>:
-        result = result.replace(/^\s*<\s*div\s*>\s*(.*)/i, '$1');
-        result = result.replace(/(.*)<\/\s*div\s*>\s*$/i, '$1');
+        result = result.replace(/^\s*<\s*div\s*>\s*/i, '');
+        result = result.replace(/<\/\s*div\s*>\s*$/i, '');
         if (name == 'submit-buttons') {
             // Add some additional stuff:
             result += expandVariables(
@@ -762,7 +762,7 @@ function onSubmit(formId, q, res) {
         const formFileName = form.environment.filename;
         const msgFileName = path.resolve(PackItMsgs, 'form-' + formId + '.txt');
         // Convert the message from PACF format to ADDON format:
-        message = message.replace(/[\r\n]+#EOF.*/, EOL + '!/ADDON!' + EOL);
+        message = message.replace(/[\r\n]+#EOF[\s\S]*/, EOL + '!/ADDON!' + EOL);
         form.message = message;
         if (form.environment.message_status == 'manual') {
             res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
