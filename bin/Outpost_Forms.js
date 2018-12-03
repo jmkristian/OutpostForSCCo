@@ -561,13 +561,12 @@ function parseArgs(args) {
         }
     }
     if (envelope.oDateTime) {
-        // TODO: parse date/time to separate ordate and ortime
         var found = /(\S+)\s*(.*)/.exec(envelope.oDateTime);
         delete envelope.oDateTime;
         if (found) {
             envelope.ordate = found[1];
             envelope.ortime = found[2];
-            found = /(\d+):(\d+):(\d+)([^\d]*)/.exec(envelope.ortime);
+            found = /^(\d+):(\d+)(:\d+)?([^\d]*)/.exec(envelope.ortime);
             if (found) {
                 // convert to 24 hour time
                 var hour = parseInt(found[1], 10);
@@ -580,8 +579,10 @@ function parseArgs(args) {
                     }
                 } else if (PM) {
                     hour += 12;
+                } else if (hour < 10) {
+                    hour = '0' + hour;
                 }
-                envelope.ortime = (hour < 10 ? '0' : '') + hour + ':' + min + ':' + sec;
+                envelope.ortime = hour + min + (sec ? sec : '');
             }
         }
     }
