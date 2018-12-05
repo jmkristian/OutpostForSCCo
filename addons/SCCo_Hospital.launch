@@ -1,0 +1,3 @@
+LINE
+ADDON -fn MHOC_Beds_Status       -a SCCo_Hospital -t form-mhoc-beds-status.html
+ADDON -fn MHOC_Resource_Request  -a SCCo_Hospital -t form-mhoc-resource-request.html
