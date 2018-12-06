@@ -566,7 +566,7 @@ function parseArgs(args) {
         if (found) {
             envelope.ordate = found[1];
             envelope.ortime = found[2];
-            found = /^(\d+):(\d+)(:\d+)?([^\d]*)/.exec(envelope.ortime);
+            found = /(\d+):(\d+)(:\d+)?([^\d]*)/.exec(envelope.ortime);
             if (found) {
                 // convert to 24 hour time
                 var hour = parseInt(found[1], 10);
@@ -582,7 +582,7 @@ function parseArgs(args) {
                 } else if (hour < 10) {
                     hour = '0' + hour;
                 }
-                envelope.ortime = hour + min + (sec ? sec : '');
+                envelope.ortime = hour + ':' + min + (sec ? sec : '');
             }
         }
     }
