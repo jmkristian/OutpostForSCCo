@@ -19,9 +19,11 @@
                 if (query_object.pingURL && query_object.mode != 'readonly') {
                     // Ping the server periodically, to keep it alive while the form is open.
                     // But not for a read-only message.
+                    var ping_sequence = 0;
                     setInterval(function() {
                         var img = new Image();
-                        img.src = query_object.pingURL;
+                        // To discourage caching, use a new query string for each ping.
+                        img.src = query_object.pingURL + '?i=' + (ping_sequence++);
                         img = undefined;
                     }, 30000); // call ping every 30 seconds
                 }
