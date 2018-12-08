@@ -2,28 +2,37 @@
 <html>
   <head>
     <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <link rel="stylesheet" type="text/css" href="resources/css/pack-it-forms.css"/>
     <title>Message Forms</title>
     <script type="text/javascript">
+      var ping_sequence = Math.random();
       setInterval(function() {
           var img = new Image();
-          img.src = "/ping-0";
+          // To discourage caching, use a new query string for each ping.
+          img.src = "/ping-0?i=" + (ping_sequence++);
           img = undefined;
       }, 30000); // call ping every 30 seconds
     </script>
   </head>
-  <body>
+  <body style="margin-top:0;">
+    <br/>
     <form action="/manual-create" method="POST" target="_blank">
-      <input type="submit" value="Create a message:"/>
-      <select name="form">{{form_options}}
-      </select>
+      <fieldset class="horizontal">
+        <input type="submit" value="Create a message:"/>
+        <select name="form">{{form_options}}
+        </select>
+      </fieldset>
     </form>
     <br/>
     <form action="/manual-view" method="POST" target="_blank">
-      <input type="submit" value="View a message:"/>
-      My Msg # <input type="text" name="envelope.RCVNUM" size="10">
-      <br/>
-      <textarea rows="20" name="message"
-                style="width:100%;white-space:pre-wrap;font-family:monospace;"
+      <fieldset class="horizontal">
+        <input type="submit" value="View a message:"/>
+        <label class="label-sameline">My Msg #
+          <input type="text" name="envelope.RCVNUM" style="width:7em;">
+        </label>
+      </fieldset>
+      <textarea name="message"
+                rows="20" style="font-weight:normal;"
                 placeholder="!addon_name!&#10;# FORMFILENAME: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
                 ></textarea>
     </form>
