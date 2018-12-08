@@ -4,9 +4,11 @@
     <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
     <title>Message Forms</title>
     <script type="text/javascript">
+      var ping_sequence = Math.random();
       setInterval(function() {
           var img = new Image();
-          img.src = "/ping-0";
+          // To discourage caching, use a new query string for each ping.
+          img.src = "/ping-0?i=" + (ping_sequence++);
           img = undefined;
       }, 30000); // call ping every 30 seconds
     </script>
