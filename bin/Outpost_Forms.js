@@ -755,6 +755,8 @@ function onSubmit(formId, q, res) {
         const form = openForms[formId];
         const foundSubject = /[\r\n]#[ \t]*SUBJECT:[ \t]*([^\r\n]*)/.exec(message);
         const subject = foundSubject ? foundSubject[1] : '';
+        const foundSeverity = /[\r\n]4.:[ \t]*\[([A-Za-z]*)]/.exec(message);
+        const severity = foundSeverity ? foundSeverity[1].toUpperCase() : '';
         const formFileName = form.environment.filename;
         const msgFileName = path.resolve(PackItMsgs, 'form-' + formId + '.txt');
         // Convert the message from PACF format to ADDON format:
@@ -778,9 +780,12 @@ function onSubmit(formId, q, res) {
                     // ignored
                 }
                 log('form ' + formId + ' submitting');
+                var options = ['-a', form.environment.addon_name, '-f', msgFileName, '-s', subject];
+                if (severity == 'URGENT' || severity == 'IMMEDIATE') {
+                    options.push('-u');
+                }
                 child_process.execFile(
-                    path.join('addons', form.environment.addon_name, 'Aoclient.exe'),
-                    ['-a', form.environment.addon_name, '-f', msgFileName, '-s', subject],
+                    path.join('addons', form.environment.addon_name, 'Aoclient.exe'), options,
                     function(err, stdout, stderr) {
                         try {
                             if (err) {
