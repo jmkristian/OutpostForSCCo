@@ -84,6 +84,8 @@ const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join('logs', 'server-port.txt');
 const StopServer = '/stopOutpostForLAARES';
 
+var logFileName = null;
+
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
     const verb = process.argv[2];
@@ -755,6 +757,8 @@ function onSubmit(formId, q, res) {
         const form = openForms[formId];
         const foundSubject = /[\r\n]#[ \t]*SUBJECT:[ \t]*([^\r\n]*)/.exec(message);
         const subject = foundSubject ? foundSubject[1] : '';
+        const foundSeverity = /[\r\n]4.:[ \t]*\[([A-Za-z]*)]/.exec(message);
+        const severity = foundSeverity ? foundSeverity[1].toUpperCase() : '';
         const formFileName = form.environment.filename;
         const msgFileName = path.resolve(PackItMsgs, 'form-' + formId + '.txt');
         // Convert the message from PACF format to ADDON format:
@@ -769,45 +773,44 @@ function onSubmit(formId, q, res) {
         // Aoclient.exe or Outpost will insert !addon_name!.
         message = message.replace(/^\s*![^\r\n]*[\r\n]+/, '');
         fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
-            if (err) {
-                res.end(errorToHTML(err, form));
-            } else {
+            try {
+                if (err) throw err;
                 try {
                     fs.unlinkSync(OpdFAIL);
                 } catch(err) {
                     // ignored
                 }
                 log('form ' + formId + ' submitting');
+                var options = ['-a', form.environment.addon_name, '-f', msgFileName, '-s', subject];
+                if (['URGENT', 'U', 'EMERGENCY', 'E'].indexOf(severity) >= 0) {
+                    options.push('-u');
+                }
                 child_process.execFile(
-                    path.join('addons', form.environment.addon_name, 'Aoclient.exe'),
-                    ['-a', form.environment.addon_name, '-f', msgFileName, '-s', subject],
+                    path.join('addons', form.environment.addon_name, 'Aoclient.exe'), options,
                     function(err, stdout, stderr) {
                         try {
-                            if (err) {
-                                throw err;
-                            } else if (fs.existsSync(OpdFAIL)) {
-                                // This is described in the Outpost Add-on Implementation Guide version 1.2,
-                                // but Aoclient.exe doesn't appear to implement it.
-                                // Happily, it does pop up a window to explain what went wrong.
+                            if (err) throw err;
+                            if (fs.existsSync(OpdFAIL)) {
                                 throw (OpdFAIL + ': ' + fs.readFileSync(OpdFAIL, ENCODING) + '\n'
                                        + stdout.toString(ENCODING)
                                        + stderr.toString(ENCODING));
-                            } else {
-                                res.redirect('/form-' + formId + '?mode=readonly');
-                                /** At this point, the operator can click the browser 'back' button,
-                                    edit the form and submit it to Outpost again. To prevent this:
+                            }
+                            res.redirect('/form-' + formId + '?mode=readonly');
+                            /** At this point, the operator can click the browser 'back' button,
+                                edit the form and submit it to Outpost again. To prevent this:
                                 form.environment.mode = 'readonly';
                                 res.redirect('/form-' + formId);
-                                    ... which causes the 'back' button to display a read-only form.
-                                */
-                                log('form ' + formId + ' submitted');
-                                fs.unlinkSync(msgFileName);
-                                // Don't closeForm, in case the operator goes back and submits it again.
-                            }
+                                ... which causes the 'back' button to display a read-only form.
+                            */
+                            log('form ' + formId + ' submitted');
+                            fs.unlinkSync(msgFileName);
+                            // Don't closeForm, in case the operator goes back and submits it again.
                         } catch(err) {
                             res.end(errorToHTML(err, form));
                         }
                     });
+            } catch(err) {
+                res.end(errorToHTML(err, form));
             }
         });
     } catch(err) {
@@ -868,7 +871,10 @@ function getAddonForms() {
 }
 
 function errorToHTML(err, state) {
-    const message = encodeHTML(EOL + errorToMessage(err) + EOL + JSON.stringify(state));
+    var message = encodeHTML(EOL + errorToMessage(err) + EOL + JSON.stringify(state));
+    if (logFileName) {
+        message += (EOL + 'log file: ' + logFileName);
+    }
     return `<HTML><title>Problem</title><body>
   <h3><img src="icon-warning.png" alt="warning" style="${IconStyle}">&nbsp;&nbsp;Something went wrong.</h3>
   This information might help resolve the problem:<pre>${message}</pre>
@@ -930,6 +936,7 @@ function logToFile(fileName) {
     windowsEOL.pipe(fileStream);
     const writer = windowsEOL.write.bind(windowsEOL);
     process.stdout.write = process.stderr.write = writer;
+    logFileName = fileName;
 }
 
 function expandVariablesInFile(variables, fromFile, intoFile) {
