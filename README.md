@@ -79,7 +79,7 @@ or view a received message as a form.
 
 If something's not right, please report it by creating or updating an issue in the
 [issues page](https://github.com/jmkristian/OutpostForLAARES/issues).
-Please say what browser and what versions of OutpostForLAARES and Windows you used.
+Please say what browser and what versions of this program, Outpost and Windows you used.
 To help isolate the problem, please attach all the files from the `logs` sub-folder
 of the folder where the program was installed,
 and a screenshot of a browser page (if any).
