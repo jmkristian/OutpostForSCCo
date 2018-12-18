@@ -13,7 +13,7 @@
 # limitations under the License.
 
 !define VersionMajor 1
-!define VersionMinor 10
+!define VersionMinor 11
 
 OutFile "${SetupFileName}_Setup-${VersionMajor}.${VersionMinor}.exe"
 
