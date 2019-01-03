@@ -780,11 +780,11 @@ function onSubmit(formId, q, res) {
                 } catch(err) {
                     // ignored
                 }
-                log('form ' + formId + ' submitting');
                 var options = ['-a', form.environment.addon_name, '-f', msgFileName, '-s', subject];
                 if (['URGENT', 'U', 'EMERGENCY', 'E'].indexOf(severity) >= 0) {
                     options.push('-u');
                 }
+                log('form ' + formId + ' submitting ' + options.join(' '));
                 child_process.execFile(
                     path.join('addons', form.environment.addon_name, 'Aoclient.exe'), options,
                     function(err, stdout, stderr) {
@@ -795,6 +795,7 @@ function onSubmit(formId, q, res) {
                                        + stdout.toString(ENCODING)
                                        + stderr.toString(ENCODING));
                             }
+                            log('form ' + formId + ' submitted');
                             res.redirect('/form-' + formId + '?mode=readonly');
                             /** At this point, the operator can click the browser 'back' button,
                                 edit the form and submit it to Outpost again. To prevent this:
@@ -802,8 +803,11 @@ function onSubmit(formId, q, res) {
                                 res.redirect('/form-' + formId);
                                 ... which causes the 'back' button to display a read-only form.
                             */
-                            log('form ' + formId + ' submitted');
-                            fs.unlinkSync(msgFileName);
+                            try {
+                                fs.unlinkSync(msgFileName);
+                            } catch(err) {
+                                log(err);
+                            }
                             // Don't closeForm, in case the operator goes back and submits it again.
                         } catch(err) {
                             res.end(errorToHTML(err, form));
