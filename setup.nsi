@@ -77,14 +77,15 @@ Function FindOutpost
   ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
   ${IfNot} ${Errors}
     ${IfNot} ${FileExists} "$R0\Aoclient.exe"
-      MessageBox MB_YESNO|MB_ICONEXCLAMATION "${DisplayName} won't work with $R0, because it doesn't contain Aoclient.exe. Do you want to use a different copy of Outpost?" /SD IDNO IDYES goAhead
+      MessageBox MB_YESNO|MB_ICONEXCLAMATION "${DisplayName} won't work with $R0, because it doesn't contain Aoclient.exe. Do you want to use a different copy of Outpost?" /SD IDNO IDYES otherOutpost
       Abort "No Aoclient.exe in $R0."
-      goAhead:
-    ${Else}
-      StrCpy $AOCLIENT_EXE "$R0\Aoclient.exe"
-      StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
-      StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
     ${EndIf}
+    otherOutpost:
+    ${If} "$AOCLIENT_EXE" == ""
+      StrCpy $AOCLIENT_EXE "$R0\Aoclient.exe"
+    ${EndIf}
+    StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
+    StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
   ${EndIf}
   ClearErrors
   Pop $R1
@@ -129,16 +130,16 @@ FunctionEnd
 Function ${un}FindOutposts
   StrCpy $OUTPOST_CODE ""
   StrCpy $OUTPOST_DATA ""
-  Push "$PROGRAMFILES\Outpost"
-  Call ${un}FindOutpost
-  ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
-    Push "$PROGRAMFILES64\Outpost"
-    Call ${un}FindOutpost
-  ${EndIf}
   Push "$PROGRAMFILES\SCCo Packet"
   Call ${un}FindOutpost
   ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
     Push "$PROGRAMFILES64\SCCo Packet"
+    Call ${un}FindOutpost
+  ${EndIf}
+  Push "$PROGRAMFILES\Outpost"
+  Call ${un}FindOutpost
+  ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
+    Push "$PROGRAMFILES64\Outpost"
     Call ${un}FindOutpost
   ${EndIf}
 FunctionEnd
@@ -214,6 +215,7 @@ Section "Install"
 
   CreateDirectory "$INSTDIR\addons\${addon_name}"
   ClearErrors
+  DetailPrint "Copy from $AOCLIENT_EXE"
   CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
   ${If} ${Errors}
     MessageBox MB_OK|MB_ICONSTOP "Can't copy $AOCLIENT_EXE."
