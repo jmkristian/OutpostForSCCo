@@ -45,13 +45,10 @@ Function FindOutpost
   ClearErrors
   ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
   ${IfNot} ${Errors}
-    ${IfNot} ${FileExists} "$R0\Aoclient.exe"
-      MessageBox MB_YESNO|MB_ICONEXCLAMATION "${DisplayName} won't work with $R0, because it doesn't contain Aoclient.exe. Do you want to use a different copy of Outpost?" /SD IDNO IDYES otherOutpost
-      Abort "No Aoclient.exe in $R0."
-    ${EndIf}
-    otherOutpost:
     ${If} "$AOCLIENT_EXE" == ""
-      StrCpy $AOCLIENT_EXE "$R0\Aoclient.exe"
+      ${If} ${FileExists} "$R0\Aoclient.exe"
+        StrCpy $AOCLIENT_EXE "$R0\Aoclient.exe"
+      ${EndIf}
     ${EndIf}
     StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
     StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
@@ -183,12 +180,17 @@ Section "Install"
   Call DeleteMyFiles
 
   CreateDirectory "$INSTDIR\addons\${addon_name}"
-  ClearErrors
-  DetailPrint "Copy from $AOCLIENT_EXE"
-  CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
-  ${If} ${Errors}
-    MessageBox MB_OK|MB_ICONSTOP "Can't copy $AOCLIENT_EXE."
-    Abort "Can't copy $AOCLIENT_EXE."
+  ${If} "$AOCLIENT_EXE" == ""
+    MessageBox MB_OK|MB_ICONSTOP "${DisplayName} won't work, because there's no Aoclient.exe file in $OUTPOST_DATA. A newer version of Outpost should have this file."
+    Abort "No Aoclient.exe in $OUTPOST_DATA."
+  ${Else}
+    DetailPrint "Copy from $AOCLIENT_EXE"
+    ClearErrors
+    CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
+    ${If} ${Errors}
+      MessageBox MB_OK|MB_ICONSTOP "Can't copy $AOCLIENT_EXE."
+      Abort "Can't copy $AOCLIENT_EXE."
+    ${EndIf}
   ${EndIf}
 
   # Files to install:
