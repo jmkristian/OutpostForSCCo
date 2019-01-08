@@ -1,5 +1,10 @@
 <script type="text/javascript">
     var formDefaultValues; // Initial values for form inputs.
+    function set_form_default_values() {
+        for (var f = formDefaultValues.length - 1; f >= 0; f--) {
+            init_form_from_fields(formDefaultValues[f], 'name');
+        }
+    }
     // Monkey patch load_callprefix:
     for (var i = startup_functions.length - 1; i >= 0; i--) {
         if (startup_functions[i] === load_callprefix) {
@@ -7,13 +12,6 @@
                 outpost_envelope = {{envelopeDefaults}};
                 var message = {{message}};
                 set_form_data_div(message || '# A new message will go here.');
-                document.getElementById('clear-form').onclick = function(event) {
-                    document.getElementById('the-form').reset();
-                    init_form_from_msg_data(message || '');
-                    expand_templated_items();
-                    check_the_form_validity();
-                    write_pacforms_representation();
-                };
                 var queryDefaults = {{queryDefaults}};
                 for (var q in queryDefaults) {
                     if (!(q in query_object)) {
@@ -42,10 +40,15 @@
                 init_form_from_fields({'Rec-Sent': (status == 'unread' || status == 'read') ? 'Received' : 'Sent'}, 'name');
                 if (query_object.mode != 'readonly') {
                     // A readonly form is initialized from the message, not default values.
-                    for (var f = formDefaultValues.length - 1; f >= 0; f--) {
-                        init_form_from_fields(formDefaultValues[f], 'name');
-                    }
+                    set_form_default_values();
                 }
+                document.getElementById('clear-form').onclick = function(event) {
+                    document.getElementById('the-form').reset();
+                    set_form_default_values();
+                    expand_templated_items();
+                    check_the_form_validity();
+                    write_pacforms_representation();
+                };
                 array_for_each(document.getElementsByName('Rec-Sent'), function(recSent) {
                     recSent.disabled = true; // Don't include it in transmitted messages.
                     recSent.classList.add('no-msg-init'); // Ignore it in received messages.
