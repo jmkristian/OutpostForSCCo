@@ -9,10 +9,15 @@
     for (var i = startup_functions.length - 1; i >= 0; i--) {
         if (startup_functions[i] === load_callprefix) {
             startup_functions[i] = function(next) {
-                outpost_envelope = {{envelopeDefaults}};
                 var message = {{message}};
-                set_form_data_div(message || '# A new message will go here.');
+                var envelopeDefaults = {{envelopeDefaults}};
                 var queryDefaults = {{queryDefaults}};
+                set_form_data_div(message || '# A new message will go here.');
+                for (var e in envelopeDefaults) {
+                    if (!(e in outpost_envelope)) {
+                        outpost_envelope[e] = envelopeDefaults[e];
+                    }
+                }
                 for (var q in queryDefaults) {
                     if (!(q in query_object)) {
                         query_object[q] = queryDefaults[q];
