@@ -32,41 +32,10 @@ Var /GLOBAL OUTPOST_DATA
 Var /GLOBAL AOCLIENT_EXE
 Var /GLOBAL WSCRIPT_EXE
 
-Function StrContainsSpace
-  Exch $R0
-  Push $R1
-  loop:
-    ${If} $R0 == ""
-      StrCpy $R0 false
-      GoTo end
-    ${Endif}
-    StrCpy $R1 $R0 1 0
-    ${If} $R1 == " "
-      StrCpy $R0 true
-      GoTo end
-    ${Endif}
-    StrLen $R1 $R0
-    StrCpy $R0 $R0 $R1 1
-    GoTo loop
-end:
-  Pop $R1
-  Exch $R0
-FunctionEnd
-!macro StrContainsSpace OUT S
-  Push `${S}`
-  Call StrContainsSpace
-  Pop `${OUT}`
-!macroend
-!define StrContainsSpace '!insertmacro "StrContainsSpace"'
-
 Function .onInit
   ${If} $INSTDIR == ""
-    StrCpy $INSTDIR "$APPDATA\${INSTDIR_NAME}\"
-    ${StrContainsSpace} $0 "$INSTDIR"
-    ${If} $0 != false
-      ReadEnvStr $0 SystemDrive
-      StrCpy $INSTDIR "$0\${INSTDIR_NAME}\"
-    ${EndIf}
+    ReadEnvStr $0 SystemDrive
+    StrCpy $INSTDIR "$0\${INSTDIR_NAME}\"
   ${EndIf}
 FunctionEnd
 
