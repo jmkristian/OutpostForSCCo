@@ -1,0 +1,74 @@
+<p>This program augments
+  <a href="https://www.outpostpm.org">Outpost Packet Message Manager</a>,
+  adding forms that are used for emergency communication by ARES and RACES
+  in Santa Clara County, California.
+  It uses a web browser to display and edit forms.</p>
+<h3 id="installation">Installation</h3>
+<p>Install Outpost before installing this program.
+  Then, download a Setup.exe file from the
+  <a href="https://github.com/jmkristian/OutpostForSCCo/releases">releases page</a>
+  and run it. After installation is complete, exit and restart Outpost.</p>
+<p>Antivirus or firewall products may resist installation.
+  Here's how to overcome their resistance:</p>
+<ul>
+  <li><p>Windows Smart Screen may prevent an "unrecognized app" from starting.
+      Click "More Info" and then "Run Anyway."</p></li>
+  <li><p>Windows Firewall may ask to allow {{addon_name}}_Forms.exe to communicate on a network.
+      Check the box for "Private networks" and click "Allow access."</p></li>
+  <li><p>Norton Security may quarantine the installer. Open the Norton Security program,
+      click "Security", click "History", select "Show Quarantine" and restore the installer.
+      When creating or opening a message, Norton may pop up a message,
+      "Suspicious network activity has been detected."
+      Select "Allow this instance", check "Do not notify me again" and click "OK".</p></li>
+  <li><p>Avast antivirus might say "This file might be dangerous - It's been submitted for interrogation."
+      Click "More details" and then "I trust this file."
+      Next, open Avast settings, select the "General" tab,
+      check "allow me to decide" under "Enable CyberCapture"
+      and try again to run the installer.
+      Then you'll have to wait for a few minutes, until its interrogation is complete.
+      Or Avast might say "this file may contain something bad,"
+      or "CyberCapture has been activated. You've discovered a very rare file."
+      After a minute, it might simply say "no problems found" and continue, without your intervention.
+      Or it might show a link you can click to run the program anyway.</p></li>
+  <li><p>Comodo Firewall may ask whether to allow the program to do things.
+      For the {{addon_name}}Forms_Setup.exe installer program, click "Treat as Installer or Updater."
+      For the bin\{{addon_name}}_Forms.exe program, check "Remember my answer" and click "Allow."</p></li>
+</ul>
+<p>Uninstall as you would any program.
+  For example on Windows 8, open the control panel "Programs and Features",
+  select "{{addon_name}} Forms" and click "Uninstall".
+  If you don't see the program in the control panel, try closing and re-opening the control panel.
+  If that fails, try running the program uninstall.exe in the folder where the program is installed.
+  After uninstallation is complete, exit and restart Outpost.</p>
+<p>For a silent install, run the installer with option <code>/S</code>.
+  To specify an installation folder, add the option <code>/D=C:\YourFolder</code>.
+  The <a href="http://nsis.sourceforge.net/Which_command_line_parameters_can_be_used_to_configure_installers">/D= option</a>
+  must be last, and the folder name must not be surrounded by quotes.
+  Beware: a folder name that contains whitepsace won't work with Outpost version 3.2 c118.
+  For a silent uninstall, run <code>.\uninstall.exe /S</code> in the folder where the program is installed.</p>
+<h3 id="usage">Usage</h3>
+<p>To create a new message, click an item in the 'Forms' menu of Outpost.
+  A browser page will pop up; enter data and click the 'Submit to Outpost' button at the top.
+  The text form of the message will pop up; enter the 'To' addresses and click 'Send' or 'Save'.</p>
+<p>Opening a message that's not ready to send will pop up the text form, only,
+  where you can enter the 'To' addresses.
+  Opening a message that's ready to send will pop up a browser page.
+  Opening a message that's been sent or received will ask whether you want to view the
+  'original format'; that is a browser page.</p>
+<h3 id="whenoutpostfails">When Outpost Fails</h3>
+<p>If Outpost is unusable, it's still possible to use this program.
+  Run browse.cmd in the folder where the program is installed.
+  It should open a page in your browser, with buttons you can use to either
+  open a form to create a message (which you could send via email),
+  or view a received message as a form.</p>
+<h3 id="incaseoftrouble">In Case of Trouble</h3>
+<p>If something's not right, please report it by creating or updating an issue in the
+  <a href="https://github.com/jmkristian/OutpostForSCCo/issues">issues page</a>.
+  Please say what browser and what versions of this program, Outpost and Windows you used.
+  To help isolate the problem, please attach all the files from the <code>logs</code> sub-folder
+  of the folder where the program is installed,
+  and a screenshot of a browser page (if any).</p>
+<p>Power users might learn more by editing addons\*.ini, changing
+  each occurrence of XXX\wscript.exe YYY\launch.vbs
+  to YYY\launch-v.cmd and observing the console windows that pop up.
+  The source code for bin\{{addon_name}}_Forms.exe is bin\Outpost_Forms.js.</p>

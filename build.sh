@@ -17,7 +17,6 @@ if [ ! -e pack-it-forms ]; then
     rm -rf pack-it-forms/.git*
 fi
 
-node showdown.js README.md README.html
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-LAARES.nsi || exit $?
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCo.nsi || exit $?
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCoHealth.nsi || exit $?

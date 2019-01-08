@@ -143,6 +143,7 @@ Function ${un}DeleteMyFiles
   ${Delete} launch.cmd
   ${Delete} launch-v.cmd
   ${Delete} README.*
+  ${Delete} UserGuide.*
   ${Delete} uninstall.exe
   ${RMDir} "$INSTDIR\addons"
   ${RMDir} "$INSTDIR\bin"
@@ -198,7 +199,7 @@ Section "Install"
   File launch.vbs
   File launch.cmd
   File launch-v.cmd
-  File README.html
+  File UserGuide.html
   SetOutPath "$INSTDIR\addons"
   File addons\${addon_name}.launch
   SetOutPath "$INSTDIR\bin"

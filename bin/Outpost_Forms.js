@@ -147,7 +147,7 @@ function installConfigFiles(myDirectory, addonNames) {
         expandVariablesInFile({addon_name: addon_name},
                               path.join('bin', 'Aoclient.ini'),
                               path.join('addons', addon_name, 'Aoclient.ini'));
-        ['browse.cmd', 'launch-v.cmd', 'launch.cmd', 'launch.vbs', 'README.html'].forEach(function(fileName) {
+        ['browse.cmd', 'launch-v.cmd', 'launch.cmd', 'launch.vbs', 'UserGuide.html'].forEach(function(fileName) {
             expandVariablesInFile({addon_name: addon_name}, fileName);
         });
     });
