@@ -107,7 +107,7 @@ if (process.argv.length > 2) {
             openMessage(3);
             break;
         case 'dry-run':
-            openMessage(4);
+            openMessage(4, process.argv[3]);
             break;
         case 'stop':
             stopServers(function() {});
