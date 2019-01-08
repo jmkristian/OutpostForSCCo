@@ -7,6 +7,13 @@
                 outpost_envelope = {{envelopeDefaults}};
                 var message = {{message}};
                 set_form_data_div(message || '# A new message will go here.');
+                document.getElementById('clear-form').onclick = function(event) {
+                    document.getElementById('the-form').reset();
+                    init_form_from_msg_data(message || '');
+                    expand_templated_items();
+                    check_the_form_validity();
+                    write_pacforms_representation();
+                };
                 var queryDefaults = {{queryDefaults}};
                 for (var q in queryDefaults) {
                     if (!(q in query_object)) {
