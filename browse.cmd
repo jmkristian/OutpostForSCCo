@@ -1,6 +1,6 @@
 @rem Open a browser page via which you can create or view forms.
 @pushd "%~dp0"
-bin\Outpost_Forms.exe dry-run
+bin\{{addon_name}}_Forms.exe dry-run {{addon_name}}_Forms.exe
 @if not %ERRORLEVEL%==0 exit /b %ERRORLEVEL%
 set /p serverPort=<logs\server-port.txt
 @if not %ERRORLEVEL%==0 exit /b %ERRORLEVEL%

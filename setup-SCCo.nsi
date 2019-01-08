@@ -14,12 +14,12 @@
 
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
-Name "Santa Clara County" "Outpost forms"
+Name "Santa Clara County" "forms"
 
-!define addon_name Santa_Clara_County
-!define DisplayName "Outpost for Santa Clara County"
-!define INSTDIR_NAME OutpostForSCCo
-!define SetupFileName OutpostForSCCo
-!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OutpostForSCCo"
+!define addon_name SCCo
+!define DisplayName "Santa Clara County Forms"
+!define INSTDIR_NAME SCCoForms
+!define SetupFileName SCCoForms
+!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCCoForms"
 
 !include setup.nsi

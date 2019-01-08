@@ -104,8 +104,10 @@ if (process.argv.length > 2) {
             serve();
             break;
         case 'open':
+            openMessage(3);
+            break;
         case 'dry-run':
-            openMessage();
+            openMessage(4);
             break;
         case 'stop':
             stopServers(function() {});
@@ -145,6 +147,9 @@ function installConfigFiles(myDirectory, addonNames) {
         expandVariablesInFile({addon_name: addon_name},
                               path.join('bin', 'Aoclient.ini'),
                               path.join('addons', addon_name, 'Aoclient.ini'));
+        ['browse.cmd', 'launch-v.cmd', 'launch.cmd', 'launch.vbs', 'README.html'].forEach(function(fileName) {
+            expandVariablesInFile({addon_name: addon_name}, fileName);
+        });
     });
 }
 
@@ -246,10 +251,17 @@ function getAddonNames(directoryName) {
     return addonNames;
 }
 
-function openMessage() {
+function openMessage(firstArg, program) {
     var args = [];
-    for (var i = 3; i < process.argv.length; i++) {
+    for (var i = firstArg; i < process.argv.length; i++) {
         args.push(process.argv[i]);
+    }
+    if (!program) {
+        for (var i = 0; i < args.length; i++) {
+            if (args[i] == '--addon_name') {
+                program = args[++i] + '_Forms.exe';
+            }
+        }
     }
     var retries = 0;
     function tryNow() {
@@ -267,7 +279,7 @@ function openMessage() {
         } else {
             ++retries;
             if (retries == 1 || retries == 4) {
-                startServer();
+                startServer(program);
             }
             setTimeout(tryNow, retries * 1000);
         }
@@ -298,9 +310,9 @@ function openForm(args, tryLater) {
     }).end(postData, CHARSET);
 }
 
-function startServer() {
+function startServer(program) {
     const command = 'start /B '
-          + path.join('bin', 'Outpost_Forms.exe')
+          + path.join('bin', program)
           + ' serve';
     log(command);
     child_process.exec(
@@ -945,13 +957,13 @@ function logToFile(fileName) {
 
 function expandVariablesInFile(variables, fromFile, intoFile) {
     if (!intoFile) intoFile = fromFile;
-    if (!fs.existsSync(path.dirname(intoFile))) {
-        fs.mkdirSync(path.dirname(intoFile));
-    }
     fs.readFile(fromFile, ENCODING, function(err, data) {
         if (err) logAndAbort(err);
         var newData = expandVariables(data, variables);
         if (newData != data || intoFile != fromFile) {
+            if (!fs.existsSync(path.dirname(intoFile))) {
+                fs.mkdirSync(path.dirname(intoFile));
+            }
             fs.writeFile(intoFile, newData, {encoding: ENCODING}, function(err) {
                 if (err) logAndAbort(err);
                 log('wrote ' + intoFile);

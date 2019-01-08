@@ -18,7 +18,7 @@ Here's how to overcome their resistance:
 * Windows Smart Screen may prevent an "unrecognized app" from starting.
 Click "More Info" and then "Run Anyway."
 
-* Windows Firewall may ask to allow Outpost_Forms.exe to communicate on a network.
+* Windows Firewall may ask to allow {{addon_name}}\_Forms.exe to communicate on a network.
 Check the box for "Private networks" and click "Allow access."
 
 * Norton Security may quarantine the installer. Open the Norton Security program,
@@ -40,7 +40,7 @@ Or it might show a link you can click to run the program anyway.
 
 * Comodo Firewall may ask whether to allow the software to do things.
 For the Setup.exe installer program, click "Treat as Installer or Updater."
-For the bin\\Outpost\_Forms.exe program, check "Remember my answer" and click "Allow."
+For the bin\\{{addon_name}}\_Forms.exe program, check "Remember my answer" and click "Allow."
 
 Uninstall as you would any program.
 For example on Windows 8, open the control panel "Programs and Features",
@@ -88,7 +88,7 @@ and a screenshot of a browser page (if any).
 Power users might learn more by editing addons\\*.ini, changing
 each occurrence of XXX\\wscript.exe YYY\\launch.vbs
 to YYY\\launch-v.cmd and observing the console windows that pop up.
-The source code for bin\\Outpost\_Forms.exe is bin\\Outpost\_Forms.js.
+The source code for bin\\{{addon_name}}\_Forms.exe is bin\\Outpost\_Forms.js.
 
 ### Developing
 
