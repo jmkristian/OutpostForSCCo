@@ -733,6 +733,7 @@ function expandDataInclude(data, form) {
         var matches = found.match(/"([^"]*)"\s*>([^<]*)/);
         var name = matches[1];
         var formDefaults = htmlEntities.decode(matches[2].trim());
+        log('data-include-html ' + name + ' ' + formDefaults);
         // Read a file from pack-it-forms:
         var fileName = path.join(PackItForms, 'resources', 'html', name + '.html')
         var result = fs.readFileSync(fileName, ENCODING);
@@ -748,7 +749,6 @@ function expandDataInclude(data, form) {
                  queryDefaults: JSON.stringify(form.environment)});
         }
         if (formDefaults) {
-            log('formDefaultValues: ' + formDefaults);
             result += `<script type="text/javascript">
   var formDefaultValues;
   if (!formDefaultValues) {
