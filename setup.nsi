@@ -248,9 +248,9 @@ Section "Install"
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ClearErrors
   ${If} ${AtMostWinXP}
-    ExecShellWait open              ".\launch.cmd" "dry-run" SW_SHOWMINIMIZED
+    ExecShellWait open              ".\launch.cmd" "dry-run ${addon_name}_Forms.exe" SW_SHOWMINIMIZED
   ${Else}
-    ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run" SW_SHOWMINIMIZED
+    ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run ${addon_name}_Forms.exe" SW_SHOWMINIMIZED
   ${EndIf}
   ${If} ${Errors}
     Abort "dry-run failed"
