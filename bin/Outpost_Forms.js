@@ -957,13 +957,13 @@ function logToFile(fileName) {
 
 function expandVariablesInFile(variables, fromFile, intoFile) {
     if (!intoFile) intoFile = fromFile;
+    if (!fs.existsSync(path.dirname(intoFile))) {
+        fs.mkdirSync(path.dirname(intoFile)); // fail fast
+    }
     fs.readFile(fromFile, ENCODING, function(err, data) {
         if (err) logAndAbort(err);
         var newData = expandVariables(data, variables);
         if (newData != data || intoFile != fromFile) {
-            if (!fs.existsSync(path.dirname(intoFile))) {
-                fs.mkdirSync(path.dirname(intoFile));
-            }
             fs.writeFile(intoFile, newData, {encoding: ENCODING}, function(err) {
                 if (err) logAndAbort(err);
                 log('wrote ' + intoFile);

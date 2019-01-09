@@ -14,12 +14,12 @@
 
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
-Name "SCCo Health" "Outpost forms"
+Name "SCCo Health" "web forms"
 
 !define addon_name SCCo_Health
-!define DisplayName "Outpost for Santa Clara County Health Agencies"
-!define INSTDIR_NAME OutpostForSCCoHealth
-!define SetupFileName OutpostForSCCoHealth
-!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OutpostForSCCoHealth"
+!define DisplayName "SSCo Health Agencies Web Forms"
+!define INSTDIR_NAME SCCoHealthWebForms
+!define SetupFileName SCCoHealthWebForms
+!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCCoHealthWebForms"
 
 !include setup.nsi

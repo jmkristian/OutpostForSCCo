@@ -13,7 +13,7 @@
 <ul>
   <li><p>Windows Smart Screen may prevent an "unrecognized app" from starting.
       Click "More Info" and then "Run Anyway."</p></li>
-  <li><p>Windows Firewall may ask to allow {{addon_name}}_Forms.exe to communicate on a network.
+  <li><p>Windows Firewall may ask to allow {{addon_name}}_Web_Forms.exe to communicate on a network.
       Check the box for "Private networks" and click "Allow access."</p></li>
   <li><p>Norton Security may quarantine the installer. Open the Norton Security program,
       click "Security", click "History", select "Show Quarantine" and restore the installer.
@@ -31,12 +31,12 @@
       After a minute, it might simply say "no problems found" and continue, without your intervention.
       Or it might show a link you can click to run the program anyway.</p></li>
   <li><p>Comodo Firewall may ask whether to allow the program to do things.
-      For the {{addon_name}}Forms_Setup.exe installer program, click "Treat as Installer or Updater."
-      For the bin\{{addon_name}}_Forms.exe program, check "Remember my answer" and click "Allow."</p></li>
+      For the {{addon_name}}WebForms_Setup.exe installer program, click "Treat as Installer or Updater."
+      For the bin\{{addon_name}}_Web_Forms.exe program, check "Remember my answer" and click "Allow."</p></li>
 </ul>
 <p>Uninstall as you would any program.
   For example on Windows 8, open the control panel "Programs and Features",
-  select "{{addon_name}} Forms" and click "Uninstall".
+  select "{{addon_name}} Web Forms" and click "Uninstall".
   If you don't see the program in the control panel, try closing and re-opening the control panel.
   If that fails, try running the program uninstall.exe in the folder where the program is installed.
   After uninstallation is complete, exit and restart Outpost.</p>
@@ -71,4 +71,4 @@
 <p>Power users might learn more by editing addons\*.ini, changing
   each occurrence of XXX\wscript.exe YYY\launch.vbs
   to YYY\launch-v.cmd and observing the console windows that pop up.
-  The source code for bin\{{addon_name}}_Forms.exe is bin\Outpost_Forms.js.</p>
+  The source code for bin\{{addon_name}}_Web_Forms.exe is bin\Outpost_Forms.js.</p>

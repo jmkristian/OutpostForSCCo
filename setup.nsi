@@ -176,8 +176,8 @@ Section "Install"
     Abort "Outpost PMM not found."
   ${EndIf}
 
-  # Stop the server (so it will release its lock on bin\${addon_name}_Forms.exe):
-  ExecShellWait open "bin\${addon_name}_Forms.exe" "stop" SW_SHOWMINIMIZED
+  # Stop the server (so it will release its lock on bin\${addon_name}_Web_Forms.exe):
+  ExecShellWait open "bin\${addon_name}_Web_Forms.exe" "stop" SW_SHOWMINIMIZED
   Call DeleteMyFiles
 
   CreateDirectory "$INSTDIR\addons\${addon_name}"
@@ -208,7 +208,7 @@ Section "Install"
   File /r /x "*~" /x .git* pack-it-forms\*
   File icon-*.png
   SetOutPath "$INSTDIR"
-  Rename "bin\Outpost_Forms.exe" "bin\${addon_name}_Forms.exe"
+  Rename "bin\Outpost_Forms.exe" "bin\${addon_name}_Web_Forms.exe"
 
   # define uninstaller:
   WriteUninstaller "$INSTDIR\uninstall.exe"
@@ -240,7 +240,7 @@ Section "Install"
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
 
   ClearErrors
-  ExecShellWait open "bin\${addon_name}_Forms.exe" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
+  ExecShellWait open "bin\${addon_name}_Web_Forms.exe" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
   ${If} ${Errors}
     Abort "install failed"
   ${EndIf}
@@ -248,9 +248,9 @@ Section "Install"
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ClearErrors
   ${If} ${AtMostWinXP}
-    ExecShellWait open              ".\launch.cmd" "dry-run ${addon_name}_Forms.exe" SW_SHOWMINIMIZED
+    ExecShellWait open              ".\launch.cmd" "dry-run ${addon_name}_Web_Forms.exe" SW_SHOWMINIMIZED
   ${Else}
-    ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run ${addon_name}_Forms.exe" SW_SHOWMINIMIZED
+    ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run ${addon_name}_Web_Forms.exe" SW_SHOWMINIMIZED
   ${EndIf}
   ${If} ${Errors}
     Abort "dry-run failed"
@@ -266,7 +266,7 @@ Section "Uninstall"
 
   # Remove our line from Outpost configuration files
   Call un.FindOutposts
-  ExecShellWait open "bin\${addon_name}_Forms.exe" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
+  ExecShellWait open "bin\${addon_name}_Web_Forms.exe" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
 
   Call un.DeleteMyFiles
   RMDir "$INSTDIR" # Do nothing if the directory is not empty

@@ -1,6 +1,6 @@
 @echo This script is for troubleshooting. For normal operation, use launch.vbs.
 @cd "%~dp0"
-bin\{{addon_name}}_Forms.exe %*
+bin\{{addon_name}}_Web_Forms.exe %*
 @rem For development or debugging, it's convenient to install Node.js and do this instead:
-@rem node bin/{{addon_name}}_Forms.js %*
+@rem node bin/{{addon_name}}_Web_Forms.js %*
 @pause

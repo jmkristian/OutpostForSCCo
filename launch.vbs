@@ -1,4 +1,4 @@
-' Run bin\{{addon_name}}_Forms.exe with the arguments that were passed to this script,
+' Run bin\{{addon_name}}_Web_Forms.exe with the arguments that were passed to this script,
 ' the working directory that contains this script and no visible window.
 
 set FSO = CreateObject("Scripting.FileSystemObject")
@@ -7,7 +7,7 @@ my_folder = FSO.GetParentFolderName(Wscript.ScriptFullName)
 
 ' Construct a command line as a string:
 ReDim arguments(WScript.Arguments.Count)
-arguments(0) = FSO.BuildPath(FSO.BuildPath(my_folder, "bin"), "{{addon_name}}_Forms.exe")
+arguments(0) = FSO.BuildPath(FSO.BuildPath(my_folder, "bin"), "{{addon_name}}_Web_Forms.exe")
 For i = 0 To WScript.Arguments.Count-1
   arg = WScript.Arguments(i)
   If Len(arg) = 0 Or InStr(arg, " ") > 0 Or InStr(arg, Chr(34)) > 0 Then
