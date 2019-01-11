@@ -17,9 +17,10 @@
 Name "Santa Clara County" "web forms"
 
 !define addon_name SCCo
-!define DisplayName "SCCo Web Forms"
-!define INSTDIR_NAME SCCoWebForms
-!define SetupFileName SCCoWebForms
-!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCCoWebForms"
+!define DisplayName "${addon_name} Web Forms"
+!define SetupFileName "${addon_name}WebForms"
+!define INSTDIR_NAME "${SetupFileName}"
+!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
+!define PROGRAM_PATH "bin\${addon_name}_Web_Forms.exe"
 
 !include setup.nsi

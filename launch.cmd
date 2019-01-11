@@ -4,4 +4,4 @@
 @rem If you know how to prevent this, please contribute to
 @rem https://github.com/jmkristian/OutpostForLAARES/issues/1
 @cd "%~dp0"
-@start /MIN bin\{{addon_name}}_Web_Forms.exe %*
+@start /MIN {{PROGRAM_PATH}} %*

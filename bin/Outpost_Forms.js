@@ -104,10 +104,8 @@ if (process.argv.length > 2) {
             serve();
             break;
         case 'open':
-            openMessage(3);
-            break;
         case 'dry-run':
-            openMessage(4, process.argv[3]);
+            openMessage();
             break;
         case 'stop':
             stopServers(function() {});
@@ -131,7 +129,8 @@ function install() {
 }
 
 function installConfigFiles(myDirectory, addonNames) {
-    var launch = process.argv[3] + ' ' + path.join(myDirectory, 'launch.vbs');
+    var programPath = process.argv[3];
+    var launch = process.argv[4] + ' ' + path.join(myDirectory, 'launch.vbs');
     const version = os.release().split(/\./);
     const majorVersion = parseInt(version[0], 10);
     if (majorVersion < 6) {
@@ -141,14 +140,14 @@ function installConfigFiles(myDirectory, addonNames) {
         launch = path.join(myDirectory, 'launch.cmd');
     }
     addonNames.forEach(function(addon_name) {
-        expandVariablesInFile({addon_name: addon_name, INSTDIR: myDirectory, LAUNCH: launch},
+        expandVariablesInFile({addon_name: addon_name, INSTDIR: myDirectory, LAUNCH: launch, PROGRAM_PATH: programPath},
                               path.join('bin', 'addon.ini'),
                               path.join('addons', addon_name + '.ini'));
         expandVariablesInFile({addon_name: addon_name},
                               path.join('bin', 'Aoclient.ini'),
                               path.join('addons', addon_name, 'Aoclient.ini'));
         ['browse.cmd', 'launch-v.cmd', 'launch.cmd', 'launch.vbs', 'UserGuide.html'].forEach(function(fileName) {
-            expandVariablesInFile({addon_name: addon_name}, fileName);
+            expandVariablesInFile({addon_name: addon_name, PROGRAM_PATH: programPath}, fileName);
         });
     });
 }
@@ -160,7 +159,7 @@ function installIncludes(myDirectory, addonNames) {
         return 'INCLUDE ' + path.resolve(myDirectory, 'addons', addonName + '.launch');
     });
     // Each of the process arguments names a directory that contains Outpost configuration data.
-    for (var a = 4; a < process.argv.length; a++) {
+    for (var a = 5; a < process.argv.length; a++) {
         var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
         // Upsert myIncludes into outpostLaunch:
         if (!fs.existsSync(outpostLaunch)) {
@@ -251,17 +250,11 @@ function getAddonNames(directoryName) {
     return addonNames;
 }
 
-function openMessage(firstArg, program) {
+function openMessage() {
+    var programPath = process.argv[3];
     var args = [];
-    for (var i = firstArg; i < process.argv.length; i++) {
+    for (var i = 4; i < process.argv.length; i++) {
         args.push(process.argv[i]);
-    }
-    if (!program) {
-        for (var i = 0; i < args.length; i++) {
-            if (args[i] == '--addon_name') {
-                program = args[++i] + '_Forms.exe';
-            }
-        }
     }
     var retries = 0;
     function tryNow() {
@@ -279,7 +272,7 @@ function openMessage(firstArg, program) {
         } else {
             ++retries;
             if (retries == 1 || retries == 4) {
-                startServer(program);
+                startServer(programPath);
             }
             setTimeout(tryNow, retries * 1000);
         }
@@ -310,10 +303,8 @@ function openForm(args, tryLater) {
     }).end(postData, CHARSET);
 }
 
-function startServer(program) {
-    const command = 'start /B '
-          + path.join('bin', program)
-          + ' serve';
+function startServer(programPath) {
+    const command = 'start /B ' + programPath + ' serve';
     log(command);
     child_process.exec(
         command,

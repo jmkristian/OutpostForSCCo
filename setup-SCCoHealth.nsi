@@ -18,8 +18,9 @@ Name "SCCo Health" "web forms"
 
 !define addon_name SCCo_Health
 !define DisplayName "SSCo Health Agencies Web Forms"
-!define INSTDIR_NAME SCCoHealthWebForms
 !define SetupFileName SCCoHealthWebForms
-!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCCoHealthWebForms"
+!define INSTDIR_NAME "${SetupFileName}"
+!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
+!define PROGRAM_PATH "bin\${addon_name}_Web_Forms.exe"
 
 !include setup.nsi
