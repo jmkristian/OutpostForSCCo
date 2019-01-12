@@ -48,9 +48,8 @@ Function selectOutpostCode
   ${If} "$OUTPOST_DATA" != ""
     Abort # that is, don't ask the user to select a folder.
   ${EndIf}
-
   Push $R0
-  nsDialogs::SelectFolderDialog "Where is Outpost installed? Select the folder that contains Outpost.conf. ${addon_name} forms will be added to the Outpost you select." "C:\Program Files (x86)"
+  nsDialogs::SelectFolderDialog "Where is SCCo Packet installed? Select the folder that contains Outpost.exe and Outpost.conf." "$PROGRAMFILES"
   Pop $R0
   ${If} "$R0" != error
     Push $R0
