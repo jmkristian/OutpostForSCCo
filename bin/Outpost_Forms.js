@@ -478,7 +478,11 @@ function serve() {
             res.end(errorToHTML(err, JSON.stringify(req.body)));
         }
     });
-    app.get(/^\/.*/, express.static(PackItForms));
+    app.get(/^\/.*/, express.static(PackItForms, {setHeaders: function(res, path, stat) {
+        if (path && path.toLowerCase().endsWith(".pdf")) {
+            res.set('Content-Type', 'application/pdf');
+        }
+    }}));
 
     const server = app.listen(0);
     const address = server.address();
