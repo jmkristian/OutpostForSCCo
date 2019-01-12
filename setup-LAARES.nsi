@@ -14,13 +14,12 @@
 
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
-Name "Los Altos ARES" "Outpost forms"
-
 !define addon_name Los_Altos
 !define DisplayName "Outpost for LAARES"
 !define SetupFileName OutpostForLAARES
 !define INSTDIR_NAME "${SetupFileName}"
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
 !define PROGRAM_PATH "bin\LAARES_Web_Forms.exe"
+!define WINDOW_TITLE "Los Altos ARES"
 
 !include setup.nsi

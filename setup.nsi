@@ -15,15 +15,18 @@
 !define VersionMajor 1
 !define VersionMinor 12
 
+Name "${WINDOW_TITLE}" "web forms"
 OutFile "${SetupFileName}_Setup-${VersionMajor}.${VersionMinor}.exe"
 
 RequestExecutionLevel highest
-Page directory
+Page custom selectOutpostCode "" "${WINDOW_TITLE} Setup"
+Page directory ifOutpostDataDefined
 Page instfiles
 UninstPage uninstConfirm
 UninstPage instfiles
 
 !include LogicLib.nsh
+!include nsDialogs.nsh
 !include TextFunc.nsh
 !include WinVer.nsh
 
@@ -39,21 +42,54 @@ Function .onInit
   ${EndIf}
 FunctionEnd
 
+Function selectOutpostCode
+  Call FindOutposts
+  ${If} "$OUTPOST_DATA" != ""
+    Abort # that is, don't ask the user to select a folder.
+  ${EndIf}
+
+  Push $R0
+  nsDialogs::SelectFolderDialog "Where is Outpost installed? Select the folder that contains Outpost.conf. ${addon_name} forms will be added to the Outpost you select." "C:\Program Files (x86)"
+  Pop $R0
+  ${If} "$R0" != error
+    Push $R0
+    Call FindOutpost
+  ${EndIf}
+  Pop $R0
+FunctionEnd
+
+Function ifOutpostDataDefined
+  ${If} "$OUTPOST_DATA" == ""
+    Abort # that is, don't show this page.
+  ${EndIf}
+FunctionEnd
+
 Function FindOutpost
   Exch $R0
   Push $R1
-  ClearErrors
-  ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
-  ${IfNot} ${Errors}
+  ${IfNot} ${FileExists} "$R0"
+    DetailPrint `No $R0`
+  ${Else}
     ${If} "$AOCLIENT_EXE" == ""
-      ${If} ${FileExists} "$R0\Aoclient.exe"
+      ${IfNot} ${FileExists} "$R0\Aoclient.exe"
+        DetailPrint `No Aoclient.exe in $R0`
+      ${Else}
+        DetailPrint `Found Aoclient.exe in $R0`
         StrCpy $AOCLIENT_EXE "$R0\Aoclient.exe"
       ${EndIf}
     ${EndIf}
-    StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
-    StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
+    ClearErrors
+    StrCpy $R1 ""
+    ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
+    ${If} "$R1" == ""
+      DetailPrint `No DataDir in $R0\Outpost.conf`
+    ${Else}
+      DetailPrint `Found Outpost data in $R1`
+      StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
+      StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
+    ${EndIf}
+    ClearErrors
   ${EndIf}
-  ClearErrors
   Pop $R1
   Pop $R0
 FunctionEnd
@@ -100,12 +136,6 @@ Function ${un}FindOutposts
   Call ${un}FindOutpost
   ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
     Push "$PROGRAMFILES64\SCCo Packet"
-    Call ${un}FindOutpost
-  ${EndIf}
-  Push "$PROGRAMFILES\Outpost"
-  Call ${un}FindOutpost
-  ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
-    Push "$PROGRAMFILES64\Outpost"
     Call ${un}FindOutpost
   ${EndIf}
 FunctionEnd
@@ -166,15 +196,15 @@ FunctionEnd
 !insertmacro defineGlobalFunctions "un."
 
 Section "Install"
+  ${If} "$OUTPOST_DATA" == ""
+    Call FindOutposts # DetailPrint diagnostic information
+    MessageBox MB_OK|MB_ICONSTOP "Before you install ${DisplayName}, please install SCCo Packet. No recent version is installed, it appears."
+    Abort "Outpost PMM data not found."
+  ${EndIf}
+
   # Where to install files:
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
-
-  Call FindOutposts
-  ${If} "$OUTPOST_DATA" == ""
-    MessageBox MB_OK|MB_ICONSTOP "Please install Outpost Packet Message Manager before you install ${DisplayName}. No recent version is installed, it appears."
-    Abort "Outpost PMM not found."
-  ${EndIf}
 
   # Stop the server (so it will release its lock on ${PROGRAM_PATH}):
   ExecShellWait open "${PROGRAM_PATH}" "stop" SW_SHOWMINIMIZED

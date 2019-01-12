@@ -14,13 +14,12 @@
 
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
-Name "Santa Clara County" "web forms"
-
 !define addon_name SCCo
 !define DisplayName "${addon_name} Web Forms"
 !define SetupFileName "${addon_name}WebForms"
 !define INSTDIR_NAME "${SetupFileName}"
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
 !define PROGRAM_PATH "bin\${addon_name}_Web_Forms.exe"
+!define WINDOW_TITLE "Santa Clara County"
 
 !include setup.nsi
