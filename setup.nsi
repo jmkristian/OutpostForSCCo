@@ -36,6 +36,7 @@ Var /GLOBAL AOCLIENT_EXE
 Var /GLOBAL WSCRIPT_EXE
 
 Function .onInit
+  StrCpy $OUTPOST_DATA ""
   ${If} $INSTDIR == ""
     ReadEnvStr $0 SystemDrive
     StrCpy $INSTDIR "$0\${INSTDIR_NAME}\"
@@ -190,7 +191,9 @@ FunctionEnd
 !insertmacro defineGlobalFunctions "un."
 
 Section "Install"
-  Call FindOutposts # DetailPrint diagnostic information
+  ${If} "$OUTPOST_DATA" == ""
+    Call FindOutposts # DetailPrint diagnostic information
+  ${EndIf}
   ${If} "$OUTPOST_DATA" == ""
     MessageBox MB_OK|MB_ICONSTOP "Before you install ${DisplayName}, please install SCCo Packet. No recent version is installed, it appears."
     Abort "Outpost PMM data not found."
