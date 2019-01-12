@@ -190,8 +190,8 @@ FunctionEnd
 !insertmacro defineGlobalFunctions "un."
 
 Section "Install"
+  Call FindOutposts # DetailPrint diagnostic information
   ${If} "$OUTPOST_DATA" == ""
-    Call FindOutposts # DetailPrint diagnostic information
     MessageBox MB_OK|MB_ICONSTOP "Before you install ${DisplayName}, please install SCCo Packet. No recent version is installed, it appears."
     Abort "Outpost PMM data not found."
   ${EndIf}
