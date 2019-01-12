@@ -68,7 +68,7 @@ Function FindOutpost
   Exch $R0
   Push $R1
   ${IfNot} ${FileExists} "$R0"
-    DetailPrint `No $R0`
+   DetailPrint `No $R0`
   ${Else}
     ${If} "$AOCLIENT_EXE" == ""
       ${IfNot} ${FileExists} "$R0\Aoclient.exe"
@@ -94,20 +94,6 @@ Function FindOutpost
   Pop $R0
 FunctionEnd
 
-Function un.FindOutpost
-  Exch $R0
-  Push $R1
-  ClearErrors
-  ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
-  ${IfNot} ${Errors}
-    StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
-    StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
-  ${EndIf}
-  ClearErrors
-  Pop $R1
-  Pop $R0
-FunctionEnd
-
 !macro Delete NAME
   IfFileExists `${NAME}` 0 +5
   Delete `${NAME}`
@@ -126,20 +112,28 @@ FunctionEnd
 !macroend
 !define RMDir '!insertmacro "RMDir"'
 
-!macro defineGlobalFunctions un
 # Set $OUTPOST_DATA = a space-separated list of folders that contain Outpost configuration files.
 # If no such folders are found, set it to "".
-Function ${un}FindOutposts
+Function FindOutposts
   StrCpy $OUTPOST_CODE ""
   StrCpy $OUTPOST_DATA ""
   Push "$PROGRAMFILES\SCCo Packet"
-  Call ${un}FindOutpost
+  Call FindOutpost
   ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
     Push "$PROGRAMFILES64\SCCo Packet"
-    Call ${un}FindOutpost
+    Call FindOutpost
   ${EndIf}
 FunctionEnd
 
+Function un.FindOutposts
+  Push $R0
+  FileOpen $R0 "$INSTDIR\uninstallFrom.txt" r
+  FileRead $R0 $OUTPOST_DATA
+  FileClose $R0
+  Pop $R0
+FunctionEnd
+
+!macro defineGlobalFunctions un
 Function ${un}IsUserAdmin
   Push $R0
   Push $R1
@@ -206,9 +200,14 @@ Section "Install"
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
 
-  # Stop the server (so it will release its lock on ${PROGRAM_PATH}):
-  ExecShellWait open "${PROGRAM_PATH}" "stop" SW_SHOWMINIMIZED
+  ${If} ${FileExists} "${PROGRAM_PATH}"
+    # Stop the server (so it will release its lock on ${PROGRAM_PATH}):
+    ExecShellWait open "${PROGRAM_PATH}" "stop" SW_SHOWMINIMIZED
+  ${EndIf}
   Call DeleteMyFiles
+  FileOpen $R0 "$INSTDIR\uninstallFrom.txt" w
+  FileWrite $R0 $OUTPOST_DATA
+  FileClose $R0
 
   CreateDirectory "$INSTDIR\addons\${addon_name}"
   ${If} "$AOCLIENT_EXE" == ""
@@ -296,8 +295,10 @@ Section "Uninstall"
 
   # Remove our line from Outpost configuration files
   Call un.FindOutposts
+  DetailPrint "${PROGRAM_PATH} uninstall$OUTPOST_DATA"
   ExecShellWait open "${PROGRAM_PATH}" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
 
   Call un.DeleteMyFiles
+  ${Delete} uninstallFrom.txt
   RMDir "$INSTDIR" # Do nothing if the directory is not empty
 SectionEnd
