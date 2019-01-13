@@ -194,9 +194,20 @@ Section "Install"
     Call FindOutposts # DetailPrint diagnostic information
   ${EndIf}
   ${If} "$OUTPOST_DATA" == ""
-    MessageBox MB_OK|MB_ICONSTOP "Before you install ${DisplayName}, please install SCCo Packet. No recent version is installed, it appears."
+    MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONQUESTION \
+     "Continue installing ${DisplayName}? \
+      Forms won't be added to Outpost, since Outpost's data folder is unknown." \
+      /SD IDCANCEL IDOK noOutpostOK
     Abort "Outpost PMM data not found."
   ${EndIf}
+  ${If} "$AOCLIENT_EXE" == ""
+    MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONQUESTION \
+     "Continue installing ${DisplayName}? \
+      It can't submit messages to Outpost, since there's no Aoclient.exe in$OUTPOST_CODE." \
+      /SD IDCANCEL IDOK noOutpostOK
+    Abort "No Aoclient.exe in$OUTPOST_CODE."
+  ${EndIf}
+  noOutpostOK:
 
   # Where to install files:
   CreateDirectory "$INSTDIR"
@@ -212,10 +223,7 @@ Section "Install"
   FileClose $R0
 
   CreateDirectory "$INSTDIR\addons\${addon_name}"
-  ${If} "$AOCLIENT_EXE" == ""
-    MessageBox MB_OK|MB_ICONSTOP "${DisplayName} won't work, because there's no Aoclient.exe file in $OUTPOST_DATA. A newer version of Outpost should have this file."
-    Abort "No Aoclient.exe in $OUTPOST_DATA."
-  ${Else}
+  ${If} "$AOCLIENT_EXE" != ""
     DetailPrint "Copy from $AOCLIENT_EXE"
     ClearErrors
     CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
