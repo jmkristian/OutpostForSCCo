@@ -191,7 +191,7 @@ Section "Install"
     StrCpy $R0 "Forms won't be added to Outpost"
     StrCpy $R0 "$R0, because I didn't find Outpost's data folder."
     StrCpy $R0 "$R0  Do you still want to install ${DisplayName}?"
-    MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDCANCEL IDOK noFormsOK
+    MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noFormsOK
     Call FindOutposts # DetailPrint diagnostic information
     Abort "No Outpost data folder"
     noFormsOK:
@@ -206,7 +206,7 @@ Section "Install"
     GoTo noSubmitOK
   ${EndIf}
   StrCpy $R0 "$R0  Do you still want to install ${DisplayName}?"
-  MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDCANCEL IDOK noSubmitOK
+  MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noSubmitOK
   ${If} "$OUTPOST_CODE" == ""
     Abort "No Outpost"
   ${Else}
@@ -245,7 +245,7 @@ Section "Install"
         StrCpy $0 "$0 To copy it, try running this installer as an administrator."
       ${EndIf}
       StrCpy $R0 "$R0  Do you still want to install ${DisplayName}?"
-      MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDCANCEL IDOK noAoclientOK
+      MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noAoclientOK
       Abort "Can't copy $AOCLIENT_EXE"
       noAoclientOK:
     ${EndIf}
