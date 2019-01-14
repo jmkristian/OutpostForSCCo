@@ -218,10 +218,14 @@ Section "Install"
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
 
+  # Stop the server (so it will release its lock on the program):
+  ${If} ${FileExists} "bin\Outpost_Forms.exe"
+    ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
+  ${EndIf}
   ${If} ${FileExists} "${PROGRAM_PATH}"
-    # Stop the server (so it will release its lock on ${PROGRAM_PATH}):
     ExecShellWait open "${PROGRAM_PATH}" "stop" SW_SHOWMINIMIZED
   ${EndIf}
+
   Call DeleteMyFiles
   FileOpen $R0 "$INSTDIR\uninstallFrom.txt" w
   FileWrite $R0 $OUTPOST_DATA
