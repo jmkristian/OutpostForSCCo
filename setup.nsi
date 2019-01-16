@@ -13,7 +13,7 @@
 # limitations under the License.
 
 !define VersionMajor 1
-!define VersionMinor 13
+!define VersionMinor 14
 
 Name "${WINDOW_TITLE}" "web forms"
 OutFile "${SetupFileName}_Setup-${VersionMajor}.${VersionMinor}.exe"
