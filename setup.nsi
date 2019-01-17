@@ -14,6 +14,7 @@
 
 !define VersionMajor 1
 !define VersionMinor 14
+!define InstalledKey SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall
 
 Name "${WINDOW_TITLE}" "web forms"
 OutFile "${SetupFileName}_Setup-${VersionMajor}.${VersionMinor}.exe"
@@ -125,6 +126,40 @@ Function FindOutposts
     Push "$PROGRAMFILES64\SCCo Packet"
     Call FindOutpost
   ${EndIf}
+  ${If} "$OUTPOST_DATA" == ""
+    # Try to find SCCo Packet in the registry:
+    Push $R0
+    Push $R1
+    Push $R2
+    Push $R3
+    SetRegView 64
+    StrCpy $R0 0
+    nextInstalledProgram:
+      EnumRegKey $R1 HKLM "${InstalledKey}" $R0
+      StrCmp "$R1" "" endInstalledPrograms
+      ReadRegStr $R2 HKLM "${InstalledKey}\$R1" "Inno setup: Icon Group"
+      ${If} "$R2" == "SCCo Packet"
+        ReadRegStr $R2 HKLM "${InstalledKey}\$R1" "InstallLocation"
+        ${If} "$R2" == ""
+          DetailPrint `No InstallLocation in $R1`
+        ${Else}
+          StrCpy $R3 $R2 1 -1
+          ${If} "$R3" == "\"
+            StrCpy $R2 $R2 -1
+          ${EndIf}
+          DetailPrint `InstallLocation: $R2 in $R1`
+          Push "$R2"
+          Call FindOutpost
+        ${EndIf}
+      ${EndIf}
+      IntOp $R0 $R0 + 1
+      GoTo nextInstalledProgram
+    endInstalledPrograms:
+    Pop $R3
+    Pop $R2
+    Pop $R1
+    Pop $R0
+  ${EndIf}
 FunctionEnd
 
 Function un.FindOutposts
@@ -195,6 +230,8 @@ Section "Install"
     Call FindOutposts # DetailPrint diagnostic information
     Abort "No Outpost data folder"
     noFormsOK:
+  ${Else}
+    DetailPrint `Outpost data $OUTPOST_DATA`
   ${EndIf}
   StrCpy $R0 "Forms can't be submitted to Outpost"
   ${If} "$OUTPOST_CODE" == ""
@@ -203,6 +240,7 @@ Section "Install"
   ${ElseIfNot} ${FileExists} "$AOCLIENT_EXE"
     StrCpy $R0 "$R0, because there's no Aoclient.exe in $OUTPOST_CODE."
   ${Else}
+    DetailPrint `Outpost $OUTPOST_CODE`
     GoTo noSubmitOK
   ${EndIf}
   StrCpy $R0 "$R0  Do you still want to install ${DisplayName}?"
@@ -270,6 +308,7 @@ Section "Install"
   # define uninstaller:
   WriteUninstaller "$INSTDIR\uninstall.exe"
   ClearErrors
+  SetRegView 32
   WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "${DisplayName}"
   WriteRegStr   HKLM "${REG_SUBKEY}" UninstallString "$\"$INSTDIR\uninstall.exe$\""
   ${If} ${Errors}
@@ -297,6 +336,7 @@ Section "Install"
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
 
   ClearErrors
+  DetailPrint `${PROGRAM_PATH} install $WSCRIPT_EXE$OUTPOST_DATA`
   ExecShellWait open "${PROGRAM_PATH}" "install ${PROGRAM_PATH} $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
   ${If} ${Errors}
     Abort "${PROGRAM_PATH} install failed"
