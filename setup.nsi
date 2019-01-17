@@ -170,7 +170,8 @@ Function un.FindOutposts
   Pop $R0
 FunctionEnd
 
-Function IsUserAdmin
+!macro defineGlobalFunctions un
+Function ${un}IsUserAdmin
   Push $R0
   Push $R1
   StrCpy $R0 true
@@ -194,7 +195,16 @@ Function IsUserAdmin
   Exch $R0
 FunctionEnd
 
-!macro defineGlobalFunctions un
+Function ${un}SetShellVarContextAppropriately
+  Call ${un}IsUserAdmin
+  Pop $1
+  ${If} $1 == true
+    SetShellVarContext all
+  ${Else}
+    SetShellVarContext current
+  ${EndIf}
+FunctionEnd
+
 Function ${un}DeleteMyFiles
   Push $R0
   Push $R1
@@ -331,6 +341,12 @@ Section "Install"
   WriteRegDWORD HKLM "${REG_SUBKEY}" NoRepair 1
   WriteRegDWORD HKLM "${REG_SUBKEY}" EstimatedSize 15000
 
+  # Add the uninstaller to the Start menu:
+  Call SetShellVarContextAppropriately
+  ${If} ${FileExists} "$SMPROGRAMS\SCCo Packet"
+    CreateShortcut "$SMPROGRAMS\SCCo Packet\Uninstall ${DisplayName}.lnk" "$INSTDIR\uninstall.exe"
+  ${EndIf}
+
   StrCpy $WSCRIPT_EXE "$SYSDIR\wscript.exe"
   IfFileExists $WSCRIPT_EXE +2
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
@@ -366,6 +382,8 @@ Section "Uninstall"
   DetailPrint `${PROGRAM_PATH} uninstall$OUTPOST_DATA`
   ExecShellWait open "${PROGRAM_PATH}" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
 
+  Call un.SetShellVarContextAppropriately
+  ${Delete} "$SMPROGRAMS\SCCo Packet\Uninstall ${DisplayName}.lnk"
   Call un.DeleteMyFiles
   ${Delete} uninstallFrom.txt
   RMDir "$INSTDIR" # Do nothing if the directory is not empty
