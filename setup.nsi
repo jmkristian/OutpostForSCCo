@@ -323,7 +323,7 @@ Section "Install"
     MessageBox MB_OK|MB_ICONINFORMATION "$0" /SD IDOK
   ${EndIf}
   WriteRegStr   HKLM "${REG_SUBKEY}" Publisher "Los Altos ARES"
-  WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "https://github.com/jmkristian/OutpostforLAARES/blob/master/README.md"
+  WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "$INSTDIR\UserGuide.html"
   WriteRegStr   HKLM "${REG_SUBKEY}" DisplayVersion "${VersionMajor}.${VersionMinor}"
   WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMajor ${VersionMajor}
   WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMinor ${VersionMinor}
