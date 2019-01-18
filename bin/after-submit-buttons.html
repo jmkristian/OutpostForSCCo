@@ -47,13 +47,6 @@
                     // A readonly form is initialized from the message, not default values.
                     set_form_default_values();
                 }
-                document.getElementById('clear-form').onclick = function(event) {
-                    document.getElementById('the-form').reset();
-                    set_form_default_values();
-                    expand_templated_items();
-                    check_the_form_validity();
-                    write_pacforms_representation();
-                };
                 array_for_each(document.getElementsByName('Rec-Sent'), function(recSent) {
                     recSent.disabled = true; // Don't include it in transmitted messages.
                     recSent.classList.add('no-msg-init'); // Ignore it in received messages.
