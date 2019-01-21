@@ -305,15 +305,14 @@ Section "Install"
   File launch.cmd
   File launch-v.cmd
   File UserGuide.html
+  File /r /x "*~" /x *.txt /x *.log /x Outpost_Forms.exe bin
+  File /oname=${PROGRAM_PATH} bin\Outpost_Forms.exe
+  File /r /x "*~" /x .git* pack-it-forms
   SetOutPath "$INSTDIR\addons"
   File addons\${addon_name}.launch
-  SetOutPath "$INSTDIR\bin"
-  File /r /x "*~" /x server-port.txt /x *.log bin\*
   SetOutPath "$INSTDIR\pack-it-forms"
-  File /r /x "*~" /x .git* pack-it-forms\*
   File icon-*.png
   SetOutPath "$INSTDIR"
-  Rename "bin\Outpost_Forms.exe" "${PROGRAM_PATH}"
 
   # define uninstaller:
   WriteUninstaller "$INSTDIR\uninstall.exe"
