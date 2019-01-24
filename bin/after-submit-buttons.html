@@ -1,10 +1,4 @@
 <script type="text/javascript">
-    var formDefaultValues; // Initial values for form inputs.
-    function set_form_default_values() {
-        for (var f = formDefaultValues.length - 1; f >= 0; f--) {
-            init_form_from_fields(formDefaultValues[f], 'name');
-        }
-    }
     // Monkey patch load_callprefix:
     for (var i = startup_functions.length - 1; i >= 0; i--) {
         if (startup_functions[i] === load_callprefix) {
@@ -37,16 +31,9 @@
                         img = undefined;
                     }, 30000); // call ping every 30 seconds
                 }
-                if (!formDefaultValues) {
-                    formDefaultValues = [];
-                }
                 var status = query_object.message_status;
                 // Show Rec-Sent based on whether we received this message:
                 init_form_from_fields({'Rec-Sent': (status == 'unread' || status == 'read') ? 'Received' : 'Sent'}, 'name');
-                if (query_object.mode != 'readonly') {
-                    // A readonly form is initialized from the message, not default values.
-                    set_form_default_values();
-                }
                 array_for_each(document.getElementsByName('Rec-Sent'), function(recSent) {
                     recSent.disabled = true; // Don't include it in transmitted messages.
                     recSent.classList.add('no-msg-init'); // Ignore it in received messages.
