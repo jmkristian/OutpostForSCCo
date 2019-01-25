@@ -13,7 +13,7 @@
 # limitations under the License.
 
 !define VersionMajor 1
-!define VersionMinor 16
+!define VersionMinor 17
 !define InstalledKey SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall
 
 Name "${WINDOW_TITLE}" "web forms"
