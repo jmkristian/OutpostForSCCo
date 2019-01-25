@@ -66,6 +66,7 @@ const morgan = require('morgan');
 const os = require('os');
 const path = require('path');
 const Transform = require('stream').Transform;
+const url = require('url');
 const util = require('util');
 
 const CHARSET = 'utf-8'; // for HTTP
@@ -364,7 +365,7 @@ function stopServer(port, next) {
             next).end();
 }
 
-function request(options, callback) {
+function request(options, callback, includeHeaders) {
     function onError(event) {
         return function(err) {
             (callback || log)(err || event);
@@ -375,6 +376,15 @@ function request(options, callback) {
         res.pipe(concat_stream(function(buffer) {
             var data = buffer.toString(CHARSET);
             if (callback) {
+                if (includeHeaders) {
+                    var rawHeaders = res.rawHeaders;
+                    var headers = res.statusCode + ' ' + res.statusMessage + '\n';
+                    for (var h = 0; h < rawHeaders.length; ) {
+                        headers += rawHeaders[h++] + ': ';
+                        headers += rawHeaders[h++] + '\n';
+                    }
+                    data = headers + '\n' + data;
+                }
                 callback(null, data);
             }
         }));
@@ -475,6 +485,41 @@ function serve() {
             res.redirect('/form-' + formId);
         } catch(err) {
             res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+            res.end(errorToHTML(err, JSON.stringify(req.body)));
+        }
+    });
+    app.post('/test-http', function(req, res, next) {
+        try {
+            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+// log('/test-http ' + JSON.stringify(req.body));
+            var URL = url.parse(req.body.URL);
+            var options = {method: req.body.method,
+                           host: URL.hostname,
+                           port: URL.port,
+                           path: URL.path};
+// log('request(' + JSON.stringify(options) + ')');
+            var client = request(
+                options,
+                function(err, data) {
+                    if (err) {
+                        res.end(errorToHTML(err, data));
+                    } else {
+                        res.end('<HTML><body><pre>'
+                                + encodeHTML(data)
+                                + '</pre></body></HTML>');
+                    }
+                },
+                true);
+            for (var name in req.body) {
+                if (name.startsWith('header.')) {
+                    var value = req.body[name];
+                    if (value) {
+                        client.setHeader(name.substring(7), value);
+                    }
+                }
+            }
+            client.end(req.body.body);
+        } catch(err) {
             res.end(errorToHTML(err, JSON.stringify(req.body)));
         }
     });
