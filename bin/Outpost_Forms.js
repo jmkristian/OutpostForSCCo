@@ -378,11 +378,8 @@ function request(options, callback, includeHeaders) {
             if (callback) {
                 if (includeHeaders) {
                     var rawHeaders = res.rawHeaders;
-                    var headers = res.statusCode + ' ' + res.statusMessage + '\n';
-                    for (var h = 0; h < rawHeaders.length; ) {
-                        headers += rawHeaders[h++] + ': ';
-                        headers += rawHeaders[h++] + '\n';
-                    }
+                    var headers = res.statusCode + ' ' + res.statusMessage + '\n'
+                        + formatHeaders(res.rawHeaders);
                     data = headers + '\n' + data;
                 }
                 callback(null, data);
@@ -488,25 +485,22 @@ function serve() {
             res.end(errorToHTML(err, JSON.stringify(req.body)));
         }
     });
-    app.post('/test-http', function(req, res, next) {
+    app.post('/http-request', function(req, res, next) {
         try {
             res.set({'Content-Type': 'text/html; charset=' + CHARSET});
-// log('/test-http ' + JSON.stringify(req.body));
             var URL = url.parse(req.body.URL);
             var options = {method: req.body.method,
                            host: URL.hostname,
                            port: URL.port,
                            path: URL.path};
-// log('request(' + JSON.stringify(options) + ')');
             var client = request(
                 options,
                 function(err, data) {
                     if (err) {
                         res.end(errorToHTML(err, data));
                     } else {
-                        res.end('<HTML><body><pre>'
-                                + encodeHTML(data)
-                                + '</pre></body></HTML>');
+                        res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
+                        res.end(data);
                     }
                 },
                 true);
@@ -520,6 +514,20 @@ function serve() {
             }
             client.end(req.body.body);
         } catch(err) {
+            res.end(errorToHTML(err, JSON.stringify(req.body)));
+        }
+    });
+    app.all('/http-response', function(req, res, next) {
+        try {
+            var headers = 'Request was:\n'
+                + req.method + ' ' + req.url + '\n'
+                + formatHeaders(req.rawHeaders) + '\n';
+            req.pipe(concat_stream(function(body) {
+                res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
+                res.end(headers + body.toString(CHARSET));
+            }));
+        } catch(err) {
+            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
             res.end(errorToHTML(err, JSON.stringify(req.body)));
         }
     });
@@ -567,6 +575,15 @@ function serve() {
             });
         }
     }, 5000);
+}
+
+function formatHeaders(rawHeaders) {
+    var headers = "";
+    for (var h = 0; h < rawHeaders.length; ) {
+        headers += rawHeaders[h++] + ': ';
+        headers += rawHeaders[h++] + '\n';
+    }
+    return headers;
 }
 
 function onOpen(formId, args) {
