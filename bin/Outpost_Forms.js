@@ -401,6 +401,22 @@ function serve() {
     var port;
     app.set('etag', false); // convenient for troubleshooting
     app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
+    app.all('/http-echo', function(req, res, next) {
+        // Respond with a copy of the request.
+        try {
+            var headers = 'Request was:\n'
+                + req.method + ' ' + req.url
+                + (req.httpVersion ? " HTTP " + req.httpVersion : "")
+                + '\n' + formatHeaders(req.rawHeaders) + '\n';
+            req.pipe(concat_stream(function(body) {
+                res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
+                res.end(headers + body.toString(CHARSET));
+            }));
+        } catch(err) {
+            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+            res.end(errorToHTML(err, JSON.stringify(req.body)));
+        }
+    });
     app.use(bodyParser.json({type: JSON_TYPE}));
     app.use(bodyParser.urlencoded({extended: false}));
     app.post(OpenOutpostMessage, function(req, res, next) {
@@ -486,6 +502,7 @@ function serve() {
         }
     });
     app.post('/http-request', function(req, res, next) {
+        // Send an HTTP request.
         try {
             res.set({'Content-Type': 'text/html; charset=' + CHARSET});
             var URL = url.parse(req.body.URL);
@@ -514,20 +531,6 @@ function serve() {
             }
             client.end(req.body.body);
         } catch(err) {
-            res.end(errorToHTML(err, JSON.stringify(req.body)));
-        }
-    });
-    app.all('/http-response', function(req, res, next) {
-        try {
-            var headers = 'Request was:\n'
-                + req.method + ' ' + req.url + '\n'
-                + formatHeaders(req.rawHeaders) + '\n';
-            req.pipe(concat_stream(function(body) {
-                res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
-                res.end(headers + body.toString(CHARSET));
-            }));
-        } catch(err) {
-            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
             res.end(errorToHTML(err, JSON.stringify(req.body)));
         }
     });
