@@ -401,6 +401,7 @@ function serve() {
     const app = express();
     var port;
     app.set('etag', false); // convenient for troubleshooting
+    app.set('trust proxy', ['loopback']); // to find the IP address of a client
     app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
     app.all('/http-echo', function(req, res, next) {
         // Respond with a copy of the request.
@@ -671,20 +672,21 @@ function parseMessage(message) {
 
 /** Handle an HTTP GET /form-id request. */
 function onGetForm(formId, res) {
-    res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+    res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
     var form = openForms[formId];
     if (formId <= 0) {
-        res.status(400).send('Form numbers start with 1.');
+        res.status(400).end('Form numbers start with 1.');
     } else if (!form) {
         log('form ' + formId + ' is not open');
         if (formId < nextFormId) {
-            res.status(NOT_FOUND).send('Form ' + formId + ' was discarded, since the browser page was closed.');
+            res.status(NOT_FOUND).end('Form ' + formId + ' was discarded, since the browser page was closed.');
         } else {
-            res.status(NOT_FOUND).send('Form ' + formId + ' has not been opened.');
+            res.status(NOT_FOUND).end('Form ' + formId + ' has not been opened.');
         }
     } else {
         log('form ' + formId + ' viewed');
         try {
+            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
             if (!form.environment) {
                 var parsed = parseArgs(form.args);
                 form.envelope = parsed.envelope;
@@ -889,20 +891,22 @@ function onGetManual(res) {
 function onPostHttpRequest(req, res) {
     try {
         res.set({'Content-Type': 'text/html; charset=' + CHARSET});
-        const clientAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+        const clientAddress = req.ip;
         if (['127.0.0.1', '::ffff:127.0.0.1'].indexOf(clientAddress) < 0) {
+            // Don't serve a remote client. It might be malicious.
             res.statusCode = FORBIDDEN;
             res.statusMessage = 'Your address is ' + clientAddress;
             res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
             res.end('Your address is ' + clientAddress);
-        } else { // localhost
+            log('POST from ' + clientAddress);
+        } else {
             // Send an HTTP request.
             const URL = url.parse(req.body.URL);
             const options = {method: req.body.method,
                              host: URL.hostname,
                              port: URL.port,
                              path: URL.path};
-            const client = request(
+            const server = request(
                 options,
                 function(err, data) {
                     if (err) {
@@ -912,16 +916,16 @@ function onPostHttpRequest(req, res) {
                         res.end(data);
                     }
                 },
-                true);
+                true); // include response headers in the data
             for (var name in req.body) {
                 if (name.startsWith('header.')) {
                     var value = req.body[name];
                     if (value) {
-                        client.setHeader(name.substring(7), value);
+                        server.setHeader(name.substring(7), value);
                     }
                 }
             }
-            client.end(req.body.body);
+            server.end(req.body.body);
         }
     } catch(err) {
         res.end(errorToHTML(err, JSON.stringify(req.body)));
