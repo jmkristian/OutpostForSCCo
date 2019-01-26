@@ -307,9 +307,7 @@ Section "Install"
   File UserGuide.html
   File /r /x "*~" /x *.txt /x *.log /x Outpost_Forms.exe bin
   File /oname=${PROGRAM_PATH} bin\Outpost_Forms.exe
-  File /r /x "*~" /x .git* pack-it-forms
-  SetOutPath "$INSTDIR\addons"
-  File addons\${addon_name}.launch
+  Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"
   File icon-*.png
   SetOutPath "$INSTDIR"

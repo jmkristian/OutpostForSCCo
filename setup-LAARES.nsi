@@ -22,4 +22,10 @@
 !define PROGRAM_PATH "bin\LAARES_Web_Forms.exe"
 !define WINDOW_TITLE "Los Altos ARES"
 
+Function ChooseAddonFiles
+  File /r /x "*~" /x .git* /x form-mhoc*.html /x http-request.html /x resources\pdf pack-it-forms
+  SetOutPath "$INSTDIR\addons"
+  File addons\${addon_name}.launch
+FunctionEnd
+
 !include setup.nsi

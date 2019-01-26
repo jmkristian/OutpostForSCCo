@@ -22,4 +22,10 @@
 !define PROGRAM_PATH "bin\${addon_name}_Web_Forms.exe"
 !define WINDOW_TITLE "Santa Clara County"
 
+Function ChooseAddonFiles
+  File /r /x "*~" /x .git* /x form-los-altos*.html /x http-request.html pack-it-forms
+  SetOutPath "$INSTDIR\addons"
+  File addons\${addon_name}.launch
+FunctionEnd
+
 !include setup.nsi

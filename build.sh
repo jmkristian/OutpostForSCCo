@@ -18,6 +18,5 @@ if [ ! -e pack-it-forms ]; then
 fi
 
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-HTTP.nsi || exit $?
-# "C:/Program Files (x86)/NSIS/makensis.exe" setup-LAARES.nsi || exit $?
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCo.nsi || exit $?
-# "C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCoHealth.nsi || exit $?
+"C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCoHealth.nsi || exit $?

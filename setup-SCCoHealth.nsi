@@ -14,12 +14,17 @@
 
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
-!define addon_name SCCo_Health
+!define addon_name SCCo
 !define DisplayName "SSCo Health Agencies Web Forms"
 !define SetupFileName SCCoHealthWebForms
 !define INSTDIR_NAME "${SetupFileName}"
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
 !define PROGRAM_PATH "bin\${addon_name}_Web_Forms.exe"
 !define WINDOW_TITLE "SCCo Health"
+
+Function ChooseAddonFiles
+  File /r /x "*~" /x .git* /x form-los-altos*.html /x http-request.html pack-it-forms
+  File /oname=addons\${addon_name}.launch addons\${addon_name}_Health.launch
+FunctionEnd
 
 !include setup.nsi
