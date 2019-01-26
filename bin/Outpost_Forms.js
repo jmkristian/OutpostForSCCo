@@ -72,6 +72,7 @@ const util = require('util');
 const CHARSET = 'utf-8'; // for HTTP
 const ENCODING = CHARSET; // for reading from files
 const EOL = '\r\n';
+const FORBIDDEN = 403;
 const htmlEntities = new AllHtmlEntities();
 const IconStyle = 'width:24pt;height:24pt;vertical-align:middle;';
 const JSON_TYPE = 'application/json';
@@ -505,31 +506,39 @@ function serve() {
         // Send an HTTP request.
         try {
             res.set({'Content-Type': 'text/html; charset=' + CHARSET});
-            var URL = url.parse(req.body.URL);
-            var options = {method: req.body.method,
-                           host: URL.hostname,
-                           port: URL.port,
-                           path: URL.path};
-            var client = request(
-                options,
-                function(err, data) {
-                    if (err) {
-                        res.end(errorToHTML(err, data));
-                    } else {
-                        res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
-                        res.end(data);
-                    }
-                },
-                true);
-            for (var name in req.body) {
-                if (name.startsWith('header.')) {
-                    var value = req.body[name];
-                    if (value) {
-                        client.setHeader(name.substring(7), value);
+            const clientAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+            if (['127.0.0.1', '::ffff:127.0.0.1'].indexOf(clientAddress) < 0) {
+                res.statusCode = FORBIDDEN;
+                res.statusMessage = 'Your address is ' + clientAddress;
+                res.end();
+                log('POST from ' + clientAddress);
+            } else { // localhost
+                var URL = url.parse(req.body.URL);
+                var options = {method: req.body.method,
+                               host: URL.hostname,
+                               port: URL.port,
+                               path: URL.path};
+                var client = request(
+                    options,
+                    function(err, data) {
+                        if (err) {
+                            res.end(errorToHTML(err, data));
+                        } else {
+                            res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
+                            res.end(data);
+                        }
+                    },
+                    true);
+                for (var name in req.body) {
+                    if (name.startsWith('header.')) {
+                        var value = req.body[name];
+                        if (value) {
+                            client.setHeader(name.substring(7), value);
+                        }
                     }
                 }
+                client.end(req.body.body);
             }
-            client.end(req.body.body);
         } catch(err) {
             res.end(errorToHTML(err, JSON.stringify(req.body)));
         }
