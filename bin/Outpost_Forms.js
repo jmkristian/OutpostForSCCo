@@ -169,7 +169,7 @@ function installIncludes(myDirectory, addonNames) {
         return 'INCLUDE ' + path.resolve(myDirectory, 'addons', addonName + '.launch');
     });
     // Each of the process arguments names a directory that contains Outpost configuration data.
-    for (var a = 5; a < process.argv.length; a++) {
+    for (var a = 4; a < process.argv.length; a++) {
         var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
         // Upsert myIncludes into outpostLaunch:
         if (!fs.existsSync(outpostLaunch)) {
