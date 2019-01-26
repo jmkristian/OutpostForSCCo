@@ -380,7 +380,7 @@ function request(options, callback, includeHeaders) {
                 if (includeHeaders) {
                     var rawHeaders = res.rawHeaders;
                     var headers = res.statusCode + ' ' + res.statusMessage + '\n'
-                        + formatHeaders(res.rawHeaders);
+                        + formatRawHeaders(res.rawHeaders);
                     data = headers + '\n' + data;
                 }
                 callback(null, data);
@@ -408,7 +408,7 @@ function serve() {
             var headers = 'Request was:\n'
                 + req.method + ' ' + req.url
                 + (req.httpVersion ? " HTTP " + req.httpVersion : "")
-                + '\n' + formatHeaders(req.rawHeaders) + '\n';
+                + '\n' + formatRawHeaders(req.rawHeaders) + '\n';
             req.pipe(concat_stream(function(body) {
                 res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
                 res.end(headers + body.toString(CHARSET));
@@ -503,45 +503,7 @@ function serve() {
         }
     });
     app.post('/http-request', function(req, res, next) {
-        // Send an HTTP request.
-        try {
-            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
-            const clientAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-            if (['127.0.0.1', '::ffff:127.0.0.1'].indexOf(clientAddress) < 0) {
-                res.statusCode = FORBIDDEN;
-                res.statusMessage = 'Your address is ' + clientAddress;
-                res.end();
-                log('POST from ' + clientAddress);
-            } else { // localhost
-                var URL = url.parse(req.body.URL);
-                var options = {method: req.body.method,
-                               host: URL.hostname,
-                               port: URL.port,
-                               path: URL.path};
-                var client = request(
-                    options,
-                    function(err, data) {
-                        if (err) {
-                            res.end(errorToHTML(err, data));
-                        } else {
-                            res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
-                            res.end(data);
-                        }
-                    },
-                    true);
-                for (var name in req.body) {
-                    if (name.startsWith('header.')) {
-                        var value = req.body[name];
-                        if (value) {
-                            client.setHeader(name.substring(7), value);
-                        }
-                    }
-                }
-                client.end(req.body.body);
-            }
-        } catch(err) {
-            res.end(errorToHTML(err, JSON.stringify(req.body)));
-        }
+        onPostHttpRequest(req, res);
     });
     app.get(/^\/.*/, express.static(PackItForms, {setHeaders: function(res, path, stat) {
         if (path && path.toLowerCase().endsWith(".pdf")) {
@@ -587,15 +549,6 @@ function serve() {
             });
         }
     }, 5000);
-}
-
-function formatHeaders(rawHeaders) {
-    var headers = "";
-    for (var h = 0; h < rawHeaders.length; ) {
-        headers += rawHeaders[h++] + ': ';
-        headers += rawHeaders[h++] + '\n';
-    }
-    return headers;
 }
 
 function onOpen(formId, args) {
@@ -931,6 +884,57 @@ function onGetManual(res) {
         }
         res.end();
     });
+}
+
+function onPostHttpRequest(req, res) {
+    try {
+        res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+        const clientAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+        if (['127.0.0.1', '::ffff:127.0.0.1'].indexOf(clientAddress) < 0) {
+            res.statusCode = FORBIDDEN;
+            res.statusMessage = 'Your address is ' + clientAddress;
+            res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
+            res.end('Your address is ' + clientAddress);
+        } else { // localhost
+            // Send an HTTP request.
+            const URL = url.parse(req.body.URL);
+            const options = {method: req.body.method,
+                             host: URL.hostname,
+                             port: URL.port,
+                             path: URL.path};
+            const client = request(
+                options,
+                function(err, data) {
+                    if (err) {
+                        res.end(errorToHTML(err, data));
+                    } else {
+                        res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
+                        res.end(data);
+                    }
+                },
+                true);
+            for (var name in req.body) {
+                if (name.startsWith('header.')) {
+                    var value = req.body[name];
+                    if (value) {
+                        client.setHeader(name.substring(7), value);
+                    }
+                }
+            }
+            client.end(req.body.body);
+        }
+    } catch(err) {
+        res.end(errorToHTML(err, JSON.stringify(req.body)));
+    }
+}
+
+function formatRawHeaders(rawHeaders) {
+    var headers = "";
+    for (var h = 0; h < rawHeaders.length; ) {
+        headers += rawHeaders[h++] + ': ';
+        headers += rawHeaders[h++] + '\n';
+    }
+    return headers;
 }
 
 function getAddonForms() {
