@@ -96,6 +96,9 @@ if (process.argv.length > 2) {
     }
     try {
         switch(verb) {
+        case 'build':
+            build(process.argv[3], process.argv[4]);
+            break;
         case 'install':
             install();
             break;
@@ -120,6 +123,19 @@ if (process.argv.length > 2) {
     }
 }
 
+function build(addonName, programPath) {
+    expandVariablesInFile({addon_name: addonName, PROGRAM_PATH: programPath},
+                          path.join('bin', 'addon.ini'),
+                          path.join('built', 'addons', addonName + '.ini'));
+    expandVariablesInFile({addon_name: addonName},
+                          path.join('bin', 'Aoclient.ini'),
+                          path.join('built', 'addons', addonName, 'Aoclient.ini'));
+    ['browse.cmd', 'launch-v.cmd', 'launch.cmd', 'launch.vbs', 'UserGuide.html'].forEach(function(fileName) {
+        expandVariablesInFile({addon_name: addonName, PROGRAM_PATH: programPath},
+                              fileName, path.join('built', fileName));
+    });
+}
+
 function install() {
     // This method must be idempotent, in part because Avira antivirus
     // might execute it repeatedly while scrutinizing the .exe for viruses.
@@ -131,8 +147,7 @@ function install() {
 }
 
 function installConfigFiles(myDirectory, addonNames) {
-    var programPath = process.argv[3];
-    var launch = process.argv[4] + ' ' + path.join(myDirectory, 'launch.vbs');
+    var launch = process.argv[3] + ' ' + path.join(myDirectory, 'launch.vbs');
     const version = os.release().split(/\./);
     const majorVersion = parseInt(version[0], 10);
     if (majorVersion < 6) {
@@ -142,15 +157,8 @@ function installConfigFiles(myDirectory, addonNames) {
         launch = path.join(myDirectory, 'launch.cmd');
     }
     addonNames.forEach(function(addon_name) {
-        expandVariablesInFile({addon_name: addon_name, INSTDIR: myDirectory, LAUNCH: launch, PROGRAM_PATH: programPath},
-                              path.join('bin', 'addon.ini'),
+        expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch},
                               path.join('addons', addon_name + '.ini'));
-        expandVariablesInFile({addon_name: addon_name},
-                              path.join('bin', 'Aoclient.ini'),
-                              path.join('addons', addon_name, 'Aoclient.ini'));
-        ['browse.cmd', 'launch-v.cmd', 'launch.cmd', 'launch.vbs', 'UserGuide.html'].forEach(function(fileName) {
-            expandVariablesInFile({addon_name: addon_name, PROGRAM_PATH: programPath}, fileName);
-        });
     });
 }
 

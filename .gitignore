@@ -6,6 +6,7 @@
 /bin/*.exe
 /bin/*.log
 /bin/server-port.txt
+/built
 /logs
 /Los_Altos
 /Los_Altos.ini

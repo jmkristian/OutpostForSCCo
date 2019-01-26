@@ -1,4 +1,4 @@
-# Copyright 2018 by John Kristian
+# Copyright 2018,2019 by John Kristian
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@
 
 Function ChooseAddonFiles
   File /r /x "*~" /x .git* /x form-los-altos*.html /x http-request.html pack-it-forms
+  SetOutPath "$INSTDIR\addons"
   File /oname=${addon_name}.launch addons\SCCo_private.launch
 FunctionEnd
 

@@ -300,12 +300,13 @@ Section "Install"
   ${EndIf}
 
   # Files to install:
-  File browse.cmd
-  File launch.vbs
-  File launch.cmd
-  File launch-v.cmd
-  File UserGuide.html
-  File /r /x "*~" /x *.txt /x *.log /x Outpost_Forms.exe bin
+  File built\browse.cmd
+  File built\launch.vbs
+  File built\launch.cmd
+  File built\launch-v.cmd
+  File built\UserGuide.html
+  File /r built\addons
+  File /r /x "*~" /x *.txt /x *.ini /x *.log /x Outpost_Forms.exe bin
   File /oname=${PROGRAM_PATH} bin\Outpost_Forms.exe
   Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"
@@ -350,7 +351,7 @@ Section "Install"
 
   ClearErrors
   DetailPrint `${PROGRAM_PATH} install $WSCRIPT_EXE$OUTPOST_DATA`
-  ExecShellWait open "${PROGRAM_PATH}" "install ${PROGRAM_PATH} $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
+  ExecShellWait open "${PROGRAM_PATH}" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
   ${If} ${Errors}
     Abort "${PROGRAM_PATH} install failed"
   ${EndIf}

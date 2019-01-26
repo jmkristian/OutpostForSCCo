@@ -17,6 +17,10 @@ if [ ! -e pack-it-forms ]; then
     rm -rf pack-it-forms/.git*
 fi
 
+rm -rf built; mkdir -p built/addons
+node bin/Outpost_Forms.js build HTTP "bin\\HTTP_server.exe"
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-HTTP.nsi || exit $?
+rm -rf built; mkdir -p built/addons
+node bin/Outpost_Forms.js build Enhanced "bin\\SCCoPIFO.exe"
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCo.nsi || exit $?
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCo_private.nsi || exit $?
