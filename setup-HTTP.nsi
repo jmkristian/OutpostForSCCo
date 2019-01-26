@@ -16,8 +16,7 @@
 
 !define addon_name HTTP
 !define DisplayName "${addon_name} add-on"
-!define SetupFileName "${addon_name}_AddOn"
-!define INSTDIR_NAME "${SetupFileName}"
+!define INSTDIR_NAME "${addon_name}_AddOn"
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
 !define PROGRAM_PATH "bin\${addon_name}_Server.exe"
 !define WINDOW_TITLE "${DisplayName}"
@@ -32,4 +31,6 @@ Function ChooseAddonFiles
   File addons\${addon_name}.launch
 FunctionEnd
 
+!include setup-version.nsi
+OutFile "${INSTDIR_NAME}_Setup-${VersionMajor}.${VersionMinor}.exe"
 !include setup.nsi

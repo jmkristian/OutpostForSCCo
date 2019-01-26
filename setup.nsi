@@ -1,4 +1,4 @@
-# Copyright 2018 by John Kristian
+# Copyright 2018,2019 by John Kristian
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-!define VersionMajor 1
-!define VersionMinor 17
 !define InstalledKey SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall
 
 Name "${WINDOW_TITLE}" "web forms"
-OutFile "${SetupFileName}_Setup-${VersionMajor}.${VersionMinor}.exe"
 
 RequestExecutionLevel highest
 Page custom selectOutpostCode "" "${WINDOW_TITLE} Setup"
@@ -317,7 +314,7 @@ Section "Install"
   WriteUninstaller "$INSTDIR\uninstall.exe"
   ClearErrors
   SetRegView 32
-  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "${DisplayName}"
+  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "${DisplayName} v${VersionMajor}.${VersionMinor}"
   WriteRegStr   HKLM "${REG_SUBKEY}" UninstallString "$\"$INSTDIR\uninstall.exe$\""
   ${If} ${Errors}
     DetailPrint `not registered`

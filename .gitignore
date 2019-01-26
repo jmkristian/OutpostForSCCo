@@ -13,7 +13,7 @@
 /msgs/*.txt
 /node_modules
 /notes
-/*_Setup-*.exe
+/*.exe
 /pack-it-forms
 /README.html
 /sh.exe.stackdump

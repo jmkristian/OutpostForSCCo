@@ -16,7 +16,6 @@
 
 !define addon_name Enhanced
 !define DisplayName "SCCo Pack-It-Forms for Outpost (Public Edition)"
-!define SetupFileName "SCCoPIFO_Public"
 !define INSTDIR_NAME "PackItForms\Outpost\SCCo"
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCCoPackItForms"
 !define PROGRAM_PATH "bin\SCCoPIFO.exe"
@@ -28,4 +27,6 @@ Function ChooseAddonFiles
   File /oname=${addon_name}.launch addons\SCCo.launch
 FunctionEnd
 
+!include setup-version.nsi
+OutFile "SCCoPIFOsetup${VersionMajor}.${VersionMinor}pub.exe"
 !include setup.nsi

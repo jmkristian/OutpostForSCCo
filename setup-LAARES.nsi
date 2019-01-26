@@ -16,8 +16,7 @@
 
 !define addon_name Los_Altos
 !define DisplayName "Outpost for LAARES"
-!define SetupFileName OutpostForLAARES
-!define INSTDIR_NAME "${SetupFileName}"
+!define INSTDIR_NAME OutpostForLAARES
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
 !define PROGRAM_PATH "bin\LAARES_Web_Forms.exe"
 !define WINDOW_TITLE "Los Altos ARES"
@@ -28,4 +27,6 @@ Function ChooseAddonFiles
   File addons\${addon_name}.launch
 FunctionEnd
 
+!include setup-version.nsi
+OutFile "${INSTDIR_NAME}_Setup-${VersionMajor}.${VersionMinor}.exe"
 !include setup.nsi
