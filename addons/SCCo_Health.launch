@@ -1,3 +1,0 @@
-LINE
-ADDON -fn TEST_MHOC_Beds_Status             -a SCCo -t form-mhoc-beds-status.html
-ADDON -fn TEST_MHOC_Resource_Request        -a SCCo -t form-mhoc-resource-request.html

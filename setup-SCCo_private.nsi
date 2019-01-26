@@ -14,17 +14,17 @@
 
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
-!define addon_name SCCo
-!define DisplayName "SSCo Health Agencies Web Forms"
-!define SetupFileName SCCoHealthWebForms
-!define INSTDIR_NAME "${SetupFileName}"
-!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
-!define PROGRAM_PATH "bin\${addon_name}_Web_Forms.exe"
-!define WINDOW_TITLE "SCCo Health"
+!define addon_name Enhanced
+!define DisplayName "SCCo Pack-It-Forms for Outpost (Private Edition)"
+!define SetupFileName "SCCoPIFO_Private"
+!define INSTDIR_NAME "PackItForms\Outpost\SCCo"
+!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCCoPackItForms"
+!define PROGRAM_PATH "bin\${SetupFileName}.exe"
+!define WINDOW_TITLE "Santa Clara County"
 
 Function ChooseAddonFiles
   File /r /x "*~" /x .git* /x form-los-altos*.html /x http-request.html pack-it-forms
-  File /oname=addons\${addon_name}.launch addons\${addon_name}_Health.launch
+  File /oname=addons\${addon_name}.launch addons\SCCo_private.launch
 FunctionEnd
 
 !include setup.nsi

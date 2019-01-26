@@ -19,4 +19,4 @@ fi
 
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-HTTP.nsi || exit $?
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCo.nsi || exit $?
-"C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCoHealth.nsi || exit $?
+"C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCo_private.nsi || exit $?
