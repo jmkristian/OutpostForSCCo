@@ -19,13 +19,13 @@
 !define SetupFileName "SCCoPIFO_Public"
 !define INSTDIR_NAME "PackItForms\Outpost\SCCo"
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCCoPackItForms"
-!define PROGRAM_PATH "bin\${SetupFileName}.exe"
+!define PROGRAM_PATH "bin\SCCoPIFO.exe"
 !define WINDOW_TITLE "Santa Clara County"
 
 Function ChooseAddonFiles
   File /r /x "*~" /x .git* /x form-los-altos*.html /x http-request.html pack-it-forms
   SetOutPath "$INSTDIR\addons"
-  File /oname=addons\${addon_name}.launch addons\SCCo.launch
+  File /oname=${addon_name}.launch addons\SCCo.launch
 FunctionEnd
 
 !include setup.nsi
