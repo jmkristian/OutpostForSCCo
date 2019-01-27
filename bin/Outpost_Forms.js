@@ -23,10 +23,8 @@
 
   Any single execution does just one of those things,
   depending on the value of process.argv[2].
-  For example, "node bin/Outpost_Forms.js uninstall C:/Outpost"
-  edits C:/Outpost/Launch.local.
 
-  When an operator clicks a menu item to create a message
+  When an operator clicks an Outpost Forms menu item to create a message
   or opens an existing message that belongs to this add-on,
   a fairly complex sequence of events ensues.
   - Outpost executes this program with arguments specified in addon.ini.
@@ -100,22 +98,29 @@ if (process.argv.length > 2) {
     try {
         switch(verb) {
         case 'build':
+            // Customize various files for a given add-on.
+            // This happens before creating an installer.
             build(process.argv[3], process.argv[4]);
             break;
         case 'install':
+            // Edit various files depending on how this program was installed.
             install();
             break;
         case 'uninstall':
+            // Remove this add-on from Outpost's configuration.
             uninstall();
-            break;
-        case 'serve':
-            serve();
             break;
         case 'open':
         case 'dry-run':
+            // Make sure a server is running, and then send process.argv[4..] to it.
             openMessage();
             break;
+        case 'serve':
+            // Serve HTTP requests until a few minutes after there are no forms open.
+            serve();
+            break;
         case 'stop':
+            // Stop any running servers.
             stopServers(function() {});
             break;
         default:
