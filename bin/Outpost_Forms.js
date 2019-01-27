@@ -871,7 +871,7 @@ function submitToOpdirect(submission, callback) {
                 }
             });
         server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
-        server.setTimeout(3000);
+        server.setTimeout(5000);
         log('form ' + submission.formId + ' submitting ' + JSON.stringify(options));
         server.end(body);
     } catch(err) {
@@ -998,6 +998,9 @@ function onPostHttpRequest(req, res) {
                         server.setHeader(name.substring(7), value);
                     }
                 }
+            }
+            if (req.body.timeout) {
+                server.setTimeout(parseFloat(req.body.timeout) * 1000);
             }
             server.end(req.body.body, CHARSET);
         }
