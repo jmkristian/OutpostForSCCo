@@ -1,4 +1,4 @@
-/* Copyright 2018 by John Kristian
+/* Copyright 2018, 2019 by John Kristian
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -65,6 +65,7 @@ const http = require('http');
 const morgan = require('morgan');
 const os = require('os');
 const path = require('path');
+const querystring = require('querystring');
 const Transform = require('stream').Transform;
 const url = require('url');
 const util = require('util');
@@ -85,6 +86,8 @@ const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join('logs', 'server-port.txt');
 const StopServer = '/stopOutpostForLAARES';
+const TEXT_HTML = 'text/html; charset=' + CHARSET;
+const TEXT_PLAIN = 'text/plain; charset=' + CHARSET;
 
 var logFileName = null;
 
@@ -375,13 +378,14 @@ function stopServer(port, next) {
 }
 
 function request(options, callback, includeHeaders) {
-    function onError(event) {
+    const onError = function(event) {
         return function(err) {
             (callback || log)(err || event);
         }
     }
     var req = http.request(options, function(res) {
-        res.on('aborted', onError('aborted'));
+        res.on('aborted', onError('res.aborted'));
+        res.on('error', onError('res.error'));
         res.pipe(concat_stream(function(buffer) {
             var data = buffer.toString(CHARSET);
             if (callback) {
@@ -395,9 +399,9 @@ function request(options, callback, includeHeaders) {
             }
         }));
     });
-    req.on('abort', onError('abort'));
-    req.on('error', onError('error'));
-    req.on('timeout', onError('timeout'));
+    req.on('aborted', onError('req.aborted'));
+    req.on('error', onError('req.error'));
+    req.on('timeout', onError('req.timeout'));
     return req;
 }
 
@@ -419,12 +423,12 @@ function serve() {
                 + (req.httpVersion ? " HTTP " + req.httpVersion : "")
                 + '\n' + formatRawHeaders(req.rawHeaders) + '\n';
             req.pipe(concat_stream(function(body) {
-                res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
+                res.set({'Content-Type': TEXT_PLAIN});
                 res.end(headers + body.toString(CHARSET));
             }));
         } catch(err) {
-            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
-            res.end(errorToHTML(err, JSON.stringify(req.body)));
+            res.set({'Content-Type': TEXT_HTML});
+            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
         }
     });
     app.use(bodyParser.json({type: JSON_TYPE}));
@@ -488,8 +492,8 @@ function serve() {
                             '--filename', form.substring(space + 1)]);
             res.redirect('/form-' + formId);
         } catch(err) {
-            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
-            res.end(errorToHTML(err, JSON.stringify(req.body)));
+            res.set({'Content-Type': TEXT_HTML});
+            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
         }
     });
     app.post('/manual-view', function(req, res, next) {
@@ -507,8 +511,8 @@ function serve() {
             onOpen(formId, args);
             res.redirect('/form-' + formId);
         } catch(err) {
-            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
-            res.end(errorToHTML(err, JSON.stringify(req.body)));
+            res.set({'Content-Type': TEXT_HTML});
+            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
         }
     });
     app.post('/http-request', function(req, res, next) {
@@ -680,21 +684,25 @@ function parseMessage(message) {
 
 /** Handle an HTTP GET /form-id request. */
 function onGetForm(formId, res) {
-    res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
+    res.set({'Content-Type': TEXT_PLAIN});
     var form = openForms[formId];
     if (formId <= 0) {
-        res.status(400).end('Form numbers start with 1.');
+        res.status(400).end('Form numbers start with 1.', CHARSET);
     } else if (!form) {
         log('form ' + formId + ' is not open');
         if (formId < nextFormId) {
-            res.status(NOT_FOUND).end('Form ' + formId + ' was discarded, since the browser page was closed.');
+            res.status(NOT_FOUND)
+                .end('Form ' + formId + ' was discarded, since the browser page was closed.',
+                     CHARSET);
         } else {
-            res.status(NOT_FOUND).end('Form ' + formId + ' has not been opened.');
+            res.status(NOT_FOUND)
+                .end('Form ' + formId + ' has not been opened.',
+                     CHARSET);
         }
     } else {
         log('form ' + formId + ' viewed');
         try {
-            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+            res.set({'Content-Type': TEXT_HTML});
             if (!form.environment) {
                 var parsed = parseArgs(form.args);
                 form.envelope = parsed.envelope;
@@ -795,81 +803,139 @@ function expandDataInclude(data, form) {
 }
 
 function onSubmit(formId, q, res) {
-    res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+    const form = openForms[formId];
+    const callback = function(err) {
+        if (err) {
+            res.set({'Content-Type': TEXT_HTML});
+            res.end(errorToHTML(err, form), CHARSET);
+        } else {
+            log('form ' + formId + ' submitted');
+            res.redirect('/form-' + formId + '?mode=readonly');
+            /** At this point, the operator can click the browser 'back' button,
+                edit the form and submit it to Outpost again. To prevent this:
+                form.environment.mode = 'readonly';
+                res.redirect('/form-' + formId);
+                ... which causes the 'back' button to display a read-only form.
+            */
+            // Don't closeForm, in case the operator goes back and submits it again.
+        }
+    };
     try {
         var message = q.formtext;
-        const form = openForms[formId];
         const foundSubject = /[\r\n]#[ \t]*SUBJECT:[ \t]*([^\r\n]*)/.exec(message);
         const subject = foundSubject ? foundSubject[1] : '';
         const foundSeverity = /[\r\n]4.:[ \t]*\[([A-Za-z]*)]/.exec(message);
         const severity = foundSeverity ? foundSeverity[1].toUpperCase() : '';
-        const formFileName = form.environment.filename;
-        const msgFileName = path.resolve(PackItMsgs, 'form-' + formId + '.txt');
-        // Convert the message from PACF format to ADDON format:
-        message = message.replace(/[\r\n]+#EOF[\s\S]*/, EOL + '!/ADDON!' + EOL);
         form.message = message;
         if (form.environment.message_status == 'manual') {
-            res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
-            res.end(message);
-            return;
+            res.set({'Content-Type': TEXT_PLAIN});
+            res.end(message, CHARSET);
+        } else {
+            submitToOpdirect({
+                formId: formId,
+                form: form,
+                addonName: form.environment.addon_name,
+                subject: subject,
+                urgent: (['URGENT', 'U', 'EMERGENCY', 'E'].indexOf(severity) >= 0),
+                // Remove the first line of the Outpost message header:
+                // Aoclient.exe or Outpost will insert !addonName!.
+                message: message.replace(/^\s*![^\r\n]*[\r\n]+/, '')
+            }, callback);
         }
-        // Remove the first line of the Outpost message header:
-        // Aoclient.exe or Outpost will insert !addon_name!.
-        message = message.replace(/^\s*![^\r\n]*[\r\n]+/, '');
-        fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
-            try {
-                if (err) throw err;
-                try {
-                    fs.unlinkSync(OpdFAIL);
-                } catch(err) {
-                    // ignored
-                }
-                var options = ['-a', form.environment.addon_name, '-f', msgFileName, '-s', subject];
-                if (['URGENT', 'U', 'EMERGENCY', 'E'].indexOf(severity) >= 0) {
-                    options.push('-u');
-                }
-                log('form ' + formId + ' submitting ' + options.join(' '));
-                child_process.execFile(
-                    path.join('addons', form.environment.addon_name, 'Aoclient.exe'), options,
-                    function(err, stdout, stderr) {
-                        try {
-                            if (err) throw err;
-                            if (fs.existsSync(OpdFAIL)) {
-                                throw (OpdFAIL + ': ' + fs.readFileSync(OpdFAIL, ENCODING) + '\n'
-                                       + stdout.toString(ENCODING)
-                                       + stderr.toString(ENCODING));
-                            }
-                            log('form ' + formId + ' submitted');
-                            res.redirect('/form-' + formId + '?mode=readonly');
-                            /** At this point, the operator can click the browser 'back' button,
-                                edit the form and submit it to Outpost again. To prevent this:
-                                form.environment.mode = 'readonly';
-                                res.redirect('/form-' + formId);
-                                ... which causes the 'back' button to display a read-only form.
-                            */
-                            try {
-                                fs.unlinkSync(msgFileName);
-                            } catch(err) {
-                                log(err);
-                            }
-                            // Don't closeForm, in case the operator goes back and submits it again.
-                        } catch(err) {
-                            res.end(errorToHTML(err, form));
-                        }
-                    });
-            } catch(err) {
-                res.end(errorToHTML(err, form));
-            }
-        });
     } catch(err) {
-        res.end(errorToHTML(err, {formId: formId}));
+        callback(err);
     }
+}
+
+function submitToOpdirect(submission, callback) {
+    try {
+        var body = {
+            adn: submission.addonName,
+            sub: submission.subject,
+            msg: submission.message
+        };
+        if (submission.urgent) {
+            body.urg = 'true';
+        }
+        body = querystring.stringify(body);
+        const options = {method: 'POST', host: LOCALHOST, port: 9334, path: '/TBD'};
+        // Send an HTTP request.
+        const server = request(
+            options,
+            function(err, data) {
+                if (err || data) {
+                    log(err || data);
+                    submitToAoclient(submission, callback);
+                } else {
+                    callback();
+                }
+            });
+        server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
+        server.setTimeout(3000);
+        log('form ' + submission.formId + ' submitting ' + JSON.stringify(options));
+        server.end(body);
+    } catch(err) {
+        try {
+            log(err);
+            submitToAoclient(submission, callback);
+        } catch(err) {
+            callback(err);
+        }
+    }
+}
+
+function submitToAoclient(submission, callback) {
+    const formFileName = submission.form.environment.filename;
+    const msgFileName = path.resolve(PackItMsgs, 'form-' + submission.formId + '.txt');
+    fs.writeFile(msgFileName, submission.message, {encoding: ENCODING}, function(err) {
+        try {
+            if (err) throw err;
+            try {
+                fs.unlinkSync(OpdFAIL);
+            } catch(err) {
+                // ignored
+            }
+            var options = ['-a', submission.addonName,
+                           '-f', msgFileName,
+                           '-s', submission.subject];
+            if (submission.urgent) {
+                options.push('-u');
+            }
+            const program = path.join ('addons', submission.addonName, 'Aoclient.exe');
+            log('form ' + submission.formId + ' submitting ' + program + ' ' + options.join(' '));
+            child_process.execFile(
+                program, options,
+                function(err, stdout, stderr) {
+                    try {
+                        if (err) throw err;
+                        if (fs.existsSync(OpdFAIL)) {
+                            throw (OpdFAIL + ': ' + fs.readFileSync(OpdFAIL, ENCODING) + '\n'
+                                   + stdout.toString(ENCODING)
+                                   + stderr.toString(ENCODING));
+                        }
+                        callback();
+                        try {
+                            fs.unlinkSync(msgFileName);
+                        } catch(err) {
+                            log(err);
+                        }
+                    } catch(err) {
+                        callback(err);
+                    }
+                });
+        } catch(err) {
+            callback(err);
+        }
+    });
+}
+
+function submittedResponse(formId, res) {
 }
 
 /** Handle an HTTP GET /manual request. */
 function onGetManual(res) {
     keepAlive(0);
-    res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+    res.set({'Content-Type': TEXT_HTML});
     const template = path.join('bin', 'manual.html');
     fs.readFile(template, {encoding: ENCODING}, function(err, data) {
         if (err) {
@@ -898,14 +964,14 @@ function onGetManual(res) {
 
 function onPostHttpRequest(req, res) {
     try {
-        res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+        res.set({'Content-Type': TEXT_HTML});
         const clientAddress = req.ip;
         if (['127.0.0.1', '::ffff:127.0.0.1'].indexOf(clientAddress) < 0) {
             // Don't serve a remote client. It might be malicious.
             res.statusCode = FORBIDDEN;
             res.statusMessage = 'Your address is ' + clientAddress;
-            res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
-            res.end('Your address is ' + clientAddress);
+            res.set({'Content-Type': TEXT_PLAIN});
+            res.end('Your address is ' + clientAddress, CHARSET);
             log('POST from ' + clientAddress);
         } else {
             // Send an HTTP request.
@@ -918,10 +984,10 @@ function onPostHttpRequest(req, res) {
                 options,
                 function(err, data) {
                     if (err) {
-                        res.end(errorToHTML(err, data));
+                        res.end(errorToHTML(err, data), CHARSET);
                     } else {
-                        res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
-                        res.end(data);
+                        res.set({'Content-Type': TEXT_PLAIN});
+                        res.end(data, CHARSET);
                     }
                 },
                 true); // include response headers in the data
@@ -933,10 +999,10 @@ function onPostHttpRequest(req, res) {
                     }
                 }
             }
-            server.end(req.body.body);
+            server.end(req.body.body, CHARSET);
         }
     } catch(err) {
-        res.end(errorToHTML(err, JSON.stringify(req.body)));
+        res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
     }
 }
 
