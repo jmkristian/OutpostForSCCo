@@ -13,4 +13,4 @@
 # limitations under the License.
 
 !define VersionMajor 1
-!define VersionMinor 17
+!define VersionMinor 18
