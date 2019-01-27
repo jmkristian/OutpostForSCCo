@@ -862,7 +862,7 @@ function submitToOpdirect(submission, callback) {
         if (submission.urgent) {
             body.urg = 'true';
         }
-        body = querystring.stringify(body);
+        body = querystring.stringify(body) + '&endOfBodyMarker=%23EOF';
         const options = {method: 'POST', host: LOCALHOST, port: 9334, path: '/TBD'};
         // Send an HTTP request.
         const server = request(
