@@ -831,7 +831,8 @@ function onSubmit(formId, q, res) {
         const subject = foundSubject ? foundSubject[1] : '';
         const foundSeverity = /[\r\n]4.:[ \t]*\[([A-Za-z]*)]/.exec(message);
         const severity = foundSeverity ? foundSeverity[1].toUpperCase() : '';
-        form.message = message;
+        // Outpost requires Windows-style line breaks:
+        form.message = message.replace(/([^\r])\n/g, '$1' + EOL);
         if (form.environment.message_status == 'manual') {
             res.set({'Content-Type': TEXT_PLAIN});
             res.end(message, CHARSET);
@@ -842,9 +843,6 @@ function onSubmit(formId, q, res) {
                 addonName: form.environment.addon_name,
                 subject: subject,
                 urgent: (['URGENT', 'U', 'EMERGENCY', 'E'].indexOf(severity) >= 0),
-                // Remove the first line of the Outpost message header:
-                // Aoclient.exe or Outpost will insert !addonName!.
-                message: message.replace(/^\s*![^\r\n]*[\r\n]+/, '')
             }, callback);
         }
     } catch(err) {
@@ -854,15 +852,23 @@ function onSubmit(formId, q, res) {
 
 function submitToOpdirect(submission, callback) {
     try {
-        var body = {
-            adn: submission.addonName,
-            sub: submission.subject,
-            msg: submission.message
-        };
+        if (!submission.addonName) throw 'addonName is required';
+        // Outpost requires parameters to appear in a specific order.
+        // So don't stringify them from a single object.
+        var body = querystring.stringify({adn: submission.addonName})
+            + '&' + querystring.stringify({sub: (submission.subject || '')});
         if (submission.urgent) {
-            body.urg = 'true';
+            body += '&' + querystring.stringify({urg: 'TRUE'});
         }
-        body = querystring.stringify(body) + '&endOfBodyMarker=%23EOF';
+        if (submission.form.message) {
+            var message = submission.form.message;
+            // Make the request fail fast, if it's an old version of Outpost:
+            // message = message.replace(/[\r\n]*$/, EOL + '#EOF');
+            // That's a PacFORMS style end-of-message marker,
+            // but it's a harmless comment for this add-on.
+            body += '&' + querystring.stringify({msg: message});
+        };
+        body += '&!/4VAO!'; // Yes, that's not a correctly stringified parameter.
         const options = {method: 'POST', host: LOCALHOST, port: 9334, path: '/TBD'};
         // Send an HTTP request.
         const server = request(
@@ -876,7 +882,7 @@ function submitToOpdirect(submission, callback) {
                 }
             });
         server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
-        server.setTimeout(5000);
+        server.setTimeout(3000);
         log('form ' + submission.formId + ' submitting ' + JSON.stringify(options));
         server.end(body);
     } catch(err) {
@@ -892,7 +898,10 @@ function submitToOpdirect(submission, callback) {
 function submitToAoclient(submission, callback) {
     const formFileName = submission.form.environment.filename;
     const msgFileName = path.resolve(PackItMsgs, 'form-' + submission.formId + '.txt');
-    fs.writeFile(msgFileName, submission.message, {encoding: ENCODING}, function(err) {
+    // Remove the first line of the Outpost message header:
+    const message = submission.form.message.replace(/^\s*![^\r\n]*[\r\n]+/, '')
+    // Outpost will insert !submission.addonName!.
+    fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
         try {
             if (err) throw err;
             try {
