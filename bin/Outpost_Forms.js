@@ -84,7 +84,7 @@ const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join('logs', 'server-port.txt');
 const StopServer = '/stopOutpostForLAARES';
-const SUBMIT_TIMEOUT_SEC = 10;
+const SUBMIT_TIMEOUT_SEC = 30;
 const TEXT_HTML = 'text/html; charset=' + CHARSET;
 const TEXT_PLAIN = 'text/plain; charset=' + CHARSET;
 
@@ -863,27 +863,28 @@ function submitToOpdirect(submission, callback) {
             body += '&' + querystring.stringify({urg: 'TRUE'});
         }
         if (submission.form.message) {
-            var message = submission.form.message;
-            // Make the request fail fast, if it's an old version of Outpost:
-            // message = message.replace(/[\r\n]*$/, EOL + '#EOF');
-            // That's a PacFORMS style end-of-message marker.
-            // Sadly, it's not a harmless comment for this add-on.
-            body += '&' + querystring.stringify({msg: message});
-        };
-        body += '&!/4VAO!'; // Yes, that's not a correctly stringified parameter.
+            body += '&' + querystring.stringify({msg: submission.form.message});
+        }
+        // URL encode the 'E' in '#EOF', to prevent Outpost from treating this as a PacFORM message:
+        body = body.replace(/%23EOF/g, '%23%45OF');
+        // Mark the end of the request body. This must be the last parameter:
+        body += '&' + querystring.stringify({'4VAO': '#EOF'});
+        // The #EOF value makes the request fail fast if the server is an old version of Outpost.
+        // An old server recognizes %23EOF as an end-of-message marker, decodes the body,
+        // finds there is no parameter named formtext and fails.
+        // A new server recognizes &4VAO= as the end-of-message marker.
+        // Either server ignores the HTTP Content-Length header; it just scans for the marker.
+
         const options = {method: 'POST', host: LOCALHOST, port: 9334, path: '/TBD'};
         // Send an HTTP request.
         const server = request(
             options,
             function(err, data) {
                 if (err || data) {
-                    if (err == 'req.timeout' || err == 'res.timeout') {
-                        err = 'The server didn\'t respond within ' + SUBMIT_TIMEOUT_SEC + ' seconds.';
-                    }
                     log(err || data);
                     submitToAoclient(submission, callback);
                 } else {
-                    callback();
+                    callback(); // success
                 }
             });
         server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
