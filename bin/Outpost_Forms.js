@@ -84,6 +84,7 @@ const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join('logs', 'server-port.txt');
 const StopServer = '/stopOutpostForLAARES';
+const SUBMIT_TIMEOUT_SEC = 10;
 const TEXT_HTML = 'text/html; charset=' + CHARSET;
 const TEXT_PLAIN = 'text/plain; charset=' + CHARSET;
 
@@ -391,6 +392,7 @@ function request(options, callback, includeHeaders) {
     var req = http.request(options, function(res) {
         res.on('aborted', onError('res.aborted'));
         res.on('error', onError('res.error'));
+        res.on('timeout', onError('res.timeout'));
         res.pipe(concat_stream(function(buffer) {
             var data = buffer.toString(CHARSET);
             if (callback) {
@@ -852,7 +854,7 @@ function onSubmit(formId, q, res) {
 
 function submitToOpdirect(submission, callback) {
     try {
-        if (!submission.addonName) throw 'addonName is required';
+        if (!submission.addonName) throw 'addonName is required'; 
         // Outpost requires parameters to appear in a specific order.
         // So don't stringify them from a single object.
         var body = querystring.stringify({adn: submission.addonName})
@@ -864,8 +866,8 @@ function submitToOpdirect(submission, callback) {
             var message = submission.form.message;
             // Make the request fail fast, if it's an old version of Outpost:
             // message = message.replace(/[\r\n]*$/, EOL + '#EOF');
-            // That's a PacFORMS style end-of-message marker,
-            // but it's a harmless comment for this add-on.
+            // That's a PacFORMS style end-of-message marker.
+            // Sadly, it's not a harmless comment for this add-on.
             body += '&' + querystring.stringify({msg: message});
         };
         body += '&!/4VAO!'; // Yes, that's not a correctly stringified parameter.
@@ -875,6 +877,9 @@ function submitToOpdirect(submission, callback) {
             options,
             function(err, data) {
                 if (err || data) {
+                    if (err == 'req.timeout' || err == 'res.timeout') {
+                        err = 'The server didn\'t respond within ' + SUBMIT_TIMEOUT_SEC + ' seconds.';
+                    }
                     log(err || data);
                     submitToAoclient(submission, callback);
                 } else {
@@ -882,7 +887,7 @@ function submitToOpdirect(submission, callback) {
                 }
             });
         server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
-        server.setTimeout(3000);
+        server.setTimeout(SUBMIT_TIMEOUT_SEC * 1000);
         log('form ' + submission.formId + ' submitting ' + JSON.stringify(options));
         server.end(body);
     } catch(err) {
