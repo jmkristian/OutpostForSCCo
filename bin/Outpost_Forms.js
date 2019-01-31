@@ -857,8 +857,10 @@ function submitToOpdirect(submission, callback) {
         if (!submission.addonName) throw 'addonName is required'; 
         // Outpost requires parameters to appear in a specific order.
         // So don't stringify them from a single object.
-        var body = querystring.stringify({adn: submission.addonName})
-            + '&' + querystring.stringify({sub: (submission.subject || '')});
+        var body = querystring.stringify({adn: submission.addonName});
+        if (submission.subject) {
+            body += '&' + querystring.stringify({sub: (submission.subject)});
+        }
         if (submission.urgent) {
             body += '&' + querystring.stringify({urg: 'TRUE'});
         }
@@ -880,12 +882,20 @@ function submitToOpdirect(submission, callback) {
         const server = request(
             options,
             function(err, data) {
-                if (err || data) {
-                    log(err || data);
-                    submitToAoclient(submission, callback);
-                } else {
+                if (err) {
+                    if (err == 'req.timeout' || err == 'res.timeout') {
+                        err = 'No response to ' + options.method + ' in ' + SUBMIT_TIMEOUT_SEC + ' seconds.';
+                    }
+                    log(err + (data ? (' ' + data) : ''));
+                } else if (!data ||
+                           data == '<html><body><br></body></html>' ||
+                           data == '<html><body><br/></body></html>') {
                     callback(); // success
+                    return;
+                } else {
+                    log(data);
                 }
+                submitToAoclient(submission, callback);
             });
         server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
         server.setTimeout(SUBMIT_TIMEOUT_SEC * 1000);
