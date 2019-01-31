@@ -858,6 +858,9 @@ function submitToOpdirect(submission, callback) {
         // Outpost requires parameters to appear in a specific order.
         // So don't stringify them from a single object.
         var body = querystring.stringify({adn: submission.addonName});
+        if (submission.form.environment.MSG_INDEX) {
+            body += '&' + querystring.stringify({upd: (submission.form.environment.MSG_INDEX)});
+        }
         if (submission.subject) {
             body += '&' + querystring.stringify({sub: (submission.subject)});
         }
@@ -890,6 +893,7 @@ function submitToOpdirect(submission, callback) {
                 } else if (!data ||
                            data == '<html><body><br></body></html>' ||
                            data == '<html><body><br/></body></html>') {
+                    log(data);
                     callback(); // success
                     return;
                 } else {

@@ -62,7 +62,8 @@
                         submitButton.value = 'Create Message';
                     }
                 }
-                if (status == 'new' && query_object.mode == 'readonly') {
+                if ((status == 'new' || status == 'draft') &&
+                     query_object.mode == 'readonly') {
                     // This message was just submitted to Outpost. Let the operator know:
                     var div = document.createElement('div');
                     div.style="position:absolute;height:20pt;top:50%;margin-top:-10pt;margin-left:5pt;font-weight:bold;";
