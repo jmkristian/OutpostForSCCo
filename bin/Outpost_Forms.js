@@ -818,14 +818,9 @@ function onSubmit(formId, q, res) {
             res.end(errorToHTML(err, form), CHARSET);
         } else {
             log('form ' + formId + ' submitted');
-            res.redirect('/form-' + formId + '?mode=readonly');
-            /** At this point, the operator can click the browser 'back' button,
-                edit the form and submit it to Outpost again. To prevent this:
-                form.environment.mode = 'readonly';
-                res.redirect('/form-' + formId);
-                ... which causes the 'back' button to display a read-only form.
-            */
-            // Don't closeForm, in case the operator goes back and submits it again.
+            form.environment.mode = 'readonly';
+            res.redirect('/form-' + formId);
+            // Don't closeForm, so the operator can view it.
         }
     };
     try {
