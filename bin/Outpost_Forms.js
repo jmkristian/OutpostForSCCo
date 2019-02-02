@@ -874,7 +874,7 @@ function submitToOpdirect(submission, callback) {
         // URL encode the 'E' in '#EOF', to prevent Outpost from treating this as a PacFORM message:
         body = body.replace(/%23EOF/g, '%23%45OF');
         // Mark the end of the request body. This must be the last parameter:
-        body += '&' + querystring.stringify({'4VAO': '#EOF'});
+        body += '&' + querystring.stringify({'4VAO': '\r\n#EOF'});
         // The #EOF value makes the request fail fast if the server is an old version of Outpost.
         // An old server recognizes %23EOF as an end-of-message marker, decodes the body,
         // finds there is no parameter named formtext and fails.
@@ -889,18 +889,25 @@ function submitToOpdirect(submission, callback) {
                 if (err) {
                     if (err == 'req.timeout' || err == 'res.timeout') {
                         err = 'No response to ' + options.method + ' in ' + SUBMIT_TIMEOUT_SEC + ' seconds.';
+                    } else if ((err + '').indexOf(' ECONNREFUSED ') >= 0) {
+                        err = "Opdirect isn't running, it appears." + EOL + err;
                     }
-                    log(err + (data ? (' ' + data) : ''));
-                } else if (!data ||
-                           data == '<html><body><br></body></html>' ||
-                           data == '<html><body><br/></body></html>') {
-                    log(data);
-                    callback(); // success
-                    return;
+                    const report = err + (data ? (EOL + data) : '');
+                    log(report);
+                    callback(report);
                 } else {
-                    log(data);
+                    log('Outpost responded: ' + data);
+                    if (!data ||
+                        data == '<html><body><br></body></html>' ||
+                        data == '<html><body><br/></body></html>') {
+                        callback(); // success
+                    } else if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
+                        // It's an old version of Outpost. Maybe Aoclient will work:
+                        submitToAoclient(submission, callback);
+                    } else {
+                        callback('Outpost said: ' + data);
+                    }
                 }
-                submitToAoclient(submission, callback);
             });
         server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
         server.setTimeout(SUBMIT_TIMEOUT_SEC * 1000);
