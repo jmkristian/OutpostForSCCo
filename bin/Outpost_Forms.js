@@ -61,6 +61,7 @@ const express = require('express');
 const fs = require('fs');
 const http = require('http');
 const morgan = require('morgan');
+const net = require('net');
 const os = require('os');
 const path = require('path');
 const querystring = require('querystring');
@@ -427,7 +428,7 @@ function serve() {
         try {
             var headers = 'Request was:\n'
                 + req.method + ' ' + req.url
-                + (req.httpVersion ? " HTTP " + req.httpVersion : "")
+                + (req.httpVersion ? " HTTP/" + req.httpVersion : "")
                 + '\n' + formatRawHeaders(req.rawHeaders) + '\n';
             req.pipe(concat_stream(function(body) {
                 res.set({'Content-Type': TEXT_PLAIN});
@@ -997,49 +998,85 @@ function onGetManual(res) {
 }
 
 function onPostHttpRequest(req, res) {
+    const onError = function(event) {
+        return function(err, data) {
+            log('onError(' + event + ')(' + err + ', ' + data + ')');
+            try {
+                res.set({'Content-Type': TEXT_HTML});
+            } catch(err) {
+                log(err);
+            }
+            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
+        }
+    }
     try {
-        res.set({'Content-Type': TEXT_HTML});
+        res.set({'Content-Type': TEXT_PLAIN});
         const clientAddress = req.ip;
         if (['127.0.0.1', '::ffff:127.0.0.1'].indexOf(clientAddress) < 0) {
             // Don't serve a remote client. It might be malicious.
             res.statusCode = FORBIDDEN;
             res.statusMessage = 'Your address is ' + clientAddress;
-            res.set({'Content-Type': TEXT_PLAIN});
             res.end('Your address is ' + clientAddress, CHARSET);
             log('POST from ' + clientAddress);
         } else {
             // Send an HTTP request.
-            const URL = url.parse(req.body.URL);
-            const options = {method: req.body.method,
-                             host: URL.hostname,
-                             port: URL.port,
-                             path: URL.path};
-            const server = request(
-                options,
-                function(err, data) {
-                    if (err) {
-                        res.end(errorToHTML(err, data), CHARSET);
-                    } else {
-                        res.set({'Content-Type': TEXT_PLAIN});
-                        res.end(data, CHARSET);
-                    }
-                },
-                true); // include response headers in the data
+            const URL = url.parse('http://' + req.body.URL);
+            const options = {host: URL.hostname, port: URL.port || 80};
+            var headers =
+                req.body.method + ' ' + URL.path + ' HTTP/1.1' + EOL
+                + 'Host: ' + options.host + ':' + options.port + EOL
+                + 'Connection: close' + EOL;
             for (var name in req.body) {
                 if (name.startsWith('header.')) {
                     var value = req.body[name];
                     if (value) {
-                        server.setHeader(name.substring(7), value);
+                        headers += (name.substring(7) + ': ' + value + EOL);
                     }
                 }
             }
-            if (req.body.timeout) {
-                server.setTimeout(parseFloat(req.body.timeout) * 1000);
+            headers += ('Content-Length: ' + (req.body.body || '').length + EOL);
+            headers += EOL; // end of headers
+            var pauseTime = 0;
+            var body = '';
+            var body2 = '';
+            if (req.body.body) {
+                if (!(req.body.pauseStart && req.body.pauseTime)) {
+                    body += req.body.body;
+                } else {
+                    const pauseStart = parseInt(req.body.pauseStart);
+                    pauseTime = parseFloat(req.body.pauseTime);
+                    body += req.body.body.substring(0, pauseStart);
+                    body2 = req.body.body.substring(pauseStart);
+                }
             }
-            server.end(req.body.body, CHARSET);
+            const server = new net.Socket();
+            server.on('error', onError('error'));
+            server.on('timeout', onError('timeout'));
+            log('server.connect ' + JSON.stringify(options));
+            server.connect(options, function(err) {
+                try {
+                    log('connected(' + err + ')');
+                    if (err) throw err;
+                    if (req.body.timeout) {
+                        server.setTimeout(parseFloat(req.body.timeout) * 1000);
+                    }
+                    log('server.pipe ...');
+                    server.pipe(res);
+                    log('server.write ' + headers + body);
+                    server.write(headers + body);
+                    if (body2) {
+                        setTimeout(function() {
+                            log('server.write ' + body2);
+                            server.write(body2);
+                        }, pauseTime * 1000);
+                    }
+                } catch(err) {
+                    onError('throw')(err);
+                }
+            });
         }
     } catch(err) {
-        res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
+        onError('throw')(err);
     }
 }
 
