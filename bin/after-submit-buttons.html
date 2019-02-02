@@ -1,13 +1,17 @@
 <script type="text/javascript">
-    var formDefaultValues; // Initial values for form inputs.
     // Monkey patch load_callprefix:
     for (var i = startup_functions.length - 1; i >= 0; i--) {
         if (startup_functions[i] === load_callprefix) {
             startup_functions[i] = function(next) {
-                outpost_envelope = {{envelopeDefaults}};
                 var message = {{message}};
-                set_form_data_div(message || '# A new message will go here.');
+                var envelopeDefaults = {{envelopeDefaults}};
                 var queryDefaults = {{queryDefaults}};
+                set_form_data_div(message || '# A new message will go here.');
+                for (var e in envelopeDefaults) {
+                    if (!(e in outpost_envelope)) {
+                        outpost_envelope[e] = envelopeDefaults[e];
+                    }
+                }
                 for (var q in queryDefaults) {
                     if (!(q in query_object)) {
                         query_object[q] = queryDefaults[q];
@@ -27,18 +31,9 @@
                         img = undefined;
                     }, 30000); // call ping every 30 seconds
                 }
-                if (!formDefaultValues) {
-                    formDefaultValues = [];
-                }
                 var status = query_object.message_status;
                 // Show Rec-Sent based on whether we received this message:
                 init_form_from_fields({'Rec-Sent': (status == 'unread' || status == 'read') ? 'Received' : 'Sent'}, 'name');
-                if (query_object.mode != 'readonly') {
-                    // A readonly form is initialized from the message, not default values.
-                    for (var f = formDefaultValues.length - 1; f >= 0; f--) {
-                        init_form_from_fields(formDefaultValues[f], 'name');
-                    }
-                }
                 array_for_each(document.getElementsByName('Rec-Sent'), function(recSent) {
                     recSent.disabled = true; // Don't include it in transmitted messages.
                     recSent.classList.add('no-msg-init'); // Ignore it in received messages.
@@ -67,7 +62,8 @@
                         submitButton.value = 'Create Message';
                     }
                 }
-                if (status == 'new' && query_object.mode == 'readonly') {
+                if ((status == 'new' || status == 'draft') &&
+                     query_object.mode == 'readonly') {
                     // This message was just submitted to Outpost. Let the operator know:
                     var div = document.createElement('div');
                     div.style="position:absolute;height:20pt;top:50%;margin-top:-10pt;margin-left:5pt;font-weight:bold;";

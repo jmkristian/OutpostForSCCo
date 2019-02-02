@@ -1,4 +1,4 @@
-# Copyright 2018 by John Kristian
+# Copyright 2018,2019 by John Kristian
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-!define VersionMajor 1
-!define VersionMinor 11
+!define InstalledKey SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall
 
-OutFile "${SetupFileName}_Setup-${VersionMajor}.${VersionMinor}.exe"
+Name "${WINDOW_TITLE}" "web forms"
 
 RequestExecutionLevel highest
-Page directory
+Page custom selectOutpostCode "" "${WINDOW_TITLE} Setup"
+Page directory ifOutpostDataDefined
 Page instfiles
 UninstPage uninstConfirm
 UninstPage instfiles
 
 !include LogicLib.nsh
+!include nsDialogs.nsh
 !include TextFunc.nsh
 !include WinVer.nsh
 
@@ -32,75 +33,63 @@ Var /GLOBAL OUTPOST_DATA
 Var /GLOBAL AOCLIENT_EXE
 Var /GLOBAL WSCRIPT_EXE
 
-Function StrContainsSpace
-  Exch $R0
-  Push $R1
-  loop:
-    ${If} $R0 == ""
-      StrCpy $R0 false
-      GoTo end
-    ${Endif}
-    StrCpy $R1 $R0 1 0
-    ${If} $R1 == " "
-      StrCpy $R0 true
-      GoTo end
-    ${Endif}
-    StrLen $R1 $R0
-    StrCpy $R0 $R0 $R1 1
-    GoTo loop
-end:
-  Pop $R1
-  Exch $R0
-FunctionEnd
-!macro StrContainsSpace OUT S
-  Push `${S}`
-  Call StrContainsSpace
-  Pop `${OUT}`
-!macroend
-!define StrContainsSpace '!insertmacro "StrContainsSpace"'
-
 Function .onInit
+  StrCpy $OUTPOST_DATA ""
   ${If} $INSTDIR == ""
-    StrCpy $INSTDIR "$APPDATA\${INSTDIR_NAME}\"
-    ${StrContainsSpace} $0 "$INSTDIR"
-    ${If} $0 != false
-      ReadEnvStr $0 SystemDrive
-      StrCpy $INSTDIR "$0\${INSTDIR_NAME}\"
-    ${EndIf}
+    ReadEnvStr $0 SystemDrive
+    StrCpy $INSTDIR "$0\${INSTDIR_NAME}\"
+  ${EndIf}
+FunctionEnd
+
+Function selectOutpostCode
+  Call FindOutposts
+  ${If} "$OUTPOST_DATA" != ""
+    Abort # that is, don't ask the user to select a folder.
+  ${EndIf}
+  Push $R0
+  nsDialogs::SelectFolderDialog "Where is SCCo Packet installed? Select a folder that contains Outpost.exe and Outpost.conf." "$PROGRAMFILES"
+  Pop $R0
+  ${If} "$R0" != error
+    Push $R0
+    Call FindOutpost
+  ${EndIf}
+  Pop $R0
+FunctionEnd
+
+Function ifOutpostDataDefined
+  ${If} "$OUTPOST_DATA" == ""
+    Abort # that is, don't show this page.
   ${EndIf}
 FunctionEnd
 
 Function FindOutpost
   Exch $R0
   Push $R1
-  ClearErrors
-  ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
-  ${IfNot} ${Errors}
-    ${IfNot} ${FileExists} "$R0\Aoclient.exe"
-      MessageBox MB_YESNO|MB_ICONEXCLAMATION "${DisplayName} won't work with $R0, because it doesn't contain Aoclient.exe. Do you want to use a different copy of Outpost?" /SD IDNO IDYES goAhead
-      Abort "No Aoclient.exe in $R0."
-      goAhead:
+  ${IfNot} ${FileExists} "$R0"
+    DetailPrint `No $R0`
+  ${Else}
+    ${IfNot} ${FileExists} "$R0\Outpost.conf"
+      DetailPrint `No $R0\Outpost.conf`
     ${Else}
+      StrCpy $R1 ""
+      ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
+      ${If} "$R1" == ""
+        DetailPrint `No DataDir in $R0\Outpost.conf`
+      ${Else}
+        StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
+        ${IfNot} ${FileExists} "$R1"
+          DetailPrint `No $R1`
+        ${Else}
+          DetailPrint `Found Outpost data folder $R1`
+          StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
+        ${EndIf}
+      ${EndIf}
+    ${EndIf}
+    ClearErrors
+    ${If} "$AOCLIENT_EXE" == ""
       StrCpy $AOCLIENT_EXE "$R0\Aoclient.exe"
-      StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
-      StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
     ${EndIf}
   ${EndIf}
-  ClearErrors
-  Pop $R1
-  Pop $R0
-FunctionEnd
-
-Function un.FindOutpost
-  Exch $R0
-  Push $R1
-  ClearErrors
-  ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
-  ${IfNot} ${Errors}
-    StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
-    StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
-  ${EndIf}
-  ClearErrors
   Pop $R1
   Pop $R0
 FunctionEnd
@@ -123,26 +112,62 @@ FunctionEnd
 !macroend
 !define RMDir '!insertmacro "RMDir"'
 
-!macro defineGlobalFunctions un
 # Set $OUTPOST_DATA = a space-separated list of folders that contain Outpost configuration files.
 # If no such folders are found, set it to "".
-Function ${un}FindOutposts
+Function FindOutposts
   StrCpy $OUTPOST_CODE ""
   StrCpy $OUTPOST_DATA ""
-  Push "$PROGRAMFILES\Outpost"
-  Call ${un}FindOutpost
-  ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
-    Push "$PROGRAMFILES64\Outpost"
-    Call ${un}FindOutpost
-  ${EndIf}
   Push "$PROGRAMFILES\SCCo Packet"
-  Call ${un}FindOutpost
+  Call FindOutpost
   ${If} "$PROGRAMFILES64" != "$PROGRAMFILES"
     Push "$PROGRAMFILES64\SCCo Packet"
-    Call ${un}FindOutpost
+    Call FindOutpost
+  ${EndIf}
+  ${If} "$OUTPOST_DATA" == ""
+    # Try to find SCCo Packet in the registry:
+    Push $R0
+    Push $R1
+    Push $R2
+    Push $R3
+    SetRegView 64
+    StrCpy $R0 0
+    nextInstalledProgram:
+      EnumRegKey $R1 HKLM "${InstalledKey}" $R0
+      StrCmp "$R1" "" endInstalledPrograms
+      ReadRegStr $R2 HKLM "${InstalledKey}\$R1" "Inno setup: Icon Group"
+      ${If} "$R2" == "SCCo Packet"
+        ReadRegStr $R2 HKLM "${InstalledKey}\$R1" "InstallLocation"
+        ${If} "$R2" == ""
+          DetailPrint `No InstallLocation in $R1`
+        ${Else}
+          StrCpy $R3 $R2 1 -1
+          ${If} "$R3" == "\"
+            StrCpy $R2 $R2 -1
+          ${EndIf}
+          DetailPrint `InstallLocation: $R2 in $R1`
+          Push "$R2"
+          Call FindOutpost
+        ${EndIf}
+      ${EndIf}
+      IntOp $R0 $R0 + 1
+      GoTo nextInstalledProgram
+    endInstalledPrograms:
+    Pop $R3
+    Pop $R2
+    Pop $R1
+    Pop $R0
   ${EndIf}
 FunctionEnd
 
+Function un.FindOutposts
+  Push $R0
+  FileOpen $R0 "$INSTDIR\uninstallFrom.txt" r
+  FileRead $R0 $OUTPOST_DATA
+  FileClose $R0
+  Pop $R0
+FunctionEnd
+
+!macro defineGlobalFunctions un
 Function ${un}IsUserAdmin
   Push $R0
   Push $R1
@@ -167,6 +192,16 @@ Function ${un}IsUserAdmin
   Exch $R0
 FunctionEnd
 
+Function ${un}SetShellVarContextAppropriately
+  Call ${un}IsUserAdmin
+  Pop $1
+  ${If} $1 == true
+    SetShellVarContext all
+  ${Else}
+    SetShellVarContext current
+  ${EndIf}
+FunctionEnd
+
 Function ${un}DeleteMyFiles
   Push $R0
   Push $R1
@@ -176,6 +211,7 @@ Function ${un}DeleteMyFiles
   ${Delete} launch.cmd
   ${Delete} launch-v.cmd
   ${Delete} README.*
+  ${Delete} UserGuide.*
   ${Delete} uninstall.exe
   ${RMDir} "$INSTDIR\addons"
   ${RMDir} "$INSTDIR\bin"
@@ -183,12 +219,7 @@ Function ${un}DeleteMyFiles
   ${RMDir} "$INSTDIR\pack-it-forms"
   ${If} ${Errors}
     StrCpy $R0 "Some files were not deleted from $INSTDIR."
-    Call ${un}IsUserAdmin
-    Pop $R1
-    ${If} $R1 != true
-      StrCpy $R0 "$R0 To delete them, run this ${un}installer again as an administrator."
-    ${EndIf}
-    MessageBox MB_OK|MB_ICONEXCLAMATION "$R0" /SD IDOK
+    MessageBox MB_OK|MB_ICONINFORMATION "$R0" /SD IDOK
   ${EndIf}
   Pop $R1
   Pop $R0
@@ -198,61 +229,106 @@ FunctionEnd
 !insertmacro defineGlobalFunctions "un."
 
 Section "Install"
+  ${If} "$OUTPOST_DATA" == ""
+    StrCpy $R0 "Forms won't be added to Outpost"
+    StrCpy $R0 "$R0, because I didn't find Outpost's data folder."
+    StrCpy $R0 "$R0  Do you still want to install ${DisplayName}?"
+    MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noFormsOK
+    Call FindOutposts # DetailPrint diagnostic information
+    Abort "No Outpost data folder"
+    noFormsOK:
+  ${Else}
+    DetailPrint `Outpost data $OUTPOST_DATA`
+  ${EndIf}
+  StrCpy $R0 "Forms can't be submitted to Outpost"
+  ${If} "$OUTPOST_CODE" == ""
+    StrCpy $R0 "$R0, because I don't know where it is."
+    Call FindOutposts # DetailPrint diagnostic information
+  ${ElseIfNot} ${FileExists} "$AOCLIENT_EXE"
+    StrCpy $R0 "$R0, because there's no Aoclient.exe in $OUTPOST_CODE."
+  ${Else}
+    DetailPrint `Outpost $OUTPOST_CODE`
+    GoTo noSubmitOK
+  ${EndIf}
+  StrCpy $R0 "$R0  Do you still want to install ${DisplayName}?"
+  MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noSubmitOK
+  ${If} "$OUTPOST_CODE" == ""
+    Abort "No Outpost"
+  ${Else}
+    Abort "No Aoclient.exe in $OUTPOST_CODE"
+  ${EndIf}
+  noSubmitOK:
+
   # Where to install files:
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
 
-  Call FindOutposts
-  ${If} "$OUTPOST_DATA" == ""
-    MessageBox MB_OK|MB_ICONSTOP "Please install Outpost Packet Message Manager before you install ${DisplayName}. No recent version is installed, it appears."
-    Abort "Outpost PMM not found."
+  # Stop the server (so it will release its lock on the program):
+  ${If} ${FileExists} "bin\Outpost_Forms.exe"
+    ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
+  ${EndIf}
+  ${If} ${FileExists} "${PROGRAM_PATH}"
+    ExecShellWait open "${PROGRAM_PATH}" "stop" SW_SHOWMINIMIZED
   ${EndIf}
 
-  # Stop the server (so it will release its lock on bin\Outpost_Forms.exe):
-  ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
   Call DeleteMyFiles
+  FileOpen $R0 "$INSTDIR\uninstallFrom.txt" w
+  FileWrite $R0 $OUTPOST_DATA
+  FileClose $R0
 
   CreateDirectory "$INSTDIR\addons\${addon_name}"
-  ClearErrors
-  CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
-  ${If} ${Errors}
-    MessageBox MB_OK|MB_ICONSTOP "Can't copy $AOCLIENT_EXE."
-    Abort "Can't copy $AOCLIENT_EXE."
+  ${If} ${FileExists} "$AOCLIENT_EXE"
+    DetailPrint `Copy from $AOCLIENT_EXE`
+    ClearErrors
+    CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
+    ${If} ${Errors}
+      StrCpy $R0 "Forms can't be submitted to Outpost"
+      StrCpy $R0 "$R0, because I can't copy $AOCLIENT_EXE."
+      Call IsUserAdmin
+      Pop $1
+      ${If} $1 != true
+        StrCpy $0 "$0 To copy it, try running this installer as an administrator."
+      ${EndIf}
+      StrCpy $R0 "$R0  Do you still want to install ${DisplayName}?"
+      MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noAoclientOK
+      Abort "Can't copy $AOCLIENT_EXE"
+      noAoclientOK:
+    ${EndIf}
   ${EndIf}
 
   # Files to install:
-  File browse.cmd
-  File launch.vbs
-  File launch.cmd
-  File launch-v.cmd
-  File README.html
-  SetOutPath "$INSTDIR\addons"
-  File addons\${addon_name}.launch
-  SetOutPath "$INSTDIR\bin"
-  File /r /x "*~" /x server-port.txt /x *.log bin\*
+  File built\browse.cmd
+  File built\launch.vbs
+  File built\launch.cmd
+  File built\launch-v.cmd
+  File built\UserGuide.html
+  File /r built\addons
+  File /r /x "*~" /x *.txt /x *.ini /x *.log /x Outpost_Forms.exe bin
+  File /oname=${PROGRAM_PATH} bin\Outpost_Forms.exe
+  Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"
-  File /r /x "*~" /x .git* pack-it-forms\*
   File icon-*.png
   SetOutPath "$INSTDIR"
 
   # define uninstaller:
   WriteUninstaller "$INSTDIR\uninstall.exe"
   ClearErrors
-  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "${DisplayName}"
+  SetRegView 32
+  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "${DisplayName} v${VersionMajor}.${VersionMinor}"
   WriteRegStr   HKLM "${REG_SUBKEY}" UninstallString "$\"$INSTDIR\uninstall.exe$\""
   ${If} ${Errors}
-    DetailPrint "not registered"
+    DetailPrint `not registered`
     StrCpy $0 "${DisplayName} wasn't registered with Windows as a program."
+    StrCpy $0 "$0 You can still use it, but to uninstall it you'll have to run uninstall.exe in $INSTDIR."
     Call IsUserAdmin
     Pop $1
     ${If} $1 != true
       StrCpy $0 "$0 To register it, run this installer again as an administrator."
     ${EndIf}
-    StrCpy $0 "$0 To uninstall it, run the uninstall.exe program in $INSTDIR\."
-    MessageBox MB_OK|MB_ICONEXCLAMATION "$0" /SD IDOK
+    MessageBox MB_OK|MB_ICONINFORMATION "$0" /SD IDOK
   ${EndIf}
   WriteRegStr   HKLM "${REG_SUBKEY}" Publisher "Los Altos ARES"
-  WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "https://github.com/jmkristian/OutpostforLAARES/blob/master/README.md"
+  WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "$INSTDIR\UserGuide.html"
   WriteRegStr   HKLM "${REG_SUBKEY}" DisplayVersion "${VersionMajor}.${VersionMinor}"
   WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMajor ${VersionMajor}
   WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMinor ${VersionMinor}
@@ -260,25 +336,32 @@ Section "Install"
   WriteRegDWORD HKLM "${REG_SUBKEY}" NoRepair 1
   WriteRegDWORD HKLM "${REG_SUBKEY}" EstimatedSize 15000
 
+  # Add the uninstaller to the Start menu:
+  Call SetShellVarContextAppropriately
+  ${If} ${FileExists} "$SMPROGRAMS\SCCo Packet"
+    CreateShortcut "$SMPROGRAMS\SCCo Packet\Uninstall ${DisplayName}.lnk" "$INSTDIR\uninstall.exe"
+  ${EndIf}
+
   StrCpy $WSCRIPT_EXE "$SYSDIR\wscript.exe"
   IfFileExists $WSCRIPT_EXE +2
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
 
   ClearErrors
-  ExecShellWait open "bin\Outpost_Forms.exe" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
+  DetailPrint `${PROGRAM_PATH} install $WSCRIPT_EXE$OUTPOST_DATA`
+  ExecShellWait open "${PROGRAM_PATH}" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
   ${If} ${Errors}
-    Abort "install failed"
+    Abort "${PROGRAM_PATH} install failed"
   ${EndIf}
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ClearErrors
   ${If} ${AtMostWinXP}
-    ExecShellWait open              ".\launch.cmd" "dry-run" SW_SHOWMINIMIZED
+    ExecShellWait open              ".\launch.cmd" "dry-run ${PROGRAM_PATH}" SW_SHOWMINIMIZED
   ${Else}
-    ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run" SW_SHOWMINIMIZED
+    ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run ${PROGRAM_PATH}" SW_SHOWMINIMIZED
   ${EndIf}
   ${If} ${Errors}
-    Abort "dry-run failed"
+    DetailPrint `dry-run failed`
   ${EndIf}
 SectionEnd
 
@@ -291,8 +374,12 @@ Section "Uninstall"
 
   # Remove our line from Outpost configuration files
   Call un.FindOutposts
-  ExecShellWait open "bin\Outpost_Forms.exe" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
+  DetailPrint `${PROGRAM_PATH} uninstall$OUTPOST_DATA`
+  ExecShellWait open "${PROGRAM_PATH}" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
 
+  Call un.SetShellVarContextAppropriately
+  ${Delete} "$SMPROGRAMS\SCCo Packet\Uninstall ${DisplayName}.lnk"
   Call un.DeleteMyFiles
+  ${Delete} uninstallFrom.txt
   RMDir "$INSTDIR" # Do nothing if the directory is not empty
 SectionEnd

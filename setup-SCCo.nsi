@@ -1,4 +1,4 @@
-# Copyright 2018 by John Kristian
+# Copyright 2018,2019 by John Kristian
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,19 +14,19 @@
 
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
-!define addon_name Los_Altos
-!define DisplayName "Outpost for LAARES"
-!define INSTDIR_NAME OutpostForLAARES
-!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
-!define PROGRAM_PATH "bin\LAARES_Web_Forms.exe"
-!define WINDOW_TITLE "Los Altos ARES"
+!define addon_name Enhanced
+!define DisplayName "SCCo Pack-It-Forms for Outpost (Public Edition)"
+!define INSTDIR_NAME "PackItForms\Outpost\SCCo"
+!define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCCoPackItForms"
+!define PROGRAM_PATH "bin\SCCoPIFO.exe"
+!define WINDOW_TITLE "Santa Clara County"
 
 Function ChooseAddonFiles
-  File /r /x "*~" /x .git* /x form-mhoc*.html /x http-request.html /x resources\pdf pack-it-forms
+  File /r /x "*~" /x .git* /x form-los-altos*.html /x http-request.html pack-it-forms
   SetOutPath "$INSTDIR\addons"
-  File addons\${addon_name}.launch
+  File /oname=${addon_name}.launch addons\SCCo.launch
 FunctionEnd
 
 !include setup-version.nsi
-OutFile "${INSTDIR_NAME}_Setup-${VersionMajor}.${VersionMinor}.exe"
+OutFile "SCCoPIFOsetup${VersionMajor}.${VersionMinor}pub.exe"
 !include setup.nsi

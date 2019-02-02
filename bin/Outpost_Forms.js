@@ -1,4 +1,4 @@
-/* Copyright 2018 by John Kristian
+/* Copyright 2018, 2019 by John Kristian
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -23,10 +23,8 @@
 
   Any single execution does just one of those things,
   depending on the value of process.argv[2].
-  For example, "node bin/Outpost_Forms.js uninstall C:/Outpost"
-  edits C:/Outpost/Launch.local.
 
-  When an operator clicks a menu item to create a message
+  When an operator clicks an Outpost Forms menu item to create a message
   or opens an existing message that belongs to this add-on,
   a fairly complex sequence of events ensues.
   - Outpost executes this program with arguments specified in addon.ini.
@@ -63,14 +61,18 @@ const express = require('express');
 const fs = require('fs');
 const http = require('http');
 const morgan = require('morgan');
+const net = require('net');
 const os = require('os');
 const path = require('path');
+const querystring = require('querystring');
 const Transform = require('stream').Transform;
+const url = require('url');
 const util = require('util');
 
 const CHARSET = 'utf-8'; // for HTTP
 const ENCODING = CHARSET; // for reading from files
 const EOL = '\r\n';
+const FORBIDDEN = 403;
 const htmlEntities = new AllHtmlEntities();
 const IconStyle = 'width:24pt;height:24pt;vertical-align:middle;';
 const JSON_TYPE = 'application/json';
@@ -83,6 +85,9 @@ const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join('logs', 'server-port.txt');
 const StopServer = '/stopOutpostForLAARES';
+const SUBMIT_TIMEOUT_SEC = 30;
+const TEXT_HTML = 'text/html; charset=' + CHARSET;
+const TEXT_PLAIN = 'text/plain; charset=' + CHARSET;
 
 var logFileName = null;
 
@@ -94,20 +99,30 @@ if (process.argv.length > 2) {
     }
     try {
         switch(verb) {
+        case 'build':
+            // Customize various files for a given add-on.
+            // This happens before creating an installer.
+            build(process.argv[3], process.argv[4]);
+            break;
         case 'install':
+            // Edit various files depending on how this program was installed.
             install();
             break;
         case 'uninstall':
+            // Remove this add-on from Outpost's configuration.
             uninstall();
-            break;
-        case 'serve':
-            serve();
             break;
         case 'open':
         case 'dry-run':
+            // Make sure a server is running, and then send process.argv[4..] to it.
             openMessage();
             break;
+        case 'serve':
+            // Serve HTTP requests until a few minutes after there are no forms open.
+            serve();
+            break;
         case 'stop':
+            // Stop any running servers.
             stopServers(function() {});
             break;
         default:
@@ -116,6 +131,19 @@ if (process.argv.length > 2) {
     } catch(err) {
         log(err);
     }
+}
+
+function build(addonName, programPath) {
+    expandVariablesInFile({addon_name: addonName, PROGRAM_PATH: programPath},
+                          path.join('bin', 'addon.ini'),
+                          path.join('built', 'addons', addonName + '.ini'));
+    expandVariablesInFile({addon_name: addonName},
+                          path.join('bin', 'Aoclient.ini'),
+                          path.join('built', 'addons', addonName, 'Aoclient.ini'));
+    ['browse.cmd', 'launch-v.cmd', 'launch.cmd', 'launch.vbs', 'UserGuide.html'].forEach(function(fileName) {
+        expandVariablesInFile({addon_name: addonName, PROGRAM_PATH: programPath},
+                              fileName, path.join('built', fileName));
+    });
 }
 
 function install() {
@@ -139,12 +167,8 @@ function installConfigFiles(myDirectory, addonNames) {
         launch = path.join(myDirectory, 'launch.cmd');
     }
     addonNames.forEach(function(addon_name) {
-        expandVariablesInFile({addon_name: addon_name, INSTDIR: myDirectory, LAUNCH: launch},
-                              path.join('bin', 'addon.ini'),
+        expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch},
                               path.join('addons', addon_name + '.ini'));
-        expandVariablesInFile({addon_name: addon_name},
-                              path.join('bin', 'Aoclient.ini'),
-                              path.join('addons', addon_name, 'Aoclient.ini'));
     });
 }
 
@@ -247,8 +271,9 @@ function getAddonNames(directoryName) {
 }
 
 function openMessage() {
+    var programPath = process.argv[3];
     var args = [];
-    for (var i = 3; i < process.argv.length; i++) {
+    for (var i = 4; i < process.argv.length; i++) {
         args.push(process.argv[i]);
     }
     var retries = 0;
@@ -267,7 +292,7 @@ function openMessage() {
         } else {
             ++retries;
             if (retries == 1 || retries == 4) {
-                startServer();
+                startServer(programPath);
             }
             setTimeout(tryNow, retries * 1000);
         }
@@ -298,10 +323,8 @@ function openForm(args, tryLater) {
     }).end(postData, CHARSET);
 }
 
-function startServer() {
-    const command = 'start /B '
-          + path.join('bin', 'Outpost_Forms.exe')
-          + ' serve';
+function startServer(programPath) {
+    const command = 'start /B ' + programPath + ' serve';
     log(command);
     child_process.exec(
         command,
@@ -361,24 +384,32 @@ function stopServer(port, next) {
             next).end();
 }
 
-function request(options, callback) {
-    function onError(event) {
+function request(options, callback, includeHeaders) {
+    const onError = function(event) {
         return function(err) {
             (callback || log)(err || event);
         }
     }
     var req = http.request(options, function(res) {
-        res.on('aborted', onError('aborted'));
+        res.on('aborted', onError('res.aborted'));
+        res.on('error', onError('res.error'));
+        res.on('timeout', onError('res.timeout'));
         res.pipe(concat_stream(function(buffer) {
             var data = buffer.toString(CHARSET);
             if (callback) {
+                if (includeHeaders) {
+                    var rawHeaders = res.rawHeaders;
+                    var headers = res.statusCode + ' ' + res.statusMessage + '\n'
+                        + formatRawHeaders(res.rawHeaders);
+                    data = headers + '\n' + data;
+                }
                 callback(null, data);
             }
         }));
     });
-    req.on('abort', onError('abort'));
-    req.on('error', onError('error'));
-    req.on('timeout', onError('timeout'));
+    req.on('aborted', onError('req.aborted'));
+    req.on('error', onError('req.error'));
+    req.on('timeout', onError('req.timeout'));
     return req;
 }
 
@@ -390,7 +421,24 @@ function serve() {
     const app = express();
     var port;
     app.set('etag', false); // convenient for troubleshooting
+    app.set('trust proxy', ['loopback']); // to find the IP address of a client
     app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
+    app.all('/http-echo', function(req, res, next) {
+        // Respond with a copy of the request.
+        try {
+            var headers = 'Request was:\n'
+                + req.method + ' ' + req.url
+                + (req.httpVersion ? " HTTP/" + req.httpVersion : "")
+                + '\n' + formatRawHeaders(req.rawHeaders) + '\n';
+            req.pipe(concat_stream(function(body) {
+                res.set({'Content-Type': TEXT_PLAIN});
+                res.end(headers + body.toString(CHARSET));
+            }));
+        } catch(err) {
+            res.set({'Content-Type': TEXT_HTML});
+            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
+        }
+    });
     app.use(bodyParser.json({type: JSON_TYPE}));
     app.use(bodyParser.urlencoded({extended: false}));
     app.post(OpenOutpostMessage, function(req, res, next) {
@@ -452,8 +500,8 @@ function serve() {
                             '--filename', form.substring(space + 1)]);
             res.redirect('/form-' + formId);
         } catch(err) {
-            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
-            res.end(errorToHTML(err, JSON.stringify(req.body)));
+            res.set({'Content-Type': TEXT_HTML});
+            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
         }
     });
     app.post('/manual-view', function(req, res, next) {
@@ -471,11 +519,18 @@ function serve() {
             onOpen(formId, args);
             res.redirect('/form-' + formId);
         } catch(err) {
-            res.set({'Content-Type': 'text/html; charset=' + CHARSET});
-            res.end(errorToHTML(err, JSON.stringify(req.body)));
+            res.set({'Content-Type': TEXT_HTML});
+            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
         }
     });
-    app.get(/^\/.*/, express.static(PackItForms));
+    app.post('/http-request', function(req, res, next) {
+        onPostHttpRequest(req, res);
+    });
+    app.get(/^\/.*/, express.static(PackItForms, {setHeaders: function(res, path, stat) {
+        if (path && path.toLowerCase().endsWith(".pdf")) {
+            res.set('Content-Type', 'application/pdf');
+        }
+    }}));
 
     const server = app.listen(0);
     const address = server.address();
@@ -637,20 +692,25 @@ function parseMessage(message) {
 
 /** Handle an HTTP GET /form-id request. */
 function onGetForm(formId, res) {
-    res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+    res.set({'Content-Type': TEXT_PLAIN});
     var form = openForms[formId];
     if (formId <= 0) {
-        res.status(400).send('Form numbers start with 1.');
+        res.status(400).end('Form numbers start with 1.', CHARSET);
     } else if (!form) {
         log('form ' + formId + ' is not open');
         if (formId < nextFormId) {
-            res.status(NOT_FOUND).send('Form ' + formId + ' was discarded, since the browser page was closed.');
+            res.status(NOT_FOUND)
+                .end('Form ' + formId + ' was discarded, since the browser page was closed.',
+                     CHARSET);
         } else {
-            res.status(NOT_FOUND).send('Form ' + formId + ' has not been opened.');
+            res.status(NOT_FOUND)
+                .end('Form ' + formId + ' has not been opened.',
+                     CHARSET);
         }
     } else {
         log('form ' + formId + ' viewed');
         try {
+            res.set({'Content-Type': TEXT_HTML});
             if (!form.environment) {
                 var parsed = parseArgs(form.args);
                 form.envelope = parsed.envelope;
@@ -721,6 +781,7 @@ function expandDataInclude(data, form) {
         var matches = found.match(/"([^"]*)"\s*>([^<]*)/);
         var name = matches[1];
         var formDefaults = htmlEntities.decode(matches[2].trim());
+        log('data-include-html ' + name + ' ' + formDefaults);
         // Read a file from pack-it-forms:
         var fileName = path.join(PackItForms, 'resources', 'html', name + '.html')
         var result = fs.readFileSync(fileName, ENCODING);
@@ -736,7 +797,6 @@ function expandDataInclude(data, form) {
                  queryDefaults: JSON.stringify(form.environment)});
         }
         if (formDefaults) {
-            log('formDefaultValues: ' + formDefaults);
             result += `<script type="text/javascript">
   var formDefaultValues;
   if (!formDefaultValues) {
@@ -751,81 +811,168 @@ function expandDataInclude(data, form) {
 }
 
 function onSubmit(formId, q, res) {
-    res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+    const form = openForms[formId];
+    const callback = function(err) {
+        if (err) {
+            res.set({'Content-Type': TEXT_HTML});
+            res.end(errorToHTML(err, form), CHARSET);
+        } else {
+            log('form ' + formId + ' submitted');
+            form.environment.mode = 'readonly';
+            res.redirect('/form-' + formId);
+            // Don't closeForm, so the operator can view it.
+        }
+    };
     try {
         var message = q.formtext;
-        const form = openForms[formId];
         const foundSubject = /[\r\n]#[ \t]*SUBJECT:[ \t]*([^\r\n]*)/.exec(message);
         const subject = foundSubject ? foundSubject[1] : '';
         const foundSeverity = /[\r\n]4.:[ \t]*\[([A-Za-z]*)]/.exec(message);
         const severity = foundSeverity ? foundSeverity[1].toUpperCase() : '';
-        const formFileName = form.environment.filename;
-        const msgFileName = path.resolve(PackItMsgs, 'form-' + formId + '.txt');
-        // Convert the message from PACF format to ADDON format:
-        message = message.replace(/[\r\n]+#EOF[\s\S]*/, EOL + '!/ADDON!' + EOL);
-        form.message = message;
+        // Outpost requires Windows-style line breaks:
+        form.message = message.replace(/([^\r])\n/g, '$1' + EOL);
         if (form.environment.message_status == 'manual') {
-            res.set({'Content-Type': 'text/plain; charset=' + CHARSET});
-            res.end(message);
-            return;
+            res.set({'Content-Type': TEXT_PLAIN});
+            res.end(message, CHARSET);
+        } else {
+            submitToOpdirect({
+                formId: formId,
+                form: form,
+                addonName: form.environment.addon_name,
+                subject: subject,
+                urgent: (['URGENT', 'U', 'EMERGENCY', 'E'].indexOf(severity) >= 0),
+            }, callback);
         }
-        // Remove the first line of the Outpost message header:
-        // Aoclient.exe or Outpost will insert !addon_name!.
-        message = message.replace(/^\s*![^\r\n]*[\r\n]+/, '');
-        fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
-            try {
-                if (err) throw err;
-                try {
-                    fs.unlinkSync(OpdFAIL);
-                } catch(err) {
-                    // ignored
-                }
-                var options = ['-a', form.environment.addon_name, '-f', msgFileName, '-s', subject];
-                if (['URGENT', 'U', 'EMERGENCY', 'E'].indexOf(severity) >= 0) {
-                    options.push('-u');
-                }
-                log('form ' + formId + ' submitting ' + options.join(' '));
-                child_process.execFile(
-                    path.join('addons', form.environment.addon_name, 'Aoclient.exe'), options,
-                    function(err, stdout, stderr) {
-                        try {
-                            if (err) throw err;
-                            if (fs.existsSync(OpdFAIL)) {
-                                throw (OpdFAIL + ': ' + fs.readFileSync(OpdFAIL, ENCODING) + '\n'
-                                       + stdout.toString(ENCODING)
-                                       + stderr.toString(ENCODING));
-                            }
-                            log('form ' + formId + ' submitted');
-                            res.redirect('/form-' + formId + '?mode=readonly');
-                            /** At this point, the operator can click the browser 'back' button,
-                                edit the form and submit it to Outpost again. To prevent this:
-                                form.environment.mode = 'readonly';
-                                res.redirect('/form-' + formId);
-                                ... which causes the 'back' button to display a read-only form.
-                            */
-                            try {
-                                fs.unlinkSync(msgFileName);
-                            } catch(err) {
-                                log(err);
-                            }
-                            // Don't closeForm, in case the operator goes back and submits it again.
-                        } catch(err) {
-                            res.end(errorToHTML(err, form));
-                        }
-                    });
-            } catch(err) {
-                res.end(errorToHTML(err, form));
-            }
-        });
     } catch(err) {
-        res.end(errorToHTML(err, {formId: formId}));
+        callback(err);
     }
+}
+
+function submitToOpdirect(submission, callback) {
+    try {
+        if (!submission.addonName) throw 'addonName is required'; 
+        // Outpost requires parameters to appear in a specific order.
+        // So don't stringify them from a single object.
+        var body = querystring.stringify({adn: submission.addonName});
+        if (submission.form.environment.MSG_INDEX) {
+            body += '&' + querystring.stringify({upd: (submission.form.environment.MSG_INDEX)});
+        }
+        if (submission.subject) {
+            body += '&' + querystring.stringify({sub: (submission.subject)});
+        }
+        if (submission.urgent) {
+            body += '&' + querystring.stringify({urg: 'TRUE'});
+        }
+        if (submission.form.message) {
+            body += '&' + querystring.stringify({msg: submission.form.message});
+        }
+        // URL encode the 'E' in '#EOF', to prevent Outpost from treating this as a PacFORM message:
+        body = body.replace(/%23EOF/g, '%23%45OF');
+        // Mark the end of the request body. This must be the last parameter:
+        body += '&' + querystring.stringify({'4VAO': '\r\n#EOF'});
+        // The #EOF value makes the request fail fast if the server is an old version of Outpost.
+        // An old server recognizes %23EOF as an end-of-message marker, decodes the body,
+        // finds there is no parameter named formtext and fails.
+        // A new server recognizes &4VAO= as the end-of-message marker.
+        // Either server ignores the HTTP Content-Length header; it just scans for the marker.
+
+        const options = {method: 'POST', host: LOCALHOST, port: 9334, path: '/TBD'};
+        // Send an HTTP request.
+        const server = request(
+            options,
+            function(err, data) {
+                if (err) {
+                    if (err == 'req.timeout' || err == 'res.timeout') {
+                        err = 'No response to ' + options.method + ' in ' + SUBMIT_TIMEOUT_SEC + ' seconds.';
+                    } else if ((err + '').indexOf(' ECONNREFUSED ') >= 0) {
+                        err = "Opdirect isn't running, it appears." + EOL + err;
+                    }
+                    const report = err + (data ? (EOL + data) : '');
+                    log(report);
+                    callback(report);
+                } else {
+                    log('Outpost responded: ' + data);
+                    if (!data ||
+                        data == '<html><body><br></body></html>' ||
+                        data == '<html><body><br/></body></html>') {
+                        callback(); // success
+                    } else if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
+                        // It's an old version of Outpost. Maybe Aoclient will work:
+                        submitToAoclient(submission, callback);
+                    } else {
+                        callback('Outpost said: ' + data);
+                    }
+                }
+            });
+        server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
+        server.setTimeout(SUBMIT_TIMEOUT_SEC * 1000);
+        log('form ' + submission.formId + ' submitting ' + JSON.stringify(options));
+        server.end(body);
+    } catch(err) {
+        try {
+            log(err);
+            submitToAoclient(submission, callback);
+        } catch(err) {
+            callback(err);
+        }
+    }
+}
+
+function submitToAoclient(submission, callback) {
+    const formFileName = submission.form.environment.filename;
+    const msgFileName = path.resolve(PackItMsgs, 'form-' + submission.formId + '.txt');
+    // Remove the first line of the Outpost message header:
+    const message = submission.form.message.replace(/^\s*![^\r\n]*[\r\n]+/, '')
+    // Outpost will insert !submission.addonName!.
+    fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
+        try {
+            if (err) throw err;
+            try {
+                fs.unlinkSync(OpdFAIL);
+            } catch(err) {
+                // ignored
+            }
+            var options = ['-a', submission.addonName,
+                           '-f', msgFileName,
+                           '-s', submission.subject];
+            if (submission.urgent) {
+                options.push('-u');
+            }
+            const program = path.join ('addons', submission.addonName, 'Aoclient.exe');
+            log('form ' + submission.formId + ' submitting ' + program + ' ' + options.join(' '));
+            child_process.execFile(
+                program, options,
+                function(err, stdout, stderr) {
+                    try {
+                        if (err) throw err;
+                        if (fs.existsSync(OpdFAIL)) {
+                            throw (OpdFAIL + ': ' + fs.readFileSync(OpdFAIL, ENCODING) + '\n'
+                                   + stdout.toString(ENCODING)
+                                   + stderr.toString(ENCODING));
+                        }
+                        callback();
+                        try {
+                            fs.unlinkSync(msgFileName);
+                        } catch(err) {
+                            log(err);
+                        }
+                    } catch(err) {
+                        callback(err);
+                    }
+                });
+        } catch(err) {
+            callback(err);
+        }
+    });
+}
+
+function submittedResponse(formId, res) {
 }
 
 /** Handle an HTTP GET /manual request. */
 function onGetManual(res) {
     keepAlive(0);
-    res.set({'Content-Type': 'text/html; charset=' + CHARSET});
+    res.set({'Content-Type': TEXT_HTML});
     const template = path.join('bin', 'manual.html');
     fs.readFile(template, {encoding: ENCODING}, function(err, data) {
         if (err) {
@@ -850,6 +997,98 @@ function onGetManual(res) {
         }
         res.end();
     });
+}
+
+function onPostHttpRequest(req, res) {
+    const onError = function(event) {
+        return function(err, data) {
+            log('onError(' + event + ')(' + err + ', ' + data + ')');
+            try {
+                res.set({'Content-Type': TEXT_HTML});
+            } catch(err) {
+                log(err);
+            }
+            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
+        }
+    }
+    try {
+        res.set({'Content-Type': TEXT_PLAIN});
+        const clientAddress = req.ip;
+        if (['127.0.0.1', '::ffff:127.0.0.1'].indexOf(clientAddress) < 0) {
+            // Don't serve a remote client. It might be malicious.
+            res.statusCode = FORBIDDEN;
+            res.statusMessage = 'Your address is ' + clientAddress;
+            res.end('Your address is ' + clientAddress, CHARSET);
+            log('POST from ' + clientAddress);
+        } else {
+            // Send an HTTP request.
+            const URL = url.parse('http://' + req.body.URL);
+            const options = {host: URL.hostname, port: URL.port || 80};
+            var headers =
+                req.body.method + ' ' + URL.path + ' HTTP/1.1' + EOL
+                + 'Host: ' + options.host + ':' + options.port + EOL
+                + 'Connection: close' + EOL;
+            for (var name in req.body) {
+                if (name.startsWith('header.')) {
+                    var value = req.body[name];
+                    if (value) {
+                        headers += (name.substring(7) + ': ' + value + EOL);
+                    }
+                }
+            }
+            headers += ('Content-Length: ' + (req.body.body || '').length + EOL);
+            headers += EOL; // end of headers
+            var pauseTime = 0;
+            var body = '';
+            var body2 = '';
+            if (req.body.body) {
+                if (!(req.body.pauseStart && req.body.pauseTime)) {
+                    body += req.body.body;
+                } else {
+                    const pauseStart = parseInt(req.body.pauseStart);
+                    pauseTime = parseFloat(req.body.pauseTime);
+                    body += req.body.body.substring(0, pauseStart);
+                    body2 = req.body.body.substring(pauseStart);
+                }
+            }
+            const server = new net.Socket();
+            server.on('error', onError('error'));
+            server.on('timeout', onError('timeout'));
+            log('server.connect ' + JSON.stringify(options));
+            server.connect(options, function(err) {
+                try {
+                    log('connected(' + err + ')');
+                    if (err) throw err;
+                    if (req.body.timeout) {
+                        server.setTimeout(parseFloat(req.body.timeout) * 1000);
+                    }
+                    log('server.pipe ...');
+                    server.pipe(res);
+                    log('server.write ' + headers + body);
+                    server.write(headers + body);
+                    if (body2) {
+                        setTimeout(function() {
+                            log('server.write ' + body2);
+                            server.write(body2);
+                        }, pauseTime * 1000);
+                    }
+                } catch(err) {
+                    onError('throw')(err);
+                }
+            });
+        }
+    } catch(err) {
+        onError('throw')(err);
+    }
+}
+
+function formatRawHeaders(rawHeaders) {
+    var headers = "";
+    for (var h = 0; h < rawHeaders.length; ) {
+        headers += rawHeaders[h++] + ': ';
+        headers += rawHeaders[h++] + '\n';
+    }
+    return headers;
 }
 
 function getAddonForms() {
@@ -946,7 +1185,7 @@ function logToFile(fileName) {
 function expandVariablesInFile(variables, fromFile, intoFile) {
     if (!intoFile) intoFile = fromFile;
     if (!fs.existsSync(path.dirname(intoFile))) {
-        fs.mkdirSync(path.dirname(intoFile));
+        fs.mkdirSync(path.dirname(intoFile)); // fail fast
     }
     fs.readFile(fromFile, ENCODING, function(err, data) {
         if (err) logAndAbort(err);

@@ -9,20 +9,24 @@
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
+
 # limitations under the License.
 
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
-!define addon_name Los_Altos
-!define DisplayName "Outpost for LAARES"
-!define INSTDIR_NAME OutpostForLAARES
+!define addon_name HTTP
+!define DisplayName "${addon_name} add-on"
+!define INSTDIR_NAME "${addon_name}_AddOn"
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
-!define PROGRAM_PATH "bin\LAARES_Web_Forms.exe"
-!define WINDOW_TITLE "Los Altos ARES"
+!define PROGRAM_PATH "bin\${addon_name}_Server.exe"
+!define WINDOW_TITLE "${DisplayName}"
 
 Function ChooseAddonFiles
-  File /r /x "*~" /x .git* /x form-mhoc*.html /x http-request.html /x resources\pdf pack-it-forms
+  SetOutPath "$INSTDIR\pack-it-forms"
+  File pack-it-forms\http-request.html
+  File /r pack-it-forms\msgs
+  SetOutPath "$INSTDIR\pack-it-forms\resources\css"
+  File pack-it-forms\resources\css\pack-it-forms.css
   SetOutPath "$INSTDIR\addons"
   File addons\${addon_name}.launch
 FunctionEnd
