@@ -978,9 +978,6 @@ function submitToAoclient(submission, callback) {
     });
 }
 
-function submittedResponse(formId, res) {
-}
-
 /** Handle an HTTP GET /manual request. */
 function onGetManual(res) {
     keepAlive(0);
