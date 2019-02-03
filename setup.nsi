@@ -230,7 +230,7 @@ FunctionEnd
 
 Section "Install"
   ${If} "$OUTPOST_DATA" == ""
-    StrCpy $R0 "Forms won't be added to Outpost"
+    StrCpy $R0 "I won't add forms to Outpost"
     StrCpy $R0 "$R0, because I didn't find Outpost's data folder."
     StrCpy $R0 "$R0  Do you still want to install ${DisplayName}?"
     MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noFormsOK
@@ -240,9 +240,9 @@ Section "Install"
   ${Else}
     DetailPrint `Outpost data $OUTPOST_DATA`
   ${EndIf}
-  StrCpy $R0 "Forms can't be submitted to Outpost"
+  StrCpy $R0 "I can't submit messages to Outpost"
   ${If} "$OUTPOST_CODE" == ""
-    StrCpy $R0 "$R0, because I don't know where it is."
+    StrCpy $R0 "$R0, because I don't know where it's installed."
     Call FindOutposts # DetailPrint diagnostic information
   ${ElseIfNot} ${FileExists} "$AOCLIENT_EXE"
     StrCpy $R0 "$R0, because there's no Aoclient.exe in $OUTPOST_CODE."
@@ -282,7 +282,7 @@ Section "Install"
     ClearErrors
     CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
     ${If} ${Errors}
-      StrCpy $R0 "Forms can't be submitted to Outpost"
+      StrCpy $R0 "I can't submit messages to Outpost"
       StrCpy $R0 "$R0, because I can't copy $AOCLIENT_EXE."
       Call IsUserAdmin
       Pop $1
