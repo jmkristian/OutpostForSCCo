@@ -18,7 +18,7 @@
 !define DisplayName "Outpost for LAARES"
 !define INSTDIR_NAME OutpostForLAARES
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
-!define PROGRAM_PATH "bin\LAARES_Web_Forms.exe"
+!define PROGRAM_PATH "bin\LAARES_Forms.exe"
 !define WINDOW_TITLE "Los Altos ARES"
 
 Function ChooseAddonFiles
