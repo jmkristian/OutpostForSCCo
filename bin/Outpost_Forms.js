@@ -867,7 +867,10 @@ function submitToOpdirect(submission, callback) {
             body += '&' + querystring.stringify({msg: submission.form.message});
         }
         // URL encode the 'E' in '#EOF', to prevent Outpost from treating this as a PacFORM message:
-        body = body.replace(/%23EOF/g, '%23%45OF');
+        body = body.replace(/%23EOF/gi, function(match) {
+            // Case insensitive:
+            return '%23' + {E: '%45', e: '%65'}[match.substring(3, 1)] + match.substring(4);
+        });
         // Mark the end of the request body. This must be the last parameter:
         body += '&' + querystring.stringify({'4VAO': '\r\n#EOF'});
         // The #EOF value makes the request fail fast if the server is an old version of Outpost.
