@@ -651,6 +651,15 @@ function parseArgs(args) {
     } else if (envelope.RCVNUM) {
         environment.msgno = envelope.RCVNUM; // display it as My Msg #
     }
+    if (environment.MSG_INDEX == '{{MSG_INDEX}}') {
+        delete environment.MSG_INDEX;
+    }
+    if (['draft', 'ready'].indexOf(environment.message_status) >= 0
+        && !environment.MSG_INDEX) {
+        // This probably came from an old version of Outpost.
+        // Without a MSG_INDEX, the operator can't revise the message:
+        environment.mode = 'readonly';
+    }
     return {envelope: envelope, environment: environment};
 }
 
