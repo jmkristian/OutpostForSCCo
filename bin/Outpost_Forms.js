@@ -769,7 +769,7 @@ function onGetForm(formId, res) {
   <div data-include-html="ics-header">
     {
       "5.": "PRIORITY",
-      "9b.": "{{msgno|msgno2name}}"
+      "9b.": "_.msgno2name(_.query.msgno)"
     }
   </div>
 */

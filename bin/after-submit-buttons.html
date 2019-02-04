@@ -13,7 +13,7 @@
                     }
                 }
                 for (var q in queryDefaults) {
-                    if (!(q in query_object)) {
+                    if (!query_object[q]) {
                         query_object[q] = queryDefaults[q];
                     }
                 }
@@ -40,21 +40,14 @@
                     // That is, init_form_from_fields won't affect this element any more.
                 });
                 // Change the message header from PACF format to ADDON format:
-                var messageHeader = document.getElementById('message-header');
-                var header = messageHeader.textContent;
-                // The subject comes after !PACF! in the first line:
-                var foundSubject = /^\s*![^!\r\n]*![ \t]*([^\r\n]*)/.exec(header);
-                if (foundSubject) {
-                    // Add the subject in a comment:
-                    header = header.replace(/\s*$/, '\r\n# SUBJECT: ' + foundSubject[1]);
-                    // Replace that first line:
-                    header = header.replace(/^\s*![^\r\n]*([\r\n])/,
-                                            '!' + query_object.addon_name + '!$1');
-                }
-                // Correct FORMFILENAME:
-                header = header.replace(/([\r\n]#[ \t]*FORMFILENAME[ \t]*:)[^\r\n]*/,
-                                        '$1 ' + query_object.filename);
-                messageHeader.textContent = header;
+                document.getElementById('message-header').textContent =
+                    "_..['!" + query_object.addon_name + "!'"
+                    + ", document.title"
+                    + ", 'JS-ver. PR-3.9-2.6, 08/11/13,'"
+                    + ", 'FORMFILENAME: " + query_object.filename + "'"
+                    + ", 'FORMVERSION: ' + _.version()"
+                    + ", 'SUBJECT: ' + _.expand(_.envelope.subject)"
+                    + "].join('\\r\\n# ')";
                 outpost_message_footer = '!/ADDON!\r\n';
                 if (status == 'manual') {
                     var submitButton = document.getElementById('opdirect-submit');
