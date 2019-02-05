@@ -42,7 +42,7 @@
                 // Change the message header from PACF format to ADDON format:
                 newMessage.header[0] = '!' + query_object.addon_name + '!';
                 newMessage.header[3] = "FORMFILENAME: " + query_object.filename;
-                newMessage.header.push("$'SUBJECT: ' + _.subject()");
+                newMessage.header.push("$'SUBJECT: ' + newSubject()");
                 newMessage.footer = '!/ADDON!\r\n';
                 if (status == 'manual') {
                     var submitButton = document.getElementById('opdirect-submit');
