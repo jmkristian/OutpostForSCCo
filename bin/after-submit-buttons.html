@@ -40,9 +40,15 @@
                     // That is, init_form_from_fields won't affect this element any more.
                 });
                 // Change the message header from PACF format to ADDON format:
-                newMessage.header[0] = '!' + query_object.addon_name + '!';
-                newMessage.header[3] = "FORMFILENAME: " + query_object.filename;
-                newMessage.header.push("$'SUBJECT: ' + newSubject()");
+                newMessage.header = function() {
+                    return '!' + query_object.addon_name + '!'
+                        + '\r\n# ' + document.title
+                        + '\r\n# JS-ver. PR-3.9-2.6, 08/11/13,'
+                        + '\r\n# FORMFILENAME: ' + query_object.filename
+                        + '\r\n# FORMVERSION: ' + formVersion()
+                        + '\r\n# SUBJECT: ' + newMessage.subject()
+                        + '\r\n';
+                };
                 newMessage.footer = '!/ADDON!\r\n';
                 if (status == 'manual') {
                     var submitButton = document.getElementById('opdirect-submit');
