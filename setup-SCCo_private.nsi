@@ -22,7 +22,10 @@
 !define WINDOW_TITLE "Santa Clara County"
 
 Function ChooseAddonFiles
-  File /r /x "*~" /x .git* /x form-los-altos*.html /x http-request.html pack-it-forms
+  File /r /x "*~" /x .git* \
+    /x form-los-altos*.html /x http-request.html \
+    /x resources\integration\pacread\* \
+    pack-it-forms
   SetOutPath "$INSTDIR\addons"
   File /oname=${addon_name}.launch addons\SCCo_private.launch
 FunctionEnd

@@ -526,6 +526,9 @@ function serve() {
     app.post('/http-request', function(req, res, next) {
         onPostHttpRequest(req, res);
     });
+    app.get('/resources/integration/*', function(req, res, next) {
+        getIntegrationFile(req, res);
+    });
     app.get(/^\/.*/, express.static(PackItForms, {setHeaders: function(res, path, stat) {
         if (path && path.toLowerCase().endsWith(".pdf")) {
             res.set('Content-Type', 'application/pdf');
@@ -751,13 +754,6 @@ function expandDataInclude(data, form) {
         // Remove the enclosing <div></div>:
         result = result.replace(/^\s*<\s*div\s*>\s*/i, '');
         result = result.replace(/<\/\s*div\s*>\s*$/i, '');
-        if (name == 'submit-buttons') {
-            // Add some additional stuff:
-            result += expandVariables(
-                fs.readFileSync(path.join('bin', 'after-submit-buttons.html'), ENCODING),
-                {message: JSON.stringify(form.message),
-                 environment: JSON.stringify(form.environment)});
-        }
         if (formDefaults) {
             result += `<script type="text/javascript">
   var formDefaultValues;
@@ -770,6 +766,36 @@ function expandDataInclude(data, form) {
         }
         return result;
     });
+}
+
+function getIntegrationFile(req, res) {
+    try {
+        const fileName =
+              path.join(PackItForms, req.path.substring(1).replace('/integration/', '/integration/scco/'));
+        log('get integration file ' + fileName);
+        fs.readFile(fileName, ENCODING, function(err, body) {
+            try {
+                if (err) throw err;
+                const referer = req.headers.referer || req.headers.referrer;
+                const formId = parseInt(referer.substring(referer.lastIndexOf('-') + 1));
+                const form = openForms[formId];
+                log('form ' + formId + ' expand integration file');
+                // Insert some stuff:
+                body = expandVariables(body,
+                                       {message: JSON.stringify(form.message),
+                                        environment: JSON.stringify(form.environment)});
+                res.end(body, CHARSET);
+            } catch(err) {
+                res.set({'Content-Type': TEXT_HTML});
+                res.end(errorToHTML(err, JSON.stringify(fileName)
+                                    + EOL + JSON.stringify(req.headers)),
+                        CHARSET);
+            }
+        });
+    } catch(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err, JSON.stringify(req.path)), CHARSET);
+    }
 }
 
 function onSubmit(formId, q, res) {
