@@ -23,7 +23,7 @@
 
 Function ChooseAddonFiles
   File /r /x "*~" /x .git* \
-    /x form-mhoc*.html /x http-request.html /x resources\pdf \
+    /x form-mhoc*.html /x http-request.html /x resources\pdf\* \
     /x resources\integration\pacread\* \
     pack-it-forms
   SetOutPath "$INSTDIR\addons"
