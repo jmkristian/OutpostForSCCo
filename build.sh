@@ -22,10 +22,6 @@ node bin/Outpost_Forms.js build Los_Altos "bin\\LAARES_Forms.exe"
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-LAARES.nsi || exit $?
 
 rm -rf built; mkdir -p built/addons
-node bin/Outpost_Forms.js build HTTP "bin\\HTTP_server.exe"
-"C:/Program Files (x86)/NSIS/makensis.exe" setup-HTTP.nsi || exit $?
-
-rm -rf built; mkdir -p built/addons
 node bin/Outpost_Forms.js build Enhanced "bin\\SCCoPIFO.exe"
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCo.nsi || exit $?
 "C:/Program Files (x86)/NSIS/makensis.exe" setup-SCCo_private.nsi || exit $?
