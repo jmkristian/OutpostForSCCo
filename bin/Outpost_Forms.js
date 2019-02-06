@@ -756,11 +756,7 @@ function expandDataInclude(data, form) {
         result = result.replace(/<\/\s*div\s*>\s*$/i, '');
         if (formDefaults) {
             result += `<script type="text/javascript">
-  var formDefaultValues;
-  if (!formDefaultValues) {
-      formDefaultValues = [];
-  }
-  formDefaultValues.push(${formDefaults});
+  add_form_default_values(${formDefaults});
 </script>
 `;
         }
