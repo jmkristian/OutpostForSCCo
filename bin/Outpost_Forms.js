@@ -497,7 +497,7 @@ function serve() {
             const space = form.indexOf(' ');
             onOpen(formId, ['--message_status', 'manual',
                             '--addon_name', form.substring(0, space),
-                            '--filename', form.substring(space + 1)]);
+                            '--ADDON_MSG_TYPE', form.substring(space + 1)]);
             res.redirect('/form-' + formId);
         } catch(err) {
             res.set({'Content-Type': TEXT_HTML});
@@ -607,52 +607,11 @@ function closeForm(formId) {
 
 function parseArgs(args) {
     var environment = {};
-    var envelope = {};
     for (var i = 0; i < args.length; i++) {
         var option = args[i];
         if (option.startsWith('--')) {
-            var name = option.substring(2);
-            var value = args[++i];
-            if (name.startsWith('envelope.')) {
-                envelope[name.substring(9)] = value;
-            } else {
-                environment[name] = value;
-            }
+            environment[option.substring(2)] = args[++i];
         }
-    }
-    if (envelope.oDateTime) {
-        var found = /(\S+)\s*(.*)/.exec(envelope.oDateTime);
-        delete envelope.oDateTime;
-        if (found) {
-            envelope.ordate = found[1];
-            envelope.ortime = found[2];
-            found = /(\d+):(\d+)(:\d+)?([^\d]*)/.exec(envelope.ortime);
-            if (found) {
-                // convert to 24 hour time
-                var hour = parseInt(found[1], 10);
-                const min = found[2];
-                const sec = found[3];
-                const PM  = found[4].trim().toLowerCase() == 'pm';
-                if (hour == 12) {
-                    if (!PM) {
-                        hour = 0;
-                    }
-                } else if (PM) {
-                    hour += 12;
-                } else if (hour < 10) {
-                    hour = '0' + hour;
-                }
-                envelope.ortime = hour + ':' + min + (sec ? sec : '');
-            }
-        }
-    }
-    if (environment.msgno == '-1') { // a sentinel value
-        delete environment.msgno;
-    }
-    if (envelope.RCVNUM == '-1') { // a sentinel value
-        delete envelope.RCVNUM;
-    } else if (envelope.RCVNUM) {
-        environment.msgno = envelope.RCVNUM; // display it as My Msg #
     }
     if (environment.MSG_INDEX == '{{MSG_INDEX}}') {
         delete environment.MSG_INDEX;
@@ -663,7 +622,7 @@ function parseArgs(args) {
         // Without a MSG_INDEX, the operator can't revise the message:
         environment.mode = 'readonly';
     }
-    return {envelope: envelope, environment: environment};
+    return environment;
 }
 
 function getMessage(environment) {
@@ -680,26 +639,6 @@ function getMessage(environment) {
         message = message.replace(/[\r\n]+[ \t]*!\/ADDON![\s\S]*$/, EOL + '!/ADDON!' + EOL);
     }
     return message;
-}
-
-function parseMessage(message) {
-    var fields = {};
-    const lines = message.split(/[\r\n]+/);
-    for (var l = 0; l < lines.length; l++) {
-        var line = lines[l];
-        var foundField = /^([^!#:][^:]*):\s*\[(.*)/.exec(line);
-        if (foundField) {
-            var name = foundField[1];
-            var value = foundField[2];
-            while(l < lines.length - 1 && (!value.endsWith(']') || (value.endsWith('`]') && !value.endsWith('``]')))) {
-                value += EOL + lines[++l];
-            }
-            value = value.substring(0, value.length - 1); // remove the ']'
-            value = value.replace(/`([`\]])/g, '$1');
-            fields[name] = value;
-        }
-    }
-    return fields;
 }
 
 /** Handle an HTTP GET /form-id request. */
@@ -724,42 +663,29 @@ function onGetForm(formId, res) {
         try {
             res.set({'Content-Type': TEXT_HTML});
             if (!form.environment) {
-                var parsed = parseArgs(form.args);
-                form.envelope = parsed.envelope;
-                form.environment = parsed.environment;
+                form.environment = parseArgs(form.args);
                 form.environment.pingURL = '/ping-' + formId;
                 form.environment.submitURL = '/submit-' + formId;
             }
             if (form.message == null) {
                 form.message = getMessage(form.environment);
                 if (form.message) {
-                    if (!form.environment.filename) {
+                    if (!form.environment.ADDON_MSG_TYPE) {
                         var foundFilename = /[\r\n]#[ \t]*FORMFILENAME:([^\r\n]*)[\r\n]/.exec(form.message);
                         if (foundFilename) {
-                            form.environment.filename = foundFilename[1].trim();
-                        }
-                    }
-                    const status = form.environment.message_status;
-                    if (!(status == 'unread' || status == 'read' || (form.envelope.ocall && form.envelope.oname))) {
-                        const fields = parseMessage(form.message);
-                        if (!form.envelope.ocall && fields.OpCall) {
-                            form.envelope.ocall = fields.OpCall;
-                        }
-                        if (!form.envelope.oname && fields.OpName) {
-                            form.envelope.oname = fields.OpName;
+                            form.environment.ADDON_MSG_TYPE = foundFilename[1].trim();
                         }
                     }
                 }
             }
-            log(form.envelope);
             log(form.environment);
             if (!form.environment.addon_name) {
                 throw new Error('addon_name is ' + form.environment.addon_name);
             }
-            if (!form.environment.filename) {
-                throw new Error('filename is ' + form.environment.filename);
+            if (!form.environment.ADDON_MSG_TYPE) {
+                throw new Error('form filename is ' + form.environment.ADDON_MSG_TYPE);
             }
-            var html = fs.readFileSync(path.join(PackItForms, form.environment.filename), ENCODING);
+            var html = fs.readFileSync(path.join(PackItForms, form.environment.ADDON_MSG_TYPE), ENCODING);
             html = expandDataIncludes(html, form);
             res.send(html);
         } catch(err) {
@@ -772,7 +698,7 @@ function onGetForm(formId, res) {
   <div data-include-html="ics-header">
     {
       "5.": "PRIORITY",
-      "9b.": "{{msgno|msgno2name}}"
+      "9b.": "_.msgno2name(_.query.msgno)"
     }
   </div>
 */
@@ -825,8 +751,7 @@ function getIntegrationFile(req, res) {
                 // Insert some stuff:
                 body = expandVariables(body,
                                        {message: JSON.stringify(form.message),
-                                        envelopeDefaults: JSON.stringify(form.envelope),
-                                        queryDefaults: JSON.stringify(form.environment)});
+                                        environment: JSON.stringify(form.environment)});
                 res.end(body, CHARSET);
             } catch(err) {
                 res.set({'Content-Type': TEXT_HTML});
@@ -953,7 +878,7 @@ function submitToOpdirect(submission, callback) {
 }
 
 function submitToAoclient(submission, callback) {
-    const formFileName = submission.form.environment.filename;
+    const formFileName = submission.form.environment.ADDON_MSG_TYPE;
     const msgFileName = path.resolve(PackItMsgs, 'form-' + submission.formId + '.txt');
     // Remove the first line of the Outpost message header:
     const message = submission.form.message.replace(/^\s*![^\r\n]*[\r\n]+/, '')
