@@ -477,8 +477,6 @@ function serve() {
     app.get('/msgs/:msgno', function(req, res, next) {
         // The client may not get the message this way,
         // since the server doesn't know what the formId is.
-        // Instead, onGetForm includes JavaScript code
-        // which passes the message to set_form_data_div.
         res.statusCode = NOT_FOUND;
         res.end(); // with no body
     });
