@@ -672,6 +672,10 @@ function onGetForm(formId, res) {
                         var foundFilename = /[\r\n]#[ \t]*FORMFILENAME:([^\r\n]*)[\r\n]/.exec(form.message);
                         if (foundFilename) {
                             form.environment.ADDON_MSG_TYPE = foundFilename[1].trim();
+                        } else {
+                            throw new Error(
+                                "I don't know what form to display, since"
+                                    + "\nthe message doesn't have a line that starts with '# FORMFILENAME: '.");
                         }
                     }
                 }
@@ -680,10 +684,22 @@ function onGetForm(formId, res) {
             if (!form.environment.addon_name) {
                 throw new Error('addon_name is ' + form.environment.addon_name);
             }
-            if (!form.environment.ADDON_MSG_TYPE) {
-                throw new Error('form filename is ' + form.environment.ADDON_MSG_TYPE);
+            const formFileName = form.environment.ADDON_MSG_TYPE;
+            if (!formFileName) {
+                throw new Error("I don't know what form to display, since "
+                                + "\nI received " + JSON.stringify(formFileName)
+                                + " instead of the name of a form.");
             }
-            var html = fs.readFileSync(path.join(PackItForms, form.environment.ADDON_MSG_TYPE), ENCODING);
+            try {
+                var html = fs.readFileSync(path.join(PackItForms, formFileName), ENCODING);
+            } catch(err) {
+                throw new Error("I don't know about a form named "
+                                + JSON.stringify(formFileName) + "."
+                                + "\nPerhaps this message came from a newer version of this "
+                                + form.environment.addon_name + " add-on,"
+                                + "\nso it might help if you install the latest version."
+                                + EOL + err);
+            }
             html = expandDataIncludes(html, form);
             res.send(html);
         } catch(err) {
