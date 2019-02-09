@@ -597,7 +597,11 @@ function closeForm(formId) {
     if (form) {
         log('form ' + formId + ' closed');
         if (form.environment && form.environment.MSG_FILENAME) {
-            fs.unlink(path.resolve(PackItMsgs, form.environment.MSG_FILENAME), log);
+            const msgFileName = path.resolve(PackItMsgs, form.environment.MSG_FILENAME);
+            fs.unlink(msgFileName, function(err) {
+                if (err) log(err);
+                else log("Deleted " + msgFileName);
+            });
         }
     }
     delete openForms[formId];
@@ -927,7 +931,8 @@ function submitToAoclient(submission, callback) {
                         try {
                             fs.unlinkSync(msgFileName);
                         } catch(err) {
-                            log(err);
+                            if (err) log(err);
+                            else log("Deleted " + msgFileName);
                         }
                     } catch(err) {
                         callback(err);
@@ -1113,7 +1118,10 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
                                 } else if (stats.isFile()) {
                                     var fileTime = stats.mtime.getTime();
                                     if (fileTime < deadline) {
-                                        fs.unlink(fullName, log);
+                                        fs.unlink(fullName, function(err) {
+                                            if (err) log(err);
+                                            else log("Deleted " + fullName);
+                                        });
                                     }
                                 }
                             };
