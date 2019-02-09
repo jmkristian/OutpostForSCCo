@@ -212,7 +212,6 @@ Function ${un}DeleteMyFiles
   ${Delete} launch-v.cmd
   ${Delete} README.*
   ${Delete} UserGuide.*
-  ${Delete} uninstall.exe
   ${RMDir} "$INSTDIR\addons"
   ${RMDir} "$INSTDIR\bin"
   ${RMDir} "$INSTDIR\logs"
@@ -221,6 +220,8 @@ Function ${un}DeleteMyFiles
     StrCpy $R0 "Some files were not deleted from $INSTDIR."
     StrCpy $R0 "$R0 To be on the safe side, you might want to uninstall and then install again."
     MessageBox MB_OK|MB_ICONINFORMATION "$R0" /SD IDOK
+  ${Else}
+    ${Delete} uninstall.exe
   ${EndIf}
   Pop $R1
   Pop $R0
