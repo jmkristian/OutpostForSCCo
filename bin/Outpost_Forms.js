@@ -74,7 +74,6 @@ const ENCODING = CHARSET; // for reading from files
 const EOL = '\r\n';
 const FORBIDDEN = 403;
 const htmlEntities = new AllHtmlEntities();
-const IconStyle = 'width:24pt;height:24pt;vertical-align:middle;';
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
 const LogFileAgeLimitMs = 1000 * 60 * 60 * 24; // 24 hours
@@ -84,6 +83,10 @@ const OpenOutpostMessage = '/openOutpostMessage';
 const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join('logs', 'server-port.txt');
+const PROBLEM_HEADER = '<html><head><title>Problem</title></head><body>'
+      + EOL + '<h3><img src="icon-warning.png" alt="warning"'
+      + ' style="width:24pt;height:24pt;vertical-align:middle;margin-right:1em;">'
+      + 'Something went wrong.</h3>';
 const StopServer = '/stopOutpostForLAARES';
 const SUBMIT_TIMEOUT_SEC = 30;
 const TEXT_HTML = 'text/html; charset=' + CHARSET;
@@ -464,7 +467,13 @@ function serve() {
     });
     app.post('/submit-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
-        onSubmit(req.params.formId, req.body, res);
+        onSubmit(req.params.formId, req.body, res,
+                 `http://${req.get('host')}/fromOutpost-${req.params.formId}`);
+    });
+    app.get('/fromOutpost-:formId', function(req, res, next) {
+        var form = openForms[req.params.formId];
+        res.set({"Content-Type": form.fromOutpost.contentType});
+        res.end(form.fromOutpost.body);
     });
     app.get('/ping-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
@@ -734,12 +743,12 @@ function expandDataIncludes(data, form) {
 function expandDataInclude(data, form) {
     const target = /<\s*div\s+data-include-html\s*=\s*"[^"]*"\s*>[^<]*<\/\s*div\s*>/gi;
     return data.replace(target, function(found) {
-        var matches = found.match(/"([^"]*)"\s*>([^<]*)/);
-        var name = matches[1];
-        var formDefaults = htmlEntities.decode(matches[2].trim());
+        const matches = found.match(/"([^"]*)"\s*>([^<]*)/);
+        const name = matches[1];
+        const formDefaults = htmlEntities.decode(matches[2].trim());
         log('data-include-html ' + name + ' ' + formDefaults);
         // Read a file from pack-it-forms:
-        var fileName = path.join(PackItForms, 'resources', 'html', name + '.html')
+        const fileName = path.join(PackItForms, 'resources', 'html', name + '.html')
         var result = fs.readFileSync(fileName, ENCODING);
         // Remove the enclosing <div></div>:
         result = result.replace(/^\s*<\s*div\s*>\s*/i, '');
@@ -784,12 +793,21 @@ function getIntegrationFile(req, res) {
     }
 }
 
-function onSubmit(formId, q, res) {
+function onSubmit(formId, q, res, fromOutpostURL) {
     const form = openForms[formId];
     const callback = function(err) {
         if (err) {
             res.set({'Content-Type': TEXT_HTML});
-            res.end(errorToHTML(err, form), CHARSET);
+            if (!err.startsWith('<html>')) {
+                res.end(errorToHTML(err, form), CHARSET);
+            } else {
+                // It appears to be a web page.
+                form.fromOutpost = {contentType: TEXT_HTML, body: err};
+                res.end(PROBLEM_HEADER + `
+  When I submitted the message to Outpost, it responded:<br/><br/>
+  <iframe src="${fromOutpostURL}" style="width:90%;"></iframe>
+ </body></html>`);
+            }
         } else {
             log('form ' + formId + ' submitted');
             form.environment.mode = 'readonly';
@@ -877,7 +895,7 @@ function submitToOpdirect(submission, callback) {
                         // It's an old version of Outpost. Maybe Aoclient will work:
                         submitToAoclient(submission, callback);
                     } else {
-                        callback('Outpost said: ' + data);
+                        callback(data);
                     }
                 }
             });
@@ -1093,10 +1111,10 @@ function errorToHTML(err, state) {
     if (logFileName) {
         message += (EOL + 'log file: ' + logFileName);
     }
-    return `<HTML><title>Problem</title><body>
-  <h3><img src="icon-warning.png" alt="warning" style="${IconStyle}">&nbsp;&nbsp;Something went wrong.</h3>
-  This information might help resolve the problem:<pre>${message}</pre>
-</body></HTML>`;
+    return PROBLEM_HEADER + `
+  This information might help resolve the problem:
+  <pre>${message}</pre>
+</body></html>`;
 }
 
 function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
