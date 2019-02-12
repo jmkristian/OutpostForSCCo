@@ -406,7 +406,7 @@ function request(options, callback, includeHeaders) {
                         + formatRawHeaders(res.rawHeaders);
                     data = headers + '\n' + data;
                 }
-                callback(null, data);
+                callback(null, data, res.statusCode);
             }
         }));
     });
@@ -881,7 +881,7 @@ function submitToOpdirect(submission, callback) {
         // Send an HTTP request.
         const server = request(
             options,
-            function(err, data) {
+            function(err, data, statusCode) {
                 if (err) {
                     if (err == 'req.timeout' || err == 'res.timeout') {
                         err = 'No response to ' + options.method + ' in ' + SUBMIT_TIMEOUT_SEC + ' seconds.';
@@ -892,14 +892,12 @@ function submitToOpdirect(submission, callback) {
                     log(report);
                     callback(report);
                 } else {
-                    log('Outpost responded: ' + data);
-                    if (!data ||
-                        data == '<html><body><br></body></html>' ||
-                        data == '<html><body><br/></body></html>') {
-                        callback(); // success
-                    } else if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
+                    log('Outpost responded ' + statusCode + '; ' + data);
+                    if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
                         // It's an old version of Outpost. Maybe Aoclient will work:
                         submitToAoclient(submission, callback);
+                    } else if (statusCode >= 200 && statusCode < 300) {
+                        callback(); // success
                     } else {
                         callback(data);
                     }
