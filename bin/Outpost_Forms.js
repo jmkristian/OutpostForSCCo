@@ -387,7 +387,7 @@ function stopServer(port, next) {
             next).end();
 }
 
-function request(options, callback, includeHeaders) {
+function request(options, callback) {
     const onError = function(event) {
         return function(err) {
             (callback || log)(err || event);
@@ -400,13 +400,7 @@ function request(options, callback, includeHeaders) {
         res.pipe(concat_stream(function(buffer) {
             var data = buffer.toString(CHARSET);
             if (callback) {
-                if (includeHeaders) {
-                    var rawHeaders = res.rawHeaders;
-                    var headers = res.statusCode + ' ' + res.statusMessage + '\n'
-                        + formatRawHeaders(res.rawHeaders);
-                    data = headers + '\n' + data;
-                }
-                callback(null, data, res.statusCode);
+                callback(null, data, res);
             }
         }));
     });
@@ -472,7 +466,7 @@ function serve() {
     });
     app.get('/fromOutpost-:formId', function(req, res, next) {
         var form = openForms[req.params.formId];
-        res.set({"Content-Type": form.fromOutpost.contentType});
+        res.set(form.fromOutpost.headers);
         res.end(form.fromOutpost.body);
     });
     app.get('/ping-:formId', function(req, res, next) {
@@ -801,24 +795,36 @@ function noCache(res) {
 
 function onSubmit(formId, q, res, fromOutpostURL) {
     const form = openForms[formId];
-    const callback = function(err) {
-        if (err) {
-            res.set({'Content-Type': TEXT_HTML});
-            if (!err.startsWith('<html>')) {
-                res.end(errorToHTML(err, form), CHARSET);
+    const callback = function(err, fromOutpost) {
+        try {
+            if (err) {
+                res.set({'Content-Type': TEXT_HTML});
+                if (!fromOutpost) {
+                    res.end(errorToHTML(err, form), CHARSET);
+                } else {
+                    log('form ' + formId + ' from Outpost ' + JSON.stringify(fromOutpost));
+                    form.fromOutpost = fromOutpost;
+                    var page = PROBLEM_HEADER + encodeHTML(errorToMessage(err))
+                        + ' Outpost responded with code ' + fromOutpost.statusCode;
+                    if (fromOutpost.statusMessage) {
+                        page += '(' + fromOutpost.statusMessage + ')';
+                    }
+                    page += ':<br/><br/><iframe src="' + fromOutpostURL
+                        + '" style="width:90%;"></iframe>';
+                    if (logFileName) {
+                        page += ('<br/>log file: ' + encodeHTML(logFileName));
+                    }
+                    res.end(page + '</body></html>');
+                }
             } else {
-                // It appears to be a web page.
-                form.fromOutpost = {contentType: TEXT_HTML, body: err};
-                res.end(PROBLEM_HEADER + `
-  When I submitted the message to Outpost, it responded:<br/><br/>
-  <iframe src="${fromOutpostURL}" style="width:90%;"></iframe>
- </body></html>`);
+                log('form ' + formId + ' submitted');
+                form.environment.mode = 'readonly';
+                res.redirect('/form-' + formId);
+                // Don't closeForm, so the operator can view it.
             }
-        } else {
-            log('form ' + formId + ' submitted');
-            form.environment.mode = 'readonly';
-            res.redirect('/form-' + formId);
-            // Don't closeForm, so the operator can view it.
+        } catch(err) {
+            res.set({'Content-Type': TEXT_HTML});
+            res.end(errorToHTML(err, q), CHARSET);
         }
     };
     try {
@@ -881,26 +887,31 @@ function submitToOpdirect(submission, callback) {
         // Send an HTTP request.
         const server = request(
             options,
-            function(err, data, statusCode) {
-                if (err) {
-                    if (err == 'req.timeout' || err == 'res.timeout') {
-                        err = 'No response to ' + options.method + ' in ' + SUBMIT_TIMEOUT_SEC + ' seconds.';
-                    } else if ((err + '').indexOf(' ECONNREFUSED ') >= 0) {
-                        err = "Opdirect isn't running, it appears." + EOL + err;
-                    }
-                    const report = err + (data ? (EOL + data) : '');
-                    log(report);
-                    callback(report);
-                } else {
-                    log('Outpost responded ' + statusCode + '; ' + data);
-                    if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
+            function(err, data, res) {
+                try {
+                    if (err) {
+                        if (err == 'req.timeout' || err == 'res.timeout') {
+                            err = 'No response to ' + options.method + ' in ' + SUBMIT_TIMEOUT_SEC + ' seconds.';
+                        } else if ((err + '').indexOf(' ECONNREFUSED ') >= 0) {
+                            err = "Opdirect isn't running, it appears." + EOL + err;
+                        }
+                        const report = err + (data ? (EOL + data) : '');
+                        log(report);
+                        callback(report);
+                    } else if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
                         // It's an old version of Outpost. Maybe Aoclient will work:
                         submitToAoclient(submission, callback);
-                    } else if (statusCode >= 200 && statusCode < 300) {
+                    } else if (res && res.statusCode >= 200 && res.statusCode < 300) {
                         callback(); // success
                     } else {
-                        callback(data);
+                        callback('When the message was submitted,',
+                                 {statusCode: res.statusCode,
+                                  statusMessage: res.statusMessage,
+                                  headers: copyHeaders(res.headers),
+                                  body: data});
                     }
+                } catch(err) {
+                    callback(err);
                 }
             });
         server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
@@ -1086,6 +1097,18 @@ function formatRawHeaders(rawHeaders) {
         headers += rawHeaders[h++] + '\n';
     }
     return headers;
+}
+
+function copyHeaders(from) {
+    var into = {};
+    if (from) {
+        for (name in from) {
+            if (name && name != 'content-length' && name != 'connection') {
+                into[name] = from[name];
+            }
+        }
+    }
+    return into;
 }
 
 function getAddonForms() {
