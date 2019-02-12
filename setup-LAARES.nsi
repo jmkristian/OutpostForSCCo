@@ -14,17 +14,14 @@
 
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
-!define addon_name Los_Altos
-!define DisplayName "Outpost for LAARES"
 !define INSTDIR_NAME OutpostForLAARES
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
 !define PROGRAM_PATH "bin\LAARES_Forms.exe"
 !define WINDOW_TITLE "Los Altos ARES"
 
 Function ChooseAddonFiles
-  File /r /x "*~" /x .git* \
-    /x form-mhoc*.html /x http-request.html /x resources\pdf\* \
-    /x resources\integration\pacread\* \
+  File /r /x "*~" /x .git* /x notes /x pacread \
+    /x form-mhoc*.html /x http-request.html /x pdf \
     pack-it-forms
   SetOutPath "$INSTDIR\addons"
   File addons\${addon_name}.launch

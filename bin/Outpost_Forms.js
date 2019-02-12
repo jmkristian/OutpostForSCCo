@@ -105,7 +105,7 @@ if (process.argv.length > 2) {
         case 'build':
             // Customize various files for a given add-on.
             // This happens before creating an installer.
-            build(process.argv[3], process.argv[4]);
+            build(process.argv[3], process.argv[4], process.argv[5]);
             break;
         case 'install':
             // Edit various files depending on how this program was installed.
@@ -136,7 +136,7 @@ if (process.argv.length > 2) {
     }
 }
 
-function build(addonName, programPath) {
+function build(addonName, programPath, displayName) {
     expandVariablesInFile({addon_name: addonName, PROGRAM_PATH: programPath},
                           path.join('bin', 'addon.ini'),
                           path.join('built', 'addons', addonName + '.ini'));
@@ -144,7 +144,7 @@ function build(addonName, programPath) {
                           path.join('bin', 'Aoclient.ini'),
                           path.join('built', 'addons', addonName, 'Aoclient.ini'));
     ['browse.cmd', 'launch-v.cmd', 'launch.cmd', 'launch.vbs', 'UserGuide.html'].forEach(function(fileName) {
-        expandVariablesInFile({addon_name: addonName, PROGRAM_PATH: programPath},
+        expandVariablesInFile({PROGRAM_PATH: programPath, DisplayName: displayName},
                               fileName, path.join('built', fileName));
     });
 }

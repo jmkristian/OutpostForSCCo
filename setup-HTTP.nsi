@@ -24,7 +24,7 @@
 Function ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"
   File pack-it-forms\http-request.html
-  File /r pack-it-forms\msgs
+  File /r /x notes /x pacread pack-it-forms\msgs
   SetOutPath "$INSTDIR\pack-it-forms\resources\css"
   File pack-it-forms\resources\css\pack-it-forms.css
   SetOutPath "$INSTDIR\addons"

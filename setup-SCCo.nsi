@@ -14,17 +14,14 @@
 
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
-!define addon_name Enhanced
-!define DisplayName "SCCo Pack-It-Forms for Outpost (Public Edition)"
 !define INSTDIR_NAME "PackItForms\Outpost\SCCo"
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCCoPackItForms"
 !define PROGRAM_PATH "bin\SCCoPIFO.exe"
 !define WINDOW_TITLE "Santa Clara County"
 
 Function ChooseAddonFiles
-  File /r /x "*~" /x .git* \
+  File /r /x "*~" /x .git* /x notes /x pacread \
     /x form-los-altos*.html /x http-request.html \
-    /x resources\integration\pacread\* \
     pack-it-forms
   SetOutPath "$INSTDIR\addons"
   File /oname=${addon_name}.launch addons\SCCo.launch

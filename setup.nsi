@@ -95,18 +95,18 @@ Function FindOutpost
 FunctionEnd
 
 !macro Delete NAME
-  IfFileExists `${NAME}` 0 +5
-  Delete `${NAME}`
-  IfFileExists `${NAME}` 0 +3
+  IfFileExists "${NAME}" 0 +5
+  Delete "${NAME}"
+  IfFileExists "${NAME}" 0 +3
   SetErrors
   DetailPrint `Can't delete ${NAME}`
 !macroend
 !define Delete '!insertmacro "Delete"'
 
 !macro RMDir NAME
-  IfFileExists `${NAME}` 0 +5
-  RMDir /r `${NAME}`
-  IfFileExists `${NAME}` 0 +3
+  IfFileExists "${NAME}" 0 +5
+  RMDir /r "${NAME}"
+  IfFileExists "${NAME}" 0 +3
   SetErrors
   DetailPrint `Can't remove ${NAME}`
 !macroend
@@ -210,11 +210,9 @@ Function ${un}DeleteMyFiles
   ${Delete} launch.vbs
   ${Delete} launch.cmd
   ${Delete} launch-v.cmd
-  ${Delete} README.*
   ${Delete} UserGuide.*
   ${RMDir} "$INSTDIR\addons"
   ${RMDir} "$INSTDIR\bin"
-  ${RMDir} "$INSTDIR\logs"
   ${RMDir} "$INSTDIR\pack-it-forms"
   ${If} ${Errors}
     StrCpy $R0 "Some files were not deleted from $INSTDIR."
@@ -223,6 +221,10 @@ Function ${un}DeleteMyFiles
   ${Else}
     ${Delete} uninstall.exe
   ${EndIf}
+  # It doesn't really matter whether these are deleted:
+  ${Delete} README.*
+  ${RMDir} "$INSTDIR\logs"
+  ${RMDir} "$INSTDIR\notes"
   Pop $R1
   Pop $R0
 FunctionEnd
@@ -231,6 +233,20 @@ FunctionEnd
 !insertmacro defineGlobalFunctions "un."
 
 Section "Install"
+  # Where to install files:
+  CreateDirectory "$INSTDIR"
+  SetOutPath "$INSTDIR"
+
+  # Stop the server (so it will release its lock on the program and log file):
+  ${If} ${FileExists} "bin\Outpost_Forms.exe"
+    ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
+  ${EndIf}
+  ${If} ${FileExists} "${PROGRAM_PATH}"
+    ExecShellWait open "${PROGRAM_PATH}" "stop" SW_SHOWMINIMIZED
+  ${Else}
+    DetailPrint `No ${PROGRAM_PATH}`
+  ${EndIf}
+
   ${If} "$OUTPOST_DATA" == ""
     StrCpy $R0 "I won't add forms to Outpost"
     StrCpy $R0 "$R0, because I didn't find Outpost's data folder."
@@ -260,18 +276,6 @@ Section "Install"
     Abort "No Aoclient.exe in $OUTPOST_CODE"
   ${EndIf}
   noSubmitOK:
-
-  # Where to install files:
-  CreateDirectory "$INSTDIR"
-  SetOutPath "$INSTDIR"
-
-  # Stop the server (so it will release its lock on the program):
-  ${If} ${FileExists} "bin\Outpost_Forms.exe"
-    ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
-  ${EndIf}
-  ${If} ${FileExists} "${PROGRAM_PATH}"
-    ExecShellWait open "${PROGRAM_PATH}" "stop" SW_SHOWMINIMIZED
-  ${EndIf}
 
   Call DeleteMyFiles
   FileOpen $R0 "$INSTDIR\uninstallFrom.txt" w
@@ -305,8 +309,8 @@ Section "Install"
   File built\launch-v.cmd
   File built\UserGuide.html
   File /r built\addons
-  File /r /x "*~" /x *.txt /x *.ini /x *.log /x Outpost_Forms.exe bin
-  File /oname=${PROGRAM_PATH} bin\Outpost_Forms.exe
+  File /r /x "*~" /x *.txt /x *.ini /x *.log /x notes bin
+  File /oname=${PROGRAM_PATH} Outpost_Forms.exe
   Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"
   File icon-*.png
