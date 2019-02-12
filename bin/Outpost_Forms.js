@@ -478,9 +478,7 @@ function serve() {
     app.get('/ping-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
         res.statusCode = NOT_FOUND;
-        res.set({'Cache-Control': 'no-cache, no-store, must-revalidate', // HTTP 1.1
-                 'Pragma': 'no-cache', // HTTP 1.0
-                 'Expires': '0'}); // proxies
+        noCache(res);
         res.end(); // with no body. The client ignores this response.
     });
     app.get('/msgs/:msgno', function(req, res, next) {
@@ -654,6 +652,7 @@ function getMessage(environment) {
 
 /** Handle an HTTP GET /form-id request. */
 function onGetForm(formId, res) {
+    noCache(res);
     res.set({'Content-Type': TEXT_PLAIN});
     var form = openForms[formId];
     if (formId <= 0) {
@@ -765,6 +764,7 @@ function expandDataInclude(data, form) {
 
 function getIntegrationFile(req, res) {
     try {
+        noCache(res);
         const fileName =
               path.join(PackItForms, req.path.substring(1).replace('/integration/', '/integration/scco/'));
         log('get integration file ' + fileName);
@@ -791,6 +791,12 @@ function getIntegrationFile(req, res) {
         res.set({'Content-Type': TEXT_HTML});
         res.end(errorToHTML(err, JSON.stringify(req.path)), CHARSET);
     }
+}
+
+function noCache(res) {
+    res.set({'Cache-Control': 'no-cache, no-store, must-revalidate', // HTTP 1.1
+             'Pragma': 'no-cache', // HTTP 1.0
+             'Expires': '0'}); // proxies
 }
 
 function onSubmit(formId, q, res, fromOutpostURL) {
