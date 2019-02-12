@@ -238,11 +238,10 @@ Section "Install"
   SetOutPath "$INSTDIR"
 
   # Stop the server (so it will release its lock on the program and log file):
-  ${If} ${FileExists} "bin\Outpost_Forms.exe"
-    ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
-  ${EndIf}
   ${If} ${FileExists} "${PROGRAM_PATH}"
     ExecShellWait open "${PROGRAM_PATH}" "stop" SW_SHOWMINIMIZED
+  ${ElseIf} ${FileExists} "bin\Outpost_Forms.exe"
+    ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
   ${Else}
     DetailPrint `No ${PROGRAM_PATH}`
   ${EndIf}
