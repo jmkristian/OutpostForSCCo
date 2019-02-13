@@ -917,7 +917,7 @@ function submitToOpdirect(submission, callback) {
                                 returnCode = parseInt(matches[1]);
                             }
                         }
-                        if (returnCode < 200 || returnCode >= 300) {
+                        if (returnCode && (returnCode < 200 || returnCode >= 300)) {
                             callback({message: 'Opdirect return code ' + returnCode,
                                       headers: res.headers,
                                       body: body});
