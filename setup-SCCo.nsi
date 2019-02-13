@@ -24,9 +24,9 @@ Function ChooseAddonFiles
     /x form-los-altos*.html /x http-request.html \
     pack-it-forms
   SetOutPath "$INSTDIR\addons"
-  File /oname=${addon_name}.launch addons\SCCo.launch
+  File /oname=${addon_name}.launch "addons\${LaunchFile}"
 FunctionEnd
 
 !include setup-version.nsi
-OutFile "SCCoPIFOsetup${VersionMajor}.${VersionMinor}pub.exe"
+OutFile "SCCoPIFOsetup${VersionMajor}.${VersionMinor}${OutFileSuffix}.exe"
 !include setup.nsi
