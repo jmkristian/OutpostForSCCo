@@ -795,32 +795,34 @@ function noCache(res) {
 
 function onSubmit(formId, q, res, fromOutpostURL) {
     const form = openForms[formId];
-    const callback = function(err, fromOutpost) {
+    const callback = function callback(err) {
         try {
-            if (err) {
-                res.set({'Content-Type': TEXT_HTML});
-                if (!fromOutpost) {
-                    res.end(errorToHTML(err, form), CHARSET);
-                } else {
-                    log('form ' + formId + ' from Outpost ' + JSON.stringify(fromOutpost));
-                    form.fromOutpost = fromOutpost;
-                    var page = PROBLEM_HEADER + encodeHTML(errorToMessage(err))
-                        + ' Outpost responded with code ' + fromOutpost.statusCode;
-                    if (fromOutpost.statusMessage) {
-                        page += '(' + fromOutpost.statusMessage + ')';
-                    }
-                    page += ':<br/><br/><iframe src="' + fromOutpostURL
-                        + '" style="width:90%;"></iframe>';
-                    if (logFileName) {
-                        page += ('<br/>log file: ' + encodeHTML(logFileName));
-                    }
-                    res.end(page + '</body></html>');
-                }
-            } else {
+            if (!err) {
                 log('form ' + formId + ' submitted');
                 form.environment.mode = 'readonly';
                 res.redirect('/form-' + formId);
                 // Don't closeForm, so the operator can view it.
+            } else {
+                res.set({'Content-Type': TEXT_HTML});
+                if ((typeof err) != 'object') {
+                    res.end(errorToHTML(err, q), CHARSET);
+                } else {
+                    err.headers = copyHeaders(err.headers);
+                    log('form ' + formId + ' from Outpost ' + JSON.stringify(err));
+                    form.fromOutpost = err;
+                    var page = PROBLEM_HEADER
+                        + EOL + 'When the message was submitted, Outpost responded:'
+                        + EOL + '<br/><br/><iframe src="' + fromOutpostURL
+                        + '" style="width:95%;"></iframe>'
+                        + EOL + '<pre>';
+                    if (err.message) {
+                        page += (EOL + encodeHTML(err.message));
+                    }
+                    if (logFileName) {
+                        page += (EOL + 'log file: ' + encodeHTML(logFileName));
+                    }
+                    res.end(page + EOL + '</pre></body></html>');
+                }
             }
         } catch(err) {
             res.set({'Content-Type': TEXT_HTML});
@@ -887,7 +889,7 @@ function submitToOpdirect(submission, callback) {
         // Send an HTTP request.
         const server = request(
             options,
-            function(err, data, res) {
+            function(err, body, res) {
                 try {
                     if (err) {
                         if (err == 'req.timeout' || err == 'res.timeout') {
@@ -895,20 +897,33 @@ function submitToOpdirect(submission, callback) {
                         } else if ((err + '').indexOf(' ECONNREFUSED ') >= 0) {
                             err = "Opdirect isn't running, it appears." + EOL + err;
                         }
-                        const report = err + (data ? (EOL + data) : '');
+                        const report = err + (body ? (EOL + body) : '');
                         log(report);
                         callback(report);
-                    } else if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
+                    } else if (body.indexOf('Your PacFORMS submission was successful!') >= 0) {
                         // It's an old version of Outpost. Maybe Aoclient will work:
                         submitToAoclient(submission, callback);
-                    } else if (res && res.statusCode >= 200 && res.statusCode < 300) {
-                        callback(); // success
+                    } else if (res.statusCode < 200 || res.statusCode >= 300) {
+                        callback({message: 'HTTP status ' + res.statusCode + ' ' + res.statusMessage,
+                                  headers: res.headers,
+                                  body: body});
                     } else {
-                        callback('When the message was submitted,',
-                                 {statusCode: res.statusCode,
-                                  statusMessage: res.statusMessage,
-                                  headers: copyHeaders(res.headers),
-                                  body: data});
+                        var returnCode = null;
+                        // Look for <meta name="OpDirectReturnCode" content="403"> in the body:
+                        var matches = body.match(/<\s*meta\s+[^>]*\bname\s*=\s*"OpDirectReturnCode"/i);
+                        if (matches) {
+                            matches = matches[0].match(/\s+content\s*=\s*"\s*([^"]*)\s*"/i);
+                            if (matches) {
+                                returnCode = parseInt(matches[1]);
+                            }
+                        }
+                        if (returnCode < 200 || returnCode >= 300) {
+                            callback({message: 'Opdirect return code ' + returnCode,
+                                      headers: res.headers,
+                                      body: body});
+                        } else {
+                            callback(); // success
+                        }
                     }
                 } catch(err) {
                     callback(err);
@@ -1254,7 +1269,7 @@ function logAndAbort(err) {
 }
 
 function encodeHTML(text) {
-    return htmlEntities.encode(text);
+    return htmlEntities.encode(text + '');
 }
 
 function enquoteRegex(text) {
