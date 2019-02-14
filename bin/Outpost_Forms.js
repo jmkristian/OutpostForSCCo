@@ -655,7 +655,7 @@ function onGetForm(formId, res) {
         log('form ' + formId + ' is not open');
         if (formId < nextFormId) {
             res.status(NOT_FOUND)
-                .end('Form ' + formId + ' was discarded, since the browser page was closed.',
+                .end('/form-' + formId + ' was discarded, since it was submitted or closed.',
                      CHARSET);
         } else {
             res.status(NOT_FOUND)
