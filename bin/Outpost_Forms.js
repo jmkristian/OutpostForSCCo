@@ -866,25 +866,10 @@ function submitToOpdirect(submission, callback) {
         if (submission.subject) {
             body += '&' + querystring.stringify({sub: (submission.subject)});
         }
-        if (submission.urgent) {
-            body += '&' + querystring.stringify({urg: 'TRUE'});
-        }
-        if (submission.form.message) {
-            body += '&' + querystring.stringify({msg: submission.form.message});
-        }
-        // URL encode the 'E' in '#EOF', to prevent Outpost from treating this as a PacFORM message:
-        body = body.replace(/%23EOF/gi, function(match) {
-            // Case insensitive:
-            return '%23' + {E: '%45', e: '%65'}[match.substring(3, 1)] + match.substring(4);
-        });
-        // Mark the end of the request body. This must be the last parameter:
-        body += '&' + querystring.stringify({'4VAO': '\r\n#EOF'});
-        // The #EOF value makes the request fail fast if the server is an old version of Outpost.
-        // An old server recognizes %23EOF as an end-of-message marker, decodes the body,
-        // finds there is no parameter named formtext and fails.
-        // A new server recognizes &4VAO= as the end-of-message marker.
-        // Either server ignores the HTTP Content-Length header; it just scans for the marker.
-
+        body += '&' + querystring.stringify({urg: submission.urgent ? 'TRUE' : 'FALSE'});
+        const message = submission.form.message
+              ? '&' + querystring.stringify({msg: submission.form.message})
+              : '';
         const options = {method: 'POST', host: LOCALHOST, port: 9334, path: '/TBD'};
         // Send an HTTP request.
         const server = request(
@@ -931,7 +916,19 @@ function submitToOpdirect(submission, callback) {
             });
         server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
         server.setTimeout(SUBMIT_TIMEOUT_SEC * 1000);
-        log('form ' + submission.formId + ' submitting ' + JSON.stringify(options));
+        log('form ' + submission.formId + ' submitting ' + JSON.stringify(options) + ' ' + body);
+        // URL encode the 'E' in '#EOF', to prevent Outpost from treating this as a PacFORM message:
+        body = (body + message).replace(/%23EOF/gi, function(match) {
+            // Case insensitive:
+            return '%23' + {E: '%45', e: '%65'}[match.substring(3, 1)] + match.substring(4);
+        });
+        // Mark the end of the request body. This must be the last parameter:
+        body += '&' + querystring.stringify({'4VAO': '\r\n#EOF'});
+        // The #EOF value makes the request fail fast if the server is an old version of Outpost.
+        // An old server recognizes %23EOF as an end-of-message marker, decodes the body,
+        // finds there is no parameter named formtext and fails.
+        // A new server recognizes &4VAO= as the end-of-message marker.
+        // Either server ignores the HTTP Content-Length header; it just scans for the marker.
         server.end(body);
     } catch(err) {
         try {
@@ -1115,12 +1112,11 @@ function formatRawHeaders(rawHeaders) {
 }
 
 function copyHeaders(from) {
+    if (!from) return from;
     var into = {};
-    if (from) {
-        for (name in from) {
-            if (name && name != 'content-length' && name != 'connection') {
-                into[name] = from[name];
-            }
+    for (name in from) {
+        if (name && name != 'content-length' && name != 'connection') {
+            into[name] = from[name];
         }
     }
     return into;
