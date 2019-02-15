@@ -529,8 +529,18 @@ function serve() {
         getIntegrationFile(req, res);
     });
     app.get(/^\/.*/, express.static(PackItForms, {setHeaders: function(res, path, stat) {
-        if (path && path.toLowerCase().endsWith(".pdf")) {
-            res.set('Content-Type', 'application/pdf');
+        if (path) {
+            const dot = path.lastIndexOf('.');
+            if (dot >= 0) {
+                const mimeType = {
+                    css: 'text/css',
+                    js: 'application/javascript',
+                    pdf: 'application/pdf'
+                }[path.substring(dot + 1).toLowerCase()];
+                if (mimeType) {
+                    res.set('Content-Type', mimeType);
+                }
+            }
         }
     }}));
 
