@@ -1,4 +1,16 @@
 @REM This can't be a Bash script, because quoting /DDisplayName doesn't work right.
+
+@rem rmdir /Q /S built
+@rem mkdir built
+@rem mkdir built\addons
+@rem node bin/Outpost_Forms.js build HTTP bin\HTTP_server.exe "HTTP Request"
+@rem if %errorlevel% neq 0 exit /b %errorlevel%
+@rem "C:\Program Files (x86)\NSIS\makensis.exe" ^
+@rem  /Daddon_name=HTTP ^
+@rem  /DDisplayName="HTTP Request" ^
+@rem  setup-HTTP.nsi
+@rem if %errorlevel% neq 0 exit /b %errorlevel%
+
 @rmdir /Q /S built
 @mkdir built
 @mkdir built\addons

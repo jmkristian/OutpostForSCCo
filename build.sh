@@ -19,4 +19,4 @@ fi
 rm -f pack-it-forms/resources/integration/integration.js
 ./build.cmd || exit
 cp -p pack-it-forms/resources/integration/pacread/* pack-it-forms/resources/integration/
-rm Outpost_Forms.exe
+mv Outpost_Forms.exe built/

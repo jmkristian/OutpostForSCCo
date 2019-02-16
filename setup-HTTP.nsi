@@ -14,8 +14,6 @@
 
 # This is meant to be interpreted by the Nullsoft scriptable install system http://nsis.sourceforge.net
 
-!define addon_name HTTP
-!define DisplayName "${addon_name} add-on"
 !define INSTDIR_NAME "${addon_name}_AddOn"
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTDIR_NAME}"
 !define PROGRAM_PATH "bin\${addon_name}_Server.exe"
