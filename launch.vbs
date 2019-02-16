@@ -2,7 +2,7 @@
 ' the working directory that contains this script and no visible window.
 
 set FSO = CreateObject("Scripting.FileSystemObject")
-my_folder = FSO.GetParentFolderName(Wscript.ScriptFullName)
+my_folder = FSO.GetParentFolderName(FSO.GetParentFolderName(Wscript.ScriptFullName))
 ' WScript.Echo my_folder
 
 ' Construct a command line as a string:

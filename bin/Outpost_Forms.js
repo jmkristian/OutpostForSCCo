@@ -160,14 +160,14 @@ function install() {
 }
 
 function installConfigFiles(myDirectory, addonNames) {
-    var launch = process.argv[3] + ' ' + path.join(myDirectory, 'launch.vbs');
+    var launch = process.argv[3] + ' ' + path.join(myDirectory, 'bin', 'launch.vbs');
     const version = os.release().split(/\./);
     const majorVersion = parseInt(version[0], 10);
     if (majorVersion < 6) {
         // We're running on Windows XP or Windows Server 2003, per
         // https://docs.microsoft.com/en-us/windows/desktop/api/winnt/ns-winnt-_osversioninfoa#remarks
         // Use launch.cmd instead of launch.vbs:
-        launch = path.join(myDirectory, 'launch.cmd');
+        launch = path.join(myDirectory, 'bin', 'launch.cmd');
     }
     addonNames.forEach(function(addon_name) {
         expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch},

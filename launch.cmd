@@ -4,4 +4,5 @@
 @rem If you know how to prevent this, please contribute to
 @rem https://github.com/jmkristian/OutpostForLAARES/issues/1
 @cd "%~dp0"
+@cd ..
 @start /MIN {{PROGRAM_PATH}} %*

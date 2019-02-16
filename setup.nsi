@@ -208,14 +208,17 @@ Function ${un}DeleteMyFiles
   # It doesn't really matter whether these are deleted:
   ${Delete} README.*
   ${Delete} UserGuide.*
+  ${Delete} launch.vbs
+  ${Delete} launch.cmd
+  ${Delete} launch-v.cmd
   ${RMDir} "$INSTDIR\bin"
   ${RMDir} "$INSTDIR\logs"
   ${RMDir} "$INSTDIR\notes"
   ClearErrors
   ${Delete} browse.cmd
-  ${Delete} launch.vbs
-  ${Delete} launch.cmd
-  ${Delete} launch-v.cmd
+  ${Delete} bin\launch.vbs
+  ${Delete} bin\launch.cmd
+  ${Delete} bin\launch-v.cmd
   ${Delete} "${PROGRAM_PATH}"
   ${RMDir} "$INSTDIR\addons"
   ${RMDir} "$INSTDIR\pack-it-forms"
@@ -307,10 +310,12 @@ Section "Install"
   ${EndIf}
 
   # Files to install:
-  File built\browse.cmd
+  SetOutPath "$INSTDIR\bin"
   File built\launch.vbs
   File built\launch.cmd
   File built\launch-v.cmd
+  SetOutPath "$INSTDIR"
+  File built\browse.cmd
   File built\UserGuide.html
   File /r built\addons
   File /r /x "*~" /x *.txt /x *.ini /x *.log /x notes bin
@@ -366,9 +371,9 @@ Section "Install"
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ClearErrors
   ${If} ${AtMostWinXP}
-    ExecShellWait open              ".\launch.cmd" "dry-run ${PROGRAM_PATH}" SW_SHOWMINIMIZED
+    ExecShellWait open              "bin\launch.cmd" "dry-run ${PROGRAM_PATH}" SW_SHOWMINIMIZED
   ${Else}
-    ExecShellWait open "$WSCRIPT_EXE" ".\launch.vbs dry-run ${PROGRAM_PATH}" SW_SHOWMINIMIZED
+    ExecShellWait open "$WSCRIPT_EXE" "bin\launch.vbs dry-run ${PROGRAM_PATH}" SW_SHOWMINIMIZED
   ${EndIf}
   ${If} ${Errors}
     DetailPrint `dry-run failed`
