@@ -205,26 +205,20 @@ FunctionEnd
 Function ${un}DeleteMyFiles
   Push $R0
   Push $R1
+  # It doesn't really matter whether these are deleted:
+  ${Delete} README.*
+  ${Delete} UserGuide.*
+  ${RMDir} "$INSTDIR\bin"
+  ${RMDir} "$INSTDIR\logs"
+  ${RMDir} "$INSTDIR\notes"
   ClearErrors
   ${Delete} browse.cmd
   ${Delete} launch.vbs
   ${Delete} launch.cmd
   ${Delete} launch-v.cmd
-  ${Delete} UserGuide.*
+  ${Delete} "${PROGRAM_PATH}"
   ${RMDir} "$INSTDIR\addons"
-  ${RMDir} "$INSTDIR\bin"
   ${RMDir} "$INSTDIR\pack-it-forms"
-  ${If} ${Errors}
-    StrCpy $R0 "Some files were not deleted from $INSTDIR."
-    StrCpy $R0 "$R0 To be on the safe side, you might want to uninstall and then install again."
-    MessageBox MB_OK|MB_ICONINFORMATION "$R0" /SD IDOK
-  ${Else}
-    ${Delete} uninstall.exe
-  ${EndIf}
-  # It doesn't really matter whether these are deleted:
-  ${Delete} README.*
-  ${RMDir} "$INSTDIR\logs"
-  ${RMDir} "$INSTDIR\notes"
   Pop $R1
   Pop $R0
 FunctionEnd
@@ -249,7 +243,7 @@ Section "Install"
   ${If} "$OUTPOST_DATA" == ""
     StrCpy $R0 "I won't add forms to Outpost"
     StrCpy $R0 "$R0, because I didn't find Outpost's data folder."
-    StrCpy $R0 "$R0  Do you still want to install ${DisplayName}?"
+    StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
     MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noFormsOK
     Call FindOutposts # DetailPrint diagnostic information
     Abort "No Outpost data folder"
@@ -267,7 +261,7 @@ Section "Install"
     DetailPrint `Outpost $OUTPOST_CODE`
     GoTo noSubmitOK
   ${EndIf}
-  StrCpy $R0 "$R0  Do you still want to install ${DisplayName}?"
+  StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
   MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noSubmitOK
   ${If} "$OUTPOST_CODE" == ""
     Abort "No Outpost"
@@ -277,6 +271,17 @@ Section "Install"
   noSubmitOK:
 
   Call DeleteMyFiles
+  ${If} ${Errors}
+    StrCpy $R0 "Some files were not deleted from $INSTDIR. Try again?"
+    MessageBox MB_YESNO|MB_DEFBUTTON1|MB_ICONINFORMATION "$R0" /SD IDYES IDNO noDeleteAgain
+    Sleep 2000
+    Call DeleteMyFiles
+    ${If} ${Errors}
+      noDeleteAgain:
+      Abort "Can't delete old files"
+    ${EndIf}
+  ${EndIf}
+  ${Delete} uninstall.exe
   FileOpen $R0 "$INSTDIR\uninstallFrom.txt" w
   FileWrite $R0 $OUTPOST_DATA
   FileClose $R0
@@ -294,7 +299,7 @@ Section "Install"
       ${If} $1 != true
         StrCpy $0 "$0 To copy it, try running this installer as an administrator."
       ${EndIf}
-      StrCpy $R0 "$R0  Do you still want to install ${DisplayName}?"
+      StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
       MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noAoclientOK
       Abort "Can't copy $AOCLIENT_EXE"
       noAoclientOK:
@@ -385,6 +390,10 @@ Section "Uninstall"
   Call un.SetShellVarContextAppropriately
   ${Delete} "$SMPROGRAMS\SCCo Packet\Uninstall ${DisplayName}.lnk"
   Call un.DeleteMyFiles
+  ${If} ${Errors}
+    StrCpy $R0 "Some files were not deleted from $INSTDIR."
+    MessageBox MB_OK|MB_ICONINFORMATION "$R0" /SD IDOK
+  ${EndIf}
   ${Delete} uninstallFrom.txt
   RMDir "$INSTDIR" # Do nothing if the directory is not empty
 SectionEnd
