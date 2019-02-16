@@ -815,10 +815,9 @@ function onSubmit(formId, q, res, fromOutpostURL) {
             } else {
                 res.set({'Content-Type': TEXT_HTML});
                 if ((typeof err) != 'object') {
-                    res.end(errorToHTML(err, q), CHARSET);
+                    res.end(errorToHTML(err, formId), CHARSET);
                 } else {
                     err.headers = copyHeaders(err.headers);
-                    log('form ' + formId + ' from Outpost ' + JSON.stringify(err));
                     form.fromOutpost = err;
                     var page = PROBLEM_HEADER
                         + EOL + 'When the message was submitted, Outpost responded:'
@@ -833,6 +832,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
                     }
                     res.end(page + EOL + '</pre></body></html>');
                 }
+                log('form ' + formId + ' from Outpost ' + JSON.stringify(err));
             }
         } catch(err) {
             res.set({'Content-Type': TEXT_HTML});
@@ -888,13 +888,14 @@ function submitToOpdirect(submission, callback) {
                 try {
                     if (err) {
                         if (err == 'req.timeout' || err == 'res.timeout') {
-                            err = 'No response to ' + options.method + ' in ' + SUBMIT_TIMEOUT_SEC + ' seconds.';
+                            err = "Outpost didn't respond within " + SUBMIT_TIMEOUT_SEC + ' seconds.'
+                                + EOL + JSON.stringify(options);
                         } else if ((err + '').indexOf(' ECONNREFUSED ') >= 0) {
-                            err = "Opdirect isn't running, it appears." + EOL + err;
+                            err = "Opdirect isn't running, it appears." + EOL + err
+                                + EOL + JSON.stringify(options);
                         }
-                        const report = err + (body ? (EOL + body) : '');
-                        log(report);
-                        callback(report);
+                        log(err + ' ' + body);
+                        callback(err);
                     } else if (body.indexOf('Your PacFORMS submission was successful!') >= 0) {
                         // It's an old version of Outpost. Maybe Aoclient will work:
                         submitToAoclient(submission, callback);
@@ -905,7 +906,7 @@ function submitToOpdirect(submission, callback) {
                     } else {
                         var returnCode = null;
                         // Look for <meta name="OpDirectReturnCode" content="403"> in the body:
-                        var matches = body.match(/<\s*meta\s+[^>]*\bname\s*=\s*"OpDirectReturnCode"/i);
+                        var matches = body.match(/<\s*meta\s+[^>]*\bname\s*=\s*"OpDirectReturnCode"[^>]*/i);
                         if (matches) {
                             matches = matches[0].match(/\s+content\s*=\s*"\s*([^"]*)\s*"/i);
                             if (matches) {
@@ -913,7 +914,7 @@ function submitToOpdirect(submission, callback) {
                             }
                         }
                         if (returnCode && (returnCode < 200 || returnCode >= 300)) {
-                            callback({message: 'Opdirect return code ' + returnCode,
+                            callback({message: 'OpDirectReturnCode ' + returnCode,
                                       headers: res.headers,
                                       body: body});
                         } else {
