@@ -815,28 +815,26 @@ function onSubmit(formId, q, res, fromOutpostURL) {
             } else {
                 res.set({'Content-Type': TEXT_HTML});
                 if ((typeof err) != 'object') {
-                    res.end(errorToHTML(err, formId), CHARSET);
-                } else {
-                    err.headers = copyHeaders(err.headers);
-                    form.fromOutpost = err;
-                    var page = PROBLEM_HEADER
-                        + EOL + 'When the message was submitted, Outpost responded:'
-                        + EOL + '<br/><br/><iframe src="' + fromOutpostURL
-                        + '" style="width:95%;"></iframe>'
-                        + EOL + '<pre>';
-                    if (err.message) {
-                        page += (EOL + encodeHTML(err.message));
-                    }
-                    if (logFileName) {
-                        page += (EOL + 'log file: ' + encodeHTML(logFileName));
-                    }
-                    res.end(page + EOL + '</pre></body></html>');
+                    throw err;
                 }
+                form.fromOutpost = err;
+                var page = PROBLEM_HEADER
+                    + EOL + 'When the message was submitted, Outpost responded:'
+                    + EOL + '<br/><br/><iframe src="' + fromOutpostURL
+                    + '" style="width:95%;"></iframe>'
+                    + EOL + '<pre>';
+                if (err.message) {
+                    page += (EOL + encodeHTML(err.message));
+                }
+                if (logFileName) {
+                    page += (EOL + 'log file: ' + encodeHTML(logFileName));
+                }
+                res.end(page + EOL + '</pre></body></html>');
                 log('form ' + formId + ' from Outpost ' + JSON.stringify(err));
             }
         } catch(err) {
             res.set({'Content-Type': TEXT_HTML});
-            res.end(errorToHTML(err, q), CHARSET);
+            res.end(errorToHTML(err, form.environment), CHARSET);
         }
     };
     try {
@@ -884,8 +882,10 @@ function submitToOpdirect(submission, callback) {
         // Send an HTTP request.
         const server = request(
             options,
-            function(err, body, res) {
+            function(err, data, res) {
                 try {
+                    if (data == null) data = '';
+                    log('form ' + submission.formId + ' from Opdirect {' + err + '} ' + data);
                     if (err) {
                         if (err == 'req.timeout' || err == 'res.timeout') {
                             err = "Outpost didn't respond within " + SUBMIT_TIMEOUT_SEC + ' seconds.'
@@ -894,29 +894,28 @@ function submitToOpdirect(submission, callback) {
                             err = "Opdirect isn't running, it appears." + EOL + err
                                 + EOL + JSON.stringify(options);
                         }
-                        log(err + ' ' + body);
                         callback(err);
-                    } else if (body.indexOf('Your PacFORMS submission was successful!') >= 0) {
+                    } else if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
                         // It's an old version of Outpost. Maybe Aoclient will work:
                         submitToAoclient(submission, callback);
                     } else if (res.statusCode < 200 || res.statusCode >= 300) {
                         callback({message: 'HTTP status ' + res.statusCode + ' ' + res.statusMessage,
-                                  headers: res.headers,
-                                  body: body});
+                                  headers: copyHeaders(res.headers),
+                                  body: data});
                     } else {
-                        var returnCode = null;
+                        var returnCode = 0;
                         // Look for <meta name="OpDirectReturnCode" content="403"> in the body:
-                        var matches = body.match(/<\s*meta\s+[^>]*\bname\s*=\s*"OpDirectReturnCode"[^>]*/i);
+                        var matches = data.match(/<\s*meta\s+[^>]*\bname\s*=\s*"OpDirectReturnCode"[^>]*/i);
                         if (matches) {
                             matches = matches[0].match(/\s+content\s*=\s*"\s*([^"]*)\s*"/i);
                             if (matches) {
                                 returnCode = parseInt(matches[1]);
                             }
                         }
-                        if (returnCode && (returnCode < 200 || returnCode >= 300)) {
+                        if (returnCode < 200 || returnCode >= 300) {
                             callback({message: 'OpDirectReturnCode ' + returnCode,
-                                      headers: res.headers,
-                                      body: body});
+                                      headers: copyHeaders(res.headers),
+                                      body: data});
                         } else {
                             callback(); // success
                         }
@@ -1156,14 +1155,20 @@ function getAddonForms() {
 }
 
 function errorToHTML(err, state) {
-    var message = encodeHTML(EOL + errorToMessage(err) + EOL + JSON.stringify(state));
-    if (logFileName) {
-        message += (EOL + 'log file: ' + logFileName);
+    var message = 'This information might help resolve the problem:<br/><br/>' + EOL
+        + encodeHTML(errorToMessage(err)).replace(/[\r\n]+/g, '<br/>' + EOL) + '<br/>' + EOL;
+    if (state) {
+        var stateString = JSON.stringify(state);
+        if (stateString.startsWith('{')) {
+            // Enable line wrapping:
+            stateString = stateString.replace(/([^\\])","/g, '$1", "');
+        }
+        message += encodeHTML(stateString) + '<br/>' + EOL;
     }
-    return PROBLEM_HEADER + `
-  This information might help resolve the problem:
-  <pre>${message}</pre>
-</body></html>`;
+    if (logFileName) {
+        message += encodeHTML('log file: ' + logFileName) + '<br/>' + EOL;
+    }
+    return PROBLEM_HEADER + message + '</body></html>';
 }
 
 function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
