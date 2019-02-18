@@ -818,19 +818,19 @@ function onSubmit(formId, q, res, fromOutpostURL) {
                     throw err;
                 }
                 form.fromOutpost = err;
-                var page = PROBLEM_HEADER
-                    + EOL + 'When the message was submitted, Outpost responded:'
-                    + EOL + '<br/><br/><iframe src="' + fromOutpostURL
-                    + '" style="width:95%;"></iframe>'
-                    + EOL + '<pre>';
+                log('form ' + formId + ' from Outpost ' + JSON.stringify(err));
+                var page = PROBLEM_HEADER + EOL
+                    + 'When the message was submitted, Outpost responded:<br/><br/>' + EOL
+                    + '<iframe src="' + fromOutpostURL + '" style="width:95%;"></iframe><br/><br/>' + EOL;
                 if (err.message) {
-                    page += (EOL + encodeHTML(err.message));
+                    page += encodeHTML(err.message)
+                        .replace(/[\r\n]+/g, '<br/>' + EOL) + '<br/>' + EOL;
                 }
                 if (logFileName) {
-                    page += (EOL + 'log file: ' + encodeHTML(logFileName));
+                    page += encodeHTML('log file: ' + logFileName) + '<br/>' + EOL;
                 }
-                res.end(page + EOL + '</pre></body></html>');
-                log('form ' + formId + ' from Outpost ' + JSON.stringify(err));
+                page += '</body></html>';
+                res.end(page);
             }
         } catch(err) {
             res.set({'Content-Type': TEXT_HTML});
