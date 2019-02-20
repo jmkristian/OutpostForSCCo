@@ -35,7 +35,7 @@ Var /GLOBAL WSCRIPT_EXE
 
 Function .onInit
   StrCpy $OUTPOST_DATA ""
-  ${If} $INSTDIR == ""
+  ${If} "$INSTDIR" == ""
     ReadEnvStr $0 SystemDrive
     StrCpy $INSTDIR "$0\${INSTDIR_NAME}\"
   ${EndIf}
@@ -87,7 +87,9 @@ Function FindOutpost
     ${EndIf}
     ClearErrors
     ${If} "$AOCLIENT_EXE" == ""
-      StrCpy $AOCLIENT_EXE "$R0\Aoclient.exe"
+      ${If} ${FileExists} "$R0\Aoclient.exe"
+        StrCpy $AOCLIENT_EXE "$R0\Aoclient.exe"
+      ${EndIf}
     ${EndIf}
   ${EndIf}
   Pop $R1
@@ -254,24 +256,7 @@ Section "Install"
   ${Else}
     DetailPrint `Outpost data $OUTPOST_DATA`
   ${EndIf}
-  StrCpy $R0 "I can't submit messages to Outpost"
-  ${If} "$OUTPOST_CODE" == ""
-    StrCpy $R0 "$R0, because I don't know where it's installed."
-    Call FindOutposts # DetailPrint diagnostic information
-  ${ElseIfNot} ${FileExists} "$AOCLIENT_EXE"
-    StrCpy $R0 "$R0, because there's no Aoclient.exe in $OUTPOST_CODE."
-  ${Else}
-    DetailPrint `Outpost $OUTPOST_CODE`
-    GoTo noSubmitOK
-  ${EndIf}
-  StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
-  MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noSubmitOK
-  ${If} "$OUTPOST_CODE" == ""
-    Abort "No Outpost"
-  ${Else}
-    Abort "No Aoclient.exe in $OUTPOST_CODE"
-  ${EndIf}
-  noSubmitOK:
+  DetailPrint `Outpost $OUTPOST_CODE`
 
   Call DeleteMyFiles
   ${If} ${Errors}
@@ -290,24 +275,31 @@ Section "Install"
   FileClose $R0
 
   CreateDirectory "$INSTDIR\addons\${addon_name}"
-  ${If} ${FileExists} "$AOCLIENT_EXE"
+  StrCpy $R0 "You might not be able to submit messages to Outpost"
+  ${If} "$OUTPOST_CODE" == ""
+    StrCpy $R0 "$R0, because I don't know where it's installed."
+    Call FindOutposts # DetailPrint diagnostic information
+  ${ElseIf} "$AOCLIENT_EXE" == ""
+    StrCpy $R0 "$R0, because I can't find Aoclient.exe in $OUTPOST_CODE."
+  ${Else}
     DetailPrint `Copy from $AOCLIENT_EXE`
     ClearErrors
     CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
     ${If} ${Errors}
-      StrCpy $R0 "I can't submit messages to Outpost"
       StrCpy $R0 "$R0, because I can't copy $AOCLIENT_EXE."
       Call IsUserAdmin
       Pop $1
       ${If} $1 != true
-        StrCpy $0 "$0 To copy it, try running this installer as an administrator."
+        StrCpy $R0 "$R0 To copy it, try running this installer as an administrator."
       ${EndIf}
-      StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
-      MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noAoclientOK
-      Abort "Can't copy $AOCLIENT_EXE"
-      noAoclientOK:
+    ${Else}
+      GoTo AoclientOK
     ${EndIf}
   ${EndIf}
+  StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
+  MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK AoclientOK
+  Abort "Can't copy Aoclient.exe"
+  AoclientOK:
 
   # Files to install:
   SetOutPath "$INSTDIR\bin"
