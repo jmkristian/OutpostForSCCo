@@ -19,6 +19,7 @@
 @"C:\Program Files (x86)\NSIS\makensis.exe" ^
   /Daddon_name=Los_Altos ^
   /DDisplayName="Outpost for LAARES" ^
+  /DPROGRAM_PATH=bin\LAARES_Forms.exe ^
   setup-LAARES.nsi
 @if %errorlevel% neq 0 exit /b %errorlevel%
 
@@ -32,6 +33,7 @@
     /Daddon_name=Enhanced ^
     /DLaunchFile=SCCo.launch ^
     /DOutFileSuffix=pub ^
+    /DPROGRAM_PATH=bin\SCCoPIFO.exe ^
     setup-SCCo.nsi
 @if %errorlevel% neq 0 exit /b %errorlevel%
 
@@ -45,5 +47,6 @@
 @rem    /Daddon_name=Enhanced ^
 @rem    /DLaunchFile=SCCo_private.launch ^
 @rem    /DOutFileSuffix=pvt ^
+@rem    /DPROGRAM_PATH=bin\SCCoPIFO.exe ^
 @rem    setup-SCCo.nsi
 @rem if %errorlevel% neq 0 exit /b %errorlevel%
