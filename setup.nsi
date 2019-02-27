@@ -213,6 +213,7 @@ Function ${un}DeleteMyFiles
   ${Delete} launch.vbs
   ${Delete} launch.cmd
   ${Delete} launch-v.cmd
+  ${Delete} version.txt
   ${RMDir} "$INSTDIR\bin"
   ${RMDir} "$INSTDIR\logs"
   ${RMDir} "$INSTDIR\notes"
@@ -272,6 +273,9 @@ Section "Install"
   ${Delete} uninstall.exe
   FileOpen $R0 "$INSTDIR\uninstallFrom.txt" w
   FileWrite $R0 $OUTPOST_DATA
+  FileClose $R0
+  FileOpen $R0 "version.txt" w
+  FileWrite $R0 "${VersionMajor}.${VersionMinor}"
   FileClose $R0
 
   CreateDirectory "$INSTDIR\addons\${addon_name}"
