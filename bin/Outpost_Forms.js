@@ -1154,23 +1154,25 @@ function getAddonForms() {
                 if (line.startsWith('ADDON ')) {
                     var addonForm = {};
                     var name = null;
-                    const tokens = line.split(/\s+/);
-                    for (var t = 0; t < tokens.length; ++t) {
-                        var token = tokens[t];
-                        if (token.startsWith('-')) {
-                            name = token.substring(1);
-                            if (name == 'fn') {
-                                // The value may contain whitespace.
-                                var value = '';
-                                while (++t < tokens.length && tokens[t] != '-a') {
-                                    value += (value && ' ') + tokens[t];
-                                }
-                                --t;
+                    var value = '';
+                    line.split(/\s+/).forEach(function(token) {
+                        switch(token) {
+                        case '-fn':
+                        case '-a':
+                        case '-t':
+                            if (name) {
                                 addonForm[name] = value;
                             }
-                        } else if (name) {
-                            addonForm[name] = token;
+                            name = token.substring(1);
+                            value = '';
+                            break;
+                        default:
+                            value += (value && ' ') + token;
+                            break;
                         }
+                    });
+                    if (name) {
+                        addonForm[name] = value;
                     }
                     addonForms.push(addonForm);
                 }
