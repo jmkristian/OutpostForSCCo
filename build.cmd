@@ -26,11 +26,11 @@
 @rmdir /Q /S built
 @mkdir built
 @mkdir built\addons
-@node bin/Outpost_Forms.js build Enhanced bin\SCCoPIFO.exe "SCCo Pack-It-Forms for Outpost"
+@node bin/Outpost_Forms.js build SCCoPIFO bin\SCCoPIFO.exe "SCCo Pack-It-Forms for Outpost"
 @if %errorlevel% neq 0 exit /b %errorlevel%
 @"C:/Program Files (x86)/NSIS/makensis.exe" ^
     /DDisplayName="SCCo Pack-It-Forms for Outpost (Public Edition)" ^
-    /Daddon_name=Enhanced ^
+    /Daddon_name=SCCoPIFO ^
     /DLaunchFile=SCCo.launch ^
     /DOutFileSuffix=pub ^
     /DPROGRAM_PATH=bin\SCCoPIFO.exe ^
@@ -40,11 +40,11 @@
 @rem rmdir /Q /S built
 @rem mkdir built
 @rem mkdir built\addons
-@rem node bin/Outpost_Forms.js build Enhanced bin\SCCoPIFO.exe "SCCo Pack-It-Forms for Outpost"
+@rem node bin/Outpost_Forms.js build SCCoPIFO bin\SCCoPIFO.exe "SCCo Pack-It-Forms for Outpost"
 @rem if %errorlevel% neq 0 exit /b %errorlevel%
 @rem "C:/Program Files (x86)/NSIS/makensis.exe" ^
 @rem    /DDisplayName="SCCo Pack-It-Forms for Outpost (Private Edition)" ^
-@rem    /Daddon_name=Enhanced ^
+@rem    /Daddon_name=SCCoPIFO ^
 @rem    /DLaunchFile=SCCo_private.launch ^
 @rem    /DOutFileSuffix=pvt ^
 @rem    /DPROGRAM_PATH=bin\SCCoPIFO.exe ^

@@ -1,9 +1,9 @@
 LINE
-ADDON -fn TEST XSC ICS-213 Message Form        -a Enhanced -t form-ics213.html
-ADDON -fn TEST XSC EOC-213RR Resource Request  -a Enhanced -t form-scco-eoc-213rr.html
-ADDON -fn TEST XSC OA Municipal Status         -a Enhanced -t form-oa-muni-status.html
-ADDON -fn TEST XSC OA Shelter Status           -a Enhanced -t form-oa-shelter-status.html
-ADDON -fn TEST XSC RACES Mutual Aid Request    -a Enhanced -t form-oa-mutual-aid-request.html
+ADDON -fn TEST XSC ICS-213 Message Form        -a SCCoPIFO -t form-ics213.html
+ADDON -fn TEST XSC EOC-213RR Resource Request  -a SCCoPIFO -t form-scco-eoc-213rr.html
+ADDON -fn TEST XSC OA Municipal Status         -a SCCoPIFO -t form-oa-muni-status.html
+ADDON -fn TEST XSC OA Shelter Status           -a SCCoPIFO -t form-oa-shelter-status.html
+ADDON -fn TEST XSC RACES Mutual Aid Request    -a SCCoPIFO -t form-oa-mutual-aid-request.html
 LINE
-ADDON -fn TEST MHOC Beds Status                -a Enhanced -t form-mhoc-beds-status.html
-ADDON -fn TEST MHOC Resource Request           -a Enhanced -t form-mhoc-resource-request.html
+ADDON -fn TEST MHOC Beds Status                -a SCCoPIFO -t form-mhoc-beds-status.html
+ADDON -fn TEST MHOC Resource Request           -a SCCoPIFO -t form-mhoc-resource-request.html
