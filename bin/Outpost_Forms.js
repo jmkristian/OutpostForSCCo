@@ -143,6 +143,9 @@ function build(addonName, programPath, displayName) {
     expandVariablesInFile({addon_name: addonName},
                           path.join('bin', 'Aoclient.ini'),
                           path.join('built', 'addons', addonName, 'Aoclient.ini'));
+    expandVariablesInFile({addon_name: addonName},
+                          path.join('bin', 'manual.html'),
+                          path.join('built', 'manual.html'));
     ['browse.cmd', 'launch-v.cmd', 'launch.cmd', 'launch.vbs', 'UserGuide.html'].forEach(function(fileName) {
         expandVariablesInFile({PROGRAM_PATH: programPath, DisplayName: displayName},
                               fileName, path.join('built', fileName));

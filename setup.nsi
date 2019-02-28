@@ -310,11 +310,12 @@ Section "Install"
   File built\launch.vbs
   File built\launch.cmd
   File built\launch-v.cmd
+  File built\manual.html
   SetOutPath "$INSTDIR"
   File built\browse.cmd
   File built\UserGuide.html
   File /r built\addons
-  File /r /x "*~" /x *.txt /x *.ini /x *.log /x notes bin
+  File /r /x "*~" /x *.txt /x *.ini /x *.html /x *.log /x notes bin
   File /oname=${PROGRAM_PATH} Outpost_Forms.exe
   Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"

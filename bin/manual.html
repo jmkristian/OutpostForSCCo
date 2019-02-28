@@ -14,7 +14,7 @@
       }, 30000); // call ping every 30 seconds
     </script>
   </head>
-  <body style="margin-top:0;">
+  <body style="padding-top:1em;">
     <br/>
     <form action="/manual-create" method="POST" target="_blank">
       <fieldset class="horizontal">
@@ -33,7 +33,7 @@
       </fieldset>
       <textarea name="message"
                 rows="20" style="font-weight:normal;"
-                placeholder="!addon_name!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
+                placeholder="!{{addon_name}}!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
                 ></textarea>
     </form>
   </body>
