@@ -1148,13 +1148,24 @@ function getAddonForms() {
                 if (line.startsWith('ADDON ')) {
                     var addonForm = {};
                     var name = null;
-                    line.split(/\s+/).forEach(function(token) {
+                    const tokens = line.split(/\s+/);
+                    for (var t = 0; t < tokens.length; ++t) {
+                        var token = tokens[t];
                         if (token.startsWith('-')) {
                             name = token.substring(1);
+                            if (name == 'fn') {
+                                // The value may contain whitespace.
+                                var value = '';
+                                while (++t < tokens.length && tokens[t] != '-a') {
+                                    value += (value && ' ') + tokens[t];
+                                }
+                                --t;
+                                addonForm[name] = value;
+                            }
                         } else if (name) {
                             addonForm[name] = token;
                         }
-                    });
+                    }
                     addonForms.push(addonForm);
                 }
             });
