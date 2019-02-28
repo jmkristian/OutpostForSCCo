@@ -65,7 +65,7 @@ const net = require('net');
 const os = require('os');
 const path = require('path');
 const querystring = require('querystring');
-const Transform = require('stream').Transform;
+const stream = require('stream');
 const url = require('url');
 const util = require('util');
 
@@ -76,7 +76,7 @@ const FORBIDDEN = 403;
 const htmlEntities = new AllHtmlEntities();
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
-const LogFileAgeLimitMs = 1000 * 60 * 60 * 24; // 24 hours
+const LogFileAgeLimitMs = 1000 * 60 * 60 * 24 * 7; // 7 days
 const NOT_FOUND = 404;
 const OpdFAIL = 'OpdFAIL';
 const OpenOutpostMessage = '/openOutpostMessage';
@@ -98,7 +98,7 @@ if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
     const verb = process.argv[2];
     if (verb != 'serve') {
-        logToFile(path.join('logs', verb + '.log'));
+        logToFile(verb);
     }
     try {
         switch(verb) {
@@ -351,7 +351,7 @@ function stopServers(next) {
         var ports = [];
         const fileNames = fs.readdirSync('logs', {encoding: ENCODING});
         fileNames.forEach(function(fileName) {
-            var found = /^server-(\d*)\.log$/.exec(fileName);
+            var found = /\.server-(\d*)\.log$/.exec(fileName);
             if (found && found[1]) {
                 ports.push(found[1]);
             }
@@ -422,6 +422,12 @@ function serve() {
     var port;
     app.set('etag', false); // convenient for troubleshooting
     app.set('trust proxy', ['loopback']); // to find the IP address of a client
+    app.get('/ping-:formId', function(req, res, next) {
+        keepAlive(req.params.formId);
+        res.statusCode = NOT_FOUND;
+        noCache(res);
+        res.end(); // with no body. The client ignores this response.
+    });
     app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
     app.all('/http-echo', function(req, res, next) {
         // Respond with a copy of the request.
@@ -471,12 +477,6 @@ function serve() {
         var form = openForms[req.params.formId];
         res.set(form.fromOutpost.headers);
         res.end(form.fromOutpost.body);
-    });
-    app.get('/ping-:formId', function(req, res, next) {
-        keepAlive(req.params.formId);
-        res.statusCode = NOT_FOUND;
-        noCache(res);
-        res.end(); // with no body. The client ignores this response.
     });
     app.get('/msgs/:msgno', function(req, res, next) {
         // The client may not get the message this way,
@@ -554,10 +554,8 @@ function serve() {
         fs.mkdirSync('logs');
     }
     fs.writeFileSync(PortFileName, port + '', {encoding: ENCODING}); // advertise my port
-    const logFileName = path.resolve('logs', 'server-' + port + '.log');
-    logToFile(logFileName);
+    logToFile('server-' + port);
     log('Listening for HTTP requests on port ' + port + '...');
-    deleteOldFiles('logs', /^server-\d*\.log$/, LogFileAgeLimitMs);
     const checkSilent = setInterval(function() {
         // Scan openForms and close any that have been quiet too long.
         var anyOpen = false;
@@ -1231,13 +1229,16 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
     }
 }
 
-function logToFile(fileName) {
-    const windowsEOL = new Transform({
+function logToFile(fileNameSuffix) {
+    if (!fs.existsSync('logs')) {
+        fs.mkdirSync('logs');
+    }
+    const windowsEOL = new stream.Transform({
         // Transform line endings from Unix style to Windows style.
         transform: function(chunk, encoding, output) {
             if (encoding == 'buffer') {
                 output(null, new Buffer(chunk.toString('binary')
-                                             .replace(/([^\r])\n/g, '$1' + EOL),
+                                        .replace(/([^\r])\n/g, '$1' + EOL),
                                         'binary'));;
             } else if (typeof chunk == 'string') {
                 output(null, chunk.replace(/([^\r])\n/g, '$1' + EOL));
@@ -1246,14 +1247,32 @@ function logToFile(fileName) {
             }
         }
     });
-    if (!fs.existsSync(path.dirname(fileName))) {
-        fs.mkdirSync(path.dirname(fileName));
-    }
-    const fileStream = fs.createWriteStream(fileName, {autoClose: true});
-    windowsEOL.pipe(fileStream);
+    var fileDate = null;
+    var fileStream = null;
+    const dailyFile = new stream.Writable(
+        {decodeStrings: false, objectMode: true,
+         write: function(chunk, encoding, next) {
+             var today = new Date();
+             today.setUTCHours(0);
+             today.setUTCMinutes(0);
+             today.setUTCSeconds(0);
+             today.setUTCMilliseconds(0);
+             if (fileDate != +today) {
+                 const prefix = today.toISOString().substring(0, 10) + '.';
+                 const fileName = path.join('logs', prefix + fileNameSuffix +'.log');
+                 if (fileStream) {
+                     fileStream.end();
+                 }
+                 fileStream = fs.createWriteStream(fileName, {flags: 'a', autoClose: true});
+                 fileDate = +today;
+                 logFileName = fileName;
+                 deleteOldFiles('logs', /\.log$/, LogFileAgeLimitMs);
+             }
+             return fileStream.write(chunk, encoding, next);
+         }});
+    windowsEOL.pipe(dailyFile);
     const writer = windowsEOL.write.bind(windowsEOL);
     process.stdout.write = process.stderr.write = writer;
-    logFileName = fileName;
 }
 
 function expandVariablesInFile(variables, fromFile, intoFile) {

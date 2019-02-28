@@ -1,6 +1,7 @@
 #!/bin/bash
 # This script can be executed by the bash that's packaged with git for Windows.
 cd `dirname "$0"` || exit $?
+rm -r logs
 if [ ! -e node_modules ]; then
     npm install # https://nodejs.org
     npm install --global pkg@4.2.6 # https://github.com/zeit/pkg
