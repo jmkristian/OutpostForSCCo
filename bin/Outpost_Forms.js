@@ -596,7 +596,7 @@ function onOpen(formId, args) {
         args: args,
         quietSeconds: 0
     };
-    log('form ' + formId + ' opened');
+    log('/form-' + formId + ' opened');
 }
 
 function keepAlive(formId) {
@@ -611,7 +611,7 @@ function keepAlive(formId) {
 function closeForm(formId) {
     var form = openForms[formId];
     if (form) {
-        log('form ' + formId + ' closed');
+        log('/form-' + formId + ' closed');
         if (form.environment && form.environment.MSG_FILENAME) {
             const msgFileName = path.resolve(PackItMsgs, form.environment.MSG_FILENAME);
             fs.unlink(msgFileName, function(err) {
@@ -667,18 +667,17 @@ function onGetForm(formId, res) {
     if (formId <= 0) {
         res.status(400).end('Form numbers start with 1.', CHARSET);
     } else if (!form) {
-        log('form ' + formId + ' is not open');
+        log('/form-' + formId + ' is not open');
         if (formId < nextFormId) {
             res.status(NOT_FOUND)
                 .end('/form-' + formId + ' was discarded, since it was submitted or closed.',
                      CHARSET);
         } else {
             res.status(NOT_FOUND)
-                .end('Form ' + formId + ' has not been opened.',
-                     CHARSET);
+                .end('/form-' + formId + ' has not been opened.', CHARSET);
         }
     } else {
-        log('form ' + formId + ' viewed');
+        log('/form-' + formId + ' viewed');
         try {
             res.set({'Content-Type': TEXT_HTML});
             if (!form.environment) {
@@ -789,7 +788,7 @@ function getIntegrationFile(req, res) {
                 const referer = req.headers.referer || req.headers.referrer;
                 const formId = parseInt(referer.substring(referer.lastIndexOf('-') + 1));
                 const form = openForms[formId];
-                log('form ' + formId + ' expand integration file');
+                log('/form-' + formId + ' expand integration file');
                 // Insert some stuff:
                 body = expandVariables(body,
                                        {message: JSON.stringify(form.message),
@@ -819,7 +818,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
     const callback = function callback(err) {
         try {
             if (!err) {
-                log('form ' + formId + ' submitted');
+                log('/form-' + formId + ' submitted');
                 form.environment.mode = 'readonly';
                 res.redirect('/form-' + formId);
                 // Don't closeForm, so the operator can view it.
@@ -829,7 +828,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
                     throw err;
                 }
                 form.fromOutpost = err;
-                log('form ' + formId + ' from Outpost ' + JSON.stringify(err));
+                log('/form-' + formId + ' from Outpost ' + JSON.stringify(err));
                 var page = PROBLEM_HEADER + EOL
                     + 'When the message was submitted, Outpost responded:<br/><br/>' + EOL
                     + '<iframe src="' + fromOutpostURL + '" style="width:95%;"></iframe><br/><br/>' + EOL;
@@ -900,7 +899,7 @@ function submitToOpdirect(submission, callback) {
             function(err, data, res) {
                 try {
                     if (data == null) data = '';
-                    log('form ' + submission.formId + ' from Opdirect {' + err + '} ' + data);
+                    log('/form-' + submission.formId + ' from Opdirect {' + err + '} ' + data);
                     if (err) {
                         if (err == 'req.timeout' || err == 'res.timeout') {
                             err = "Outpost didn't respond within " + SUBMIT_TIMEOUT_SEC + ' seconds.'
@@ -941,7 +940,7 @@ function submitToOpdirect(submission, callback) {
             });
         server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
         server.setTimeout(SUBMIT_TIMEOUT_SEC * 1000);
-        log('form ' + submission.formId + ' submitting ' + JSON.stringify(options) + ' ' + body);
+        log('/form-' + submission.formId + ' submitting ' + JSON.stringify(options) + ' ' + body);
         // URL encode the 'E' in '#EOF', to prevent Outpost from treating this as a PacFORM message:
         body = (body + message).replace(/%23EOF/gi, function(match) {
             // Case insensitive:
@@ -986,7 +985,7 @@ function submitToAoclient(submission, callback) {
                 options.push('-u');
             }
             const program = path.join ('addons', submission.addonName, 'Aoclient.exe');
-            log('form ' + submission.formId + ' submitting ' + program + ' ' + options.join(' '));
+            log('/form-' + submission.formId + ' submitting ' + program + ' ' + options.join(' '));
             child_process.execFile(
                 program, options,
                 function(err, stdout, stderr) {
