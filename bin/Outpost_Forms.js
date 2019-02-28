@@ -685,13 +685,13 @@ function onGetForm(formId, res) {
                 form.message = getMessage(form.environment);
                 if (form.message) {
                     if (!form.environment.ADDON_MSG_TYPE) {
-                        var foundFilename = /[\r\n]#[ \t]*FORMFILENAME:([^\r\n]*)[\r\n]/.exec(form.message);
+                        var foundFilename = /[\r\n]#[ \t]*(T|FORMFILENAME):([^\r\n]*)[\r\n]/.exec(form.message);
                         if (foundFilename) {
-                            form.environment.ADDON_MSG_TYPE = foundFilename[1].trim();
+                            form.environment.ADDON_MSG_TYPE = foundFilename[2].trim();
                         } else {
                             throw new Error(
                                 "I don't know what form to display, since"
-                                    + "\nthe message doesn't have a line that starts with '# FORMFILENAME: '.");
+                                    + "\nthe message doesn't have a line that starts with '#T: ' or '# FORMFILENAME: '.");
                         }
                     }
                 }
@@ -708,12 +708,10 @@ function onGetForm(formId, res) {
             }
             if (['draft', 'read', 'unread'].indexOf(form.environment.message_status) >= 0) {
                 const receiverFileName = formFileName.replace(/\.([^.]*)$/, '.receiver.$1');
-log("receiverFileName " + receiverFileName);
                 if (fs.existsSync(path.join(PackItForms, receiverFileName))) {
                     formFileName = receiverFileName;
                 }
             }
-log("formFileName " + formFileName);
             try {
                 var html = fs.readFileSync(path.join(PackItForms, formFileName), ENCODING);
             } catch(err) {
@@ -846,9 +844,13 @@ function onSubmit(formId, q, res, fromOutpostURL) {
         }
     };
     try {
-        var message = q.formtext;
-        const foundSubject = /[\r\n]#[ \t]*SUBJECT:[ \t]*([^\r\n]*)/.exec(message);
-        const subject = foundSubject ? foundSubject[1] : '';
+        var subject = '';
+        var message = q.formtext.replace(
+            /[\r\n]*#[ \t]*Subject:[ \t]*([^\r\n]*)/i,
+            function(found, $1) {
+                subject = $1;
+                return '';
+            });
         const foundSeverity = /[\r\n]4.:[ \t]*\[([A-Za-z]*)]/.exec(message);
         const severity = foundSeverity ? foundSeverity[1].toUpperCase() : '';
         // Outpost requires Windows-style line breaks:
