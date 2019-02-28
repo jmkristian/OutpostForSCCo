@@ -351,7 +351,11 @@ function stopServers(next) {
         var ports = [];
         const fileNames = fs.readdirSync('logs', {encoding: ENCODING});
         fileNames.forEach(function(fileName) {
-            var found = /\.server-(\d*)\.log$/.exec(fileName);
+            var found = /^server-(\d*)\.log$/.exec(fileName);
+            if (found && found[1]) {
+                ports.push(found[1]);
+            }
+            found = /-server-(\d*)\.log$/.exec(fileName);
             if (found && found[1]) {
                 ports.push(found[1]);
             }
@@ -1258,7 +1262,7 @@ function logToFile(fileNameSuffix) {
              today.setUTCSeconds(0);
              today.setUTCMilliseconds(0);
              if (fileDate != +today) {
-                 const prefix = today.toISOString().substring(0, 10) + '.';
+                 const prefix = today.toISOString().substring(0, 10) + '-';
                  const fileName = path.join('logs', prefix + fileNameSuffix +'.log');
                  if (fileStream) {
                      fileStream.end();
