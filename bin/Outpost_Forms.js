@@ -837,7 +837,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
                         .replace(/[\r\n]+/g, '<br/>' + EOL) + '<br/>' + EOL;
                 }
                 if (logFileName) {
-                    page += encodeHTML('log file: ' + logFileName) + '<br/>' + EOL;
+                    page += encodeHTML('log file ' + logFileName) + '<br/>' + EOL;
                 }
                 page += '</body></html>';
                 res.end(page);
@@ -1193,7 +1193,7 @@ function errorToHTML(err, state) {
         message += encodeHTML(stateString) + '<br/>' + EOL;
     }
     if (logFileName) {
-        message += encodeHTML('log file: ' + logFileName) + '<br/>' + EOL;
+        message += encodeHTML('log file ' + logFileName) + '<br/>' + EOL;
     }
     return PROBLEM_HEADER + message + '</body></html>';
 }
@@ -1270,7 +1270,7 @@ function logToFile(fileNameSuffix) {
                  }
                  fileStream = fs.createWriteStream(fileName, {flags: 'a', autoClose: true});
                  fileDate = +today;
-                 logFileName = fileName;
+                 logFileName = path.resolve(fileName);
                  deleteOldFiles('logs', /\.log$/, LogFileAgeLimitMs);
              }
              return fileStream.write(chunk, encoding, next);
