@@ -76,7 +76,8 @@ const FORBIDDEN = 403;
 const htmlEntities = new AllHtmlEntities();
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
-const LogFileAgeLimitMs = 1000 * 60 * 60 * 24 * 7; // 7 days
+const seconds = 1000;
+const hours = 60 * 60 * seconds;
 const NOT_FOUND = 404;
 const OpdFAIL = 'OpdFAIL';
 const OpenOutpostMessage = '/openOutpostMessage';
@@ -300,7 +301,7 @@ function openMessage() {
             if (retries == 1 || retries == 4) {
                 startServer(programPath);
             }
-            setTimeout(tryNow, retries * 1000);
+            setTimeout(tryNow, retries * seconds);
         }
     }
     tryNow();
@@ -939,7 +940,7 @@ function submitToOpdirect(submission, callback) {
                 }
             });
         server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
-        server.setTimeout(SUBMIT_TIMEOUT_SEC * 1000);
+        server.setTimeout(SUBMIT_TIMEOUT_SEC * seconds);
         log('/form-' + submission.formId + ' submitting ' + JSON.stringify(options) + ' ' + body);
         // URL encode the 'E' in '#EOF', to prevent Outpost from treating this as a PacFORM message:
         body = (body + message).replace(/%23EOF/gi, function(match) {
@@ -1104,7 +1105,7 @@ function onPostHttpRequest(req, res) {
                     log('connected(' + err + ')');
                     if (err) throw err;
                     if (req.body.timeout) {
-                        server.setTimeout(parseFloat(req.body.timeout) * 1000);
+                        server.setTimeout(parseFloat(req.body.timeout) * seconds);
                     }
                     log('server.pipe ...');
                     server.pipe(res);
@@ -1114,7 +1115,7 @@ function onPostHttpRequest(req, res) {
                         setTimeout(function() {
                             log('server.write ' + body2);
                             server.write(body2);
-                        }, pauseTime * 1000);
+                        }, pauseTime * seconds);
                     }
                 } catch(err) {
                     onError('throw')(err);
@@ -1252,26 +1253,34 @@ function logToFile(fileNameSuffix) {
             }
         }
     });
-    var fileDate = null;
     var fileStream = null;
+    var fileName = null;
+    var nextDay = 0;
     const dailyFile = new stream.Writable(
         {decodeStrings: false, objectMode: true,
          write: function(chunk, encoding, next) {
              var today = new Date();
-             today.setUTCHours(0);
-             today.setUTCMinutes(0);
-             today.setUTCSeconds(0);
-             today.setUTCMilliseconds(0);
-             if (fileDate != +today) {
+             if (+today >= nextDay) {
+                 today.setUTCHours(0);
+                 today.setUTCMinutes(0);
+                 today.setUTCSeconds(0);
+                 today.setUTCMilliseconds(0);
                  const prefix = today.toISOString().substring(0, 10) + '-';
-                 const fileName = path.join('logs', prefix + fileNameSuffix +'.log');
-                 if (fileStream) {
-                     fileStream.end();
+                 const nextFileName = path.join('logs', prefix + fileNameSuffix +'.log');
+                 if (nextFileName == fileName) {
+                     // Oops, we jumped the gun. Wait a second longer:
+                     nextDay = +today + seconds;
+                 } else {
+                     nextDay = +today + (24 * hours);
+                     const nextFileStream = fs.createWriteStream(nextFileName, {flags: 'a', autoClose: true});
+                     if (fileStream) {
+                         fileStream.end();
+                     }
+                     fileStream = nextFileStream;
+                     fileName = nextFileName;
+                     logFileName = path.resolve(fileName);
+                     deleteOldFiles('logs', /\.log$/, 7 * 24 * hours);
                  }
-                 fileStream = fs.createWriteStream(fileName, {flags: 'a', autoClose: true});
-                 fileDate = +today;
-                 logFileName = path.resolve(fileName);
-                 deleteOldFiles('logs', /\.log$/, LogFileAgeLimitMs);
              }
              return fileStream.write(chunk, encoding, next);
          }});
