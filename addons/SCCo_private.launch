@@ -7,3 +7,5 @@ ADDON -fn TEST XSC RACES Mutual Aid Request    -a SCCoPIFO -t form-oa-mutual-aid
 LINE
 ADDON -fn TEST MHOC Beds Status                -a SCCoPIFO -t form-mhoc-beds-status.html
 ADDON -fn TEST MHOC Resource Request           -a SCCoPIFO -t form-mhoc-resource-request.html
+ADDON -fn TEST Medical Facility Status         -a SCCoPIFO -t form-medical-facility-status.html
+ADDON -fn TEST Allied Health Facility Status   -a SCCoPIFO -t form-allied-health-facility-status.html
