@@ -434,22 +434,6 @@ function serve() {
         res.end(); // with no body. The client ignores this response.
     });
     app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
-    app.all('/http-echo', function(req, res, next) {
-        // Respond with a copy of the request.
-        try {
-            var headers = 'Request was:\n'
-                + req.method + ' ' + req.url
-                + (req.httpVersion ? " HTTP/" + req.httpVersion : "")
-                + '\n' + formatRawHeaders(req.rawHeaders) + '\n';
-            req.pipe(concat_stream(function(body) {
-                res.set({'Content-Type': TEXT_PLAIN});
-                res.end(headers + body.toString(CHARSET));
-            }));
-        } catch(err) {
-            res.set({'Content-Type': TEXT_HTML});
-            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
-        }
-    });
     app.use(bodyParser.json({type: JSON_TYPE}));
     app.use(bodyParser.urlencoded({extended: false}));
     app.post(OpenOutpostMessage, function(req, res, next) {
@@ -529,9 +513,6 @@ function serve() {
             res.set({'Content-Type': TEXT_HTML});
             res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
         }
-    });
-    app.post('/http-request', function(req, res, next) {
-        onPostHttpRequest(req, res);
     });
     app.get('/resources/integration/*', function(req, res, next) {
         getIntegrationFile(req, res);
@@ -1042,98 +1023,6 @@ function onGetManual(res) {
         }
         res.end();
     });
-}
-
-function onPostHttpRequest(req, res) {
-    const onError = function(event) {
-        return function(err, data) {
-            log('onError(' + event + ')(' + err + ', ' + data + ')');
-            try {
-                res.set({'Content-Type': TEXT_HTML});
-            } catch(err) {
-                log(err);
-            }
-            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
-        }
-    }
-    try {
-        res.set({'Content-Type': TEXT_PLAIN});
-        const clientAddress = req.ip;
-        if (['127.0.0.1', '::ffff:127.0.0.1'].indexOf(clientAddress) < 0) {
-            // Don't serve a remote client. It might be malicious.
-            res.statusCode = FORBIDDEN;
-            res.statusMessage = 'Your address is ' + clientAddress;
-            res.end('Your address is ' + clientAddress, CHARSET);
-            log('POST from ' + clientAddress);
-        } else {
-            // Send an HTTP request.
-            const URL = url.parse('http://' + req.body.URL);
-            const options = {host: URL.hostname, port: URL.port || 80};
-            var headers =
-                req.body.method + ' ' + URL.path + ' HTTP/1.1' + EOL
-                + 'Host: ' + options.host + ':' + options.port + EOL
-                + 'Connection: close' + EOL;
-            for (var name in req.body) {
-                if (name.startsWith('header.')) {
-                    var value = req.body[name];
-                    if (value) {
-                        headers += (name.substring(7) + ': ' + value + EOL);
-                    }
-                }
-            }
-            headers += ('Content-Length: ' + (req.body.body || '').length + EOL);
-            headers += EOL; // end of headers
-            var pauseTime = 0;
-            var body = '';
-            var body2 = '';
-            if (req.body.body) {
-                if (!(req.body.pauseStart && req.body.pauseTime)) {
-                    body += req.body.body;
-                } else {
-                    const pauseStart = parseInt(req.body.pauseStart);
-                    pauseTime = parseFloat(req.body.pauseTime);
-                    body += req.body.body.substring(0, pauseStart);
-                    body2 = req.body.body.substring(pauseStart);
-                }
-            }
-            const server = new net.Socket();
-            server.on('error', onError('error'));
-            server.on('timeout', onError('timeout'));
-            log('server.connect ' + JSON.stringify(options));
-            server.connect(options, function(err) {
-                try {
-                    log('connected(' + err + ')');
-                    if (err) throw err;
-                    if (req.body.timeout) {
-                        server.setTimeout(parseFloat(req.body.timeout) * seconds);
-                    }
-                    log('server.pipe ...');
-                    server.pipe(res);
-                    log('server.write ' + headers + body);
-                    server.write(headers + body);
-                    if (body2) {
-                        setTimeout(function() {
-                            log('server.write ' + body2);
-                            server.write(body2);
-                        }, pauseTime * seconds);
-                    }
-                } catch(err) {
-                    onError('throw')(err);
-                }
-            });
-        }
-    } catch(err) {
-        onError('throw')(err);
-    }
-}
-
-function formatRawHeaders(rawHeaders) {
-    var headers = "";
-    for (var h = 0; h < rawHeaders.length; ) {
-        headers += rawHeaders[h++] + ': ';
-        headers += rawHeaders[h++] + '\n';
-    }
-    return headers;
 }
 
 function copyHeaders(from) {
