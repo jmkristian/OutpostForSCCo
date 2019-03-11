@@ -12,5 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-!define VersionMajor 1
-!define VersionMinor 18N
+!define VersionMajor 2
+!define VersionMinor 0
