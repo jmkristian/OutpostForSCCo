@@ -1,5 +1,5 @@
 LINE
-ADDON -fn TEST XSC ICS-213 Message Form        -a SCCoPIFO -t form-ics213.html
+ADDON -fn TEST XSC ICS-213 Message             -a SCCoPIFO -t form-ics213.html
 ADDON -fn TEST XSC EOC-213RR Resource Request  -a SCCoPIFO -t form-scco-eoc-213rr.html
 ADDON -fn TEST XSC OA Municipal Status         -a SCCoPIFO -t form-oa-muni-status.html
 ADDON -fn TEST XSC OA Shelter Status           -a SCCoPIFO -t form-oa-shelter-status.html
