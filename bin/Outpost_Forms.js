@@ -839,6 +839,8 @@ function onSubmit(formId, q, res, fromOutpostURL) {
             });
         const foundSeverity = /[\r\n]4.:[ \t]*\[([A-Za-z]*)]/.exec(message);
         const severity = foundSeverity ? foundSeverity[1].toUpperCase() : '';
+        const foundHandling = /[\r\n]5.:[ \t]*\[([A-Za-z]*)]/.exec(message);
+        const handling = foundHandling ? foundHandling[1].toUpperCase() : '';
         // Outpost requires Windows-style line breaks:
         form.message = message.replace(/([^\r])\n/g, '$1' + EOL);
         if (form.environment.message_status == 'manual') {
@@ -850,7 +852,8 @@ function onSubmit(formId, q, res, fromOutpostURL) {
                 form: form,
                 addonName: form.environment.addon_name,
                 subject: subject,
-                urgent: (['URGENT', 'U', 'EMERGENCY', 'E'].indexOf(severity) >= 0),
+                urgent: (['URGENT', 'U', 'EMERGENCY', 'E'].indexOf(severity) >= 0)
+                    || (['IMMEDIATE', 'I'].indexOf(handling) >= 0)
             }, callback);
         }
     } catch(err) {
