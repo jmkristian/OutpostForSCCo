@@ -173,6 +173,7 @@ function installConfigFiles(myDirectory, addonNames) {
         // Use launch.cmd instead of launch.vbs:
         launch = path.join(myDirectory, 'bin', 'launch.cmd');
     }
+    expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch}, 'UserGuide.html');
     addonNames.forEach(function(addon_name) {
         expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch},
                               path.join('addons', addon_name + '.ini'));
