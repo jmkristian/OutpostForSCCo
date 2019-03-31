@@ -5,7 +5,7 @@ ADDON -fn TEST XSC OA Municipal Status         -a SCCoPIFO -t form-oa-muni-statu
 ADDON -fn TEST XSC OA Shelter Status           -a SCCoPIFO -t form-oa-shelter-status.html
 LINE
 ADDON -fn TEST XSC HAvBed Report                 -a SCCoPIFO -t form-mhoc-beds-status.html
-ADDON -fn TEST XSC Medical Facility Status       -a SCCoPIFO -t form-medical-facility-status.html
+ADDON -fn TEST XSC Medical Facility Status       -a SCCoPIFO -t form-medical-facility-status-v2.html
 ADDON -fn TEST XSC Medical Resource Request      -a SCCoPIFO -t form-medical-resource-request.html
 ADDON -fn TEST XSC Allied Health Facility Status -a SCCoPIFO -t form-allied-health-facility-status.html
 LINE
