@@ -26,6 +26,5 @@ Function ChooseAddonFiles
   File /oname=${addon_name}.launch "addons\${LaunchFile}"
 FunctionEnd
 
-!include setup-version.nsi
 OutFile "SCCoPIFOsetup${VersionMajor}.${VersionMinor}${OutFileSuffix}.exe"
 !include setup.nsi

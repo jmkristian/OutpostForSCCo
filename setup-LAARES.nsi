@@ -26,6 +26,5 @@ Function ChooseAddonFiles
   File addons\${addon_name}.launch
 FunctionEnd
 
-!include setup-version.nsi
 OutFile "${INSTDIR_NAME}_Setup-${VersionMajor}.${VersionMinor}.exe"
 !include setup.nsi
