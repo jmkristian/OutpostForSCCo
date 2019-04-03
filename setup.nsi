@@ -81,7 +81,7 @@ Function FindOutpost
           DetailPrint `No $R1`
         ${Else}
           DetailPrint `Found Outpost data folder $R1`
-          StrCpy $OUTPOST_DATA "$OUTPOST_DATA $\"$R1$\""
+          StrCpy $OUTPOST_DATA '$OUTPOST_DATA "$R1"'
         ${EndIf}
       ${EndIf}
     ${EndIf}
@@ -95,6 +95,19 @@ Function FindOutpost
   Pop $R1
   Pop $R0
 FunctionEnd
+
+!macro Execute COMMAND
+  Push $R0
+  DetailPrint `Execute: ${COMMAND}`
+  nsExec::ExecToLog '${COMMAND}'
+  Pop $R0
+  ${If} "$R0" != 0
+    SetErrors
+    DetailPrint `nsExec::ExecToLog returned $R0`
+  ${EndIf}
+  Pop $R0
+!macroend
+!define Execute '!insertmacro "Execute"'
 
 !macro Delete NAME
   IfFileExists "${NAME}" 0 +5
@@ -239,9 +252,9 @@ Section "Install"
 
   # Stop the server (so it will release its lock on the program and log file):
   ${If} ${FileExists} "${PROGRAM_PATH}"
-    ExecShellWait open "${PROGRAM_PATH}" "stop" SW_SHOWMINIMIZED
+    ${Execute} "${PROGRAM_PATH} stop"
   ${ElseIf} ${FileExists} "bin\Outpost_Forms.exe"
-    ExecShellWait open "bin\Outpost_Forms.exe" "stop" SW_SHOWMINIMIZED
+    ${Execute} "bin\Outpost_Forms.exe stop"
   ${Else}
     DetailPrint `No ${PROGRAM_PATH}`
   ${EndIf}
@@ -359,8 +372,7 @@ Section "Install"
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
 
   ClearErrors
-  DetailPrint `${PROGRAM_PATH} install $WSCRIPT_EXE$OUTPOST_DATA`
-  ExecShellWait open "${PROGRAM_PATH}" "install $WSCRIPT_EXE$OUTPOST_DATA" SW_SHOWMINIMIZED
+  ${Execute} '${PROGRAM_PATH} install "$WSCRIPT_EXE" $OUTPOST_DATA'
   ${If} ${Errors}
     Abort "${PROGRAM_PATH} install failed"
   ${EndIf}
@@ -368,12 +380,12 @@ Section "Install"
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ClearErrors
   ${If} ${AtMostWinXP}
-    ExecShellWait open              "bin\launch.cmd" "dry-run ${PROGRAM_PATH}" SW_SHOWMINIMIZED
+    ExecShellWait open      "bin\launch.cmd" "dry-run ${PROGRAM_PATH}" SW_SHOWMINIMIZED
   ${Else}
-    ExecShellWait open "$WSCRIPT_EXE" "bin\launch.vbs dry-run ${PROGRAM_PATH}" SW_SHOWMINIMIZED
+    ${Execute} '"$WSCRIPT_EXE" bin\launch.vbs dry-run ${PROGRAM_PATH}'
   ${EndIf}
   ${If} ${Errors}
-    DetailPrint `dry-run failed`
+    Abort "dry-run failed"
   ${EndIf}
 SectionEnd
 
@@ -386,8 +398,7 @@ Section "Uninstall"
 
   # Remove our line from Outpost configuration files
   Call un.FindOutposts
-  DetailPrint `${PROGRAM_PATH} uninstall$OUTPOST_DATA`
-  ExecShellWait open "${PROGRAM_PATH}" "uninstall$OUTPOST_DATA" SW_SHOWMINIMIZED
+  ${Execute} "${PROGRAM_PATH} uninstall$OUTPOST_DATA"
 
   Call un.SetShellVarContextAppropriately
   ${Delete} "$SMPROGRAMS\SCCo Packet\Uninstall ${DisplayName}.lnk"

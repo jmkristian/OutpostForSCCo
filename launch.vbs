@@ -28,5 +28,6 @@ objConfig.ShowWindow = 0
 set process = GetObject("winmgmts:Win32_Process") 
 result = process.Create(command_line, my_folder, objConfig, processid) 
 If result <> 0 Then
-  WScript.Echo "Error, process.Create(" & command_line & ") returned " & result
+  Call MsgBox("process.Create (" & command_line & ") returned " & result, vbOKOnly + vbExclamation)
 End If
+WScript.Quit(result)
