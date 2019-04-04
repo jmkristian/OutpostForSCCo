@@ -61,13 +61,9 @@ const express = require('express');
 const fs = require('fs');
 const http = require('http');
 const morgan = require('morgan');
-const net = require('net');
-const os = require('os');
 const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
-const url = require('url');
-const util = require('util');
 
 const CHARSET = 'utf-8'; // for HTTP
 const ENCODING = CHARSET; // for reading from files
@@ -130,10 +126,11 @@ if (process.argv.length > 2) {
             stopServers(function() {});
             break;
         default:
-            log(process.argv[1] + ': unknown verb "' + verb + '"');
+            throw 'unknown verb "' + verb + '"';
         }
     } catch(err) {
         log(err);
+        process.exit(1);
     }
 }
 
@@ -147,7 +144,7 @@ function build(addonVersion, addonName, programPath, displayName) {
     expandVariablesInFile({addon_name: addonName},
                           path.join('bin', 'manual.html'),
                           path.join('built', 'manual.html'));
-    ['browse.cmd', 'launch-v.cmd', 'launch.cmd', 'launch.vbs', 'UserGuide.html'].forEach(function(fileName) {
+    ['browse.cmd', 'launch-v.cmd', 'launch.vbs', 'UserGuide.html'].forEach(function(fileName) {
         expandVariablesInFile({PROGRAM_PATH: programPath, DisplayName: displayName},
                               fileName, path.join('built', fileName));
     });
@@ -165,14 +162,6 @@ function install() {
 
 function installConfigFiles(myDirectory, addonNames) {
     var launch = process.argv[3] + ' ' + path.join(myDirectory, 'bin', 'launch.vbs');
-    const version = os.release().split(/\./);
-    const majorVersion = parseInt(version[0], 10);
-    if (majorVersion < 6) {
-        // We're running on Windows XP or Windows Server 2003, per
-        // https://docs.microsoft.com/en-us/windows/desktop/api/winnt/ns-winnt-_osversioninfoa#remarks
-        // Use launch.cmd instead of launch.vbs:
-        launch = path.join(myDirectory, 'bin', 'launch.cmd');
-    }
     expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch}, 'UserGuide.html');
     addonNames.forEach(function(addon_name) {
         expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch},
@@ -279,7 +268,7 @@ function getAddonNames(directoryName) {
 }
 
 function openMessage() {
-    var programPath = process.argv[3];
+    const programPath = process.argv[3];
     var args = [];
     for (var i = 4; i < process.argv.length; i++) {
         args.push(process.argv[i]);

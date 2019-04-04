@@ -321,7 +321,6 @@ Section "Install"
   # Files to install:
   SetOutPath "$INSTDIR\bin"
   File built\launch.vbs
-  File built\launch.cmd
   File built\launch-v.cmd
   File built\manual.html
   SetOutPath "$INSTDIR"
@@ -379,11 +378,7 @@ Section "Install"
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ClearErrors
-  ${If} ${AtMostWinXP}
-    ExecShellWait open      "bin\launch.cmd" "dry-run ${PROGRAM_PATH}" SW_SHOWMINIMIZED
-  ${Else}
-    ${Execute} '"$WSCRIPT_EXE" bin\launch.vbs dry-run ${PROGRAM_PATH}'
-  ${EndIf}
+  ${Execute} '"$WSCRIPT_EXE" bin\launch.vbs dry-run ${PROGRAM_PATH}'
   ${If} ${Errors}
     Abort "dry-run failed"
   ${EndIf}

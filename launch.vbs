@@ -18,16 +18,15 @@ Next
 command_line = Join(arguments)
 ' WScript.Echo command_line
 
-' Set options for process creation:
-set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2") 
-set objStartup = objWMIService.Get("Win32_ProcessStartup")
-set objConfig = objStartup.SpawnInstance_
-objConfig.ShowWindow = 0
-
 ' Create process:
-set process = GetObject("winmgmts:Win32_Process") 
-result = process.Create(command_line, my_folder, objConfig, processid) 
-If result <> 0 Then
-  Call MsgBox("process.Create (" & command_line & ") returned " & result, vbOKOnly + vbExclamation)
+On Error Resume Next
+set shell = WScript.CreateObject("WScript.Shell")
+shell.CurrentDirectory = my_folder
+result = shell.Run(command_line, vbHide, true)
+If Err.Number <> 0 Then
+  Call MsgBox("Error " & Err.Number & " from WScript.Shell.Run " & command_line, vbOKOnly + vbExclamation)
+  WScript.Quit Err.Number
+ElseIf result <> 0 Then
+  Call MsgBox("Error " & result & " from " & command_line, vbOKOnly + vbExclamation)
+  WScript.Quit result
 End If
-WScript.Quit(result)
