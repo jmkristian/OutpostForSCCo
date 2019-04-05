@@ -842,8 +842,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
                 form: form,
                 addonName: form.environment.addon_name,
                 subject: subject,
-                urgent: (['URGENT', 'U', 'EMERGENCY', 'E'].indexOf(severity) >= 0)
-                    || (['IMMEDIATE', 'I'].indexOf(handling) >= 0)
+                urgent: (['IMMEDIATE', 'I'].indexOf(handling) >= 0)
             }, callback);
         }
     } catch(err) {
