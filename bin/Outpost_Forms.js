@@ -445,7 +445,7 @@ function serve() {
     });
     app.get('/form-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
-        onGetForm(req.params.formId, res);
+        onGetForm(req.params.formId, req, res);
     });
     app.post('/submit-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
@@ -632,7 +632,7 @@ function getMessage(environment) {
 }
 
 /** Handle an HTTP GET /form-id request. */
-function onGetForm(formId, res) {
+function onGetForm(formId, req, res) {
     noCache(res);
     res.set({'Content-Type': TEXT_PLAIN});
     var form = openForms[formId];
@@ -656,6 +656,14 @@ function onGetForm(formId, res) {
                 form.environment = parseArgs(form.args);
                 form.environment.pingURL = '/ping-' + formId;
                 form.environment.submitURL = '/submit-' + formId;
+            }
+            if (req.query) {
+                if (req.query.message_status) {
+                    form.environment.message_status = req.query.message_status;
+                }
+                if (req.query.mode) {
+                    form.environment.mode = req.query.mode;
+                }
             }
             if (form.message == null) {
                 form.message = getMessage(form.environment);
