@@ -32,6 +32,7 @@ Var /GLOBAL OUTPOST_CODE
 Var /GLOBAL OUTPOST_DATA
 Var /GLOBAL AOCLIENT_EXE
 Var /GLOBAL WSCRIPT_EXE
+Var /GLOBAL SILENT_LOG
 
 Function .onInit
   StrCpy $OUTPOST_DATA ""
@@ -62,25 +63,38 @@ Function ifOutpostDataDefined
   ${EndIf}
 FunctionEnd
 
+Function LogSilent
+  Exch $R0
+  DetailPrint "$R0"
+  IfSilent +1 +2
+    FileWrite $SILENT_LOG "$R0$\r$\n"
+  Pop $R0
+FunctionEnd
+!macro LogSilent message
+  Push "${message}"
+  Call LogSilent
+!macroend
+!define LogSilent '!insertmacro "LogSilent"'
+
 Function FindOutpost
   Exch $R0
   Push $R1
   ${IfNot} ${FileExists} "$R0"
-    DetailPrint `No $R0`
+    ${LogSilent} `No $R0`
   ${Else}
     ${IfNot} ${FileExists} "$R0\Outpost.conf"
-      DetailPrint `No $R0\Outpost.conf`
+      ${LogSilent} `No $R0\Outpost.conf`
     ${Else}
       StrCpy $R1 ""
       ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
       ${If} "$R1" == ""
-        DetailPrint `No DataDir in $R0\Outpost.conf`
+        ${LogSilent} `No DataDir in $R0\Outpost.conf`
       ${Else}
         StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
         ${IfNot} ${FileExists} "$R1"
-          DetailPrint `No $R1`
+          ${LogSilent} `No $R1`
         ${Else}
-          DetailPrint `Found Outpost data folder $R1`
+          ${LogSilent} `Found Outpost data $R1`
           StrCpy $OUTPOST_DATA '$OUTPOST_DATA "$R1"'
         ${EndIf}
       ${EndIf}
@@ -153,13 +167,13 @@ Function FindOutposts
       ${If} "$R2" == "SCCo Packet"
         ReadRegStr $R2 HKLM "${InstalledKey}\$R1" "InstallLocation"
         ${If} "$R2" == ""
-          DetailPrint `No InstallLocation in $R1`
+          ${LogSilent} `No InstallLocation in $R1`
         ${Else}
           StrCpy $R3 $R2 1 -1
           ${If} "$R3" == "\"
             StrCpy $R2 $R2 -1
           ${EndIf}
-          DetailPrint `InstallLocation: $R2 in $R1`
+          ${LogSilent} `InstallLocation: $R2 in $R1`
           Push "$R2"
           Call FindOutpost
         ${EndIf}
@@ -259,18 +273,22 @@ Section "Install"
     DetailPrint `No ${PROGRAM_PATH}`
   ${EndIf}
 
+  IfSilent +1 +3
+    FileOpen $SILENT_LOG silent.log w
+    Call FindOutposts
   ${If} "$OUTPOST_DATA" == ""
     StrCpy $R0 "I won't add forms to Outpost"
     StrCpy $R0 "$R0, because I didn't find Outpost's data folder."
     StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
     MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noFormsOK
     Call FindOutposts # DetailPrint diagnostic information
+    ${LogSilent} "No Outpost data folder"
     Abort "No Outpost data folder"
     noFormsOK:
   ${Else}
-    DetailPrint `Outpost data $OUTPOST_DATA`
+    ${LogSilent} `Outpost data$OUTPOST_DATA`
   ${EndIf}
-  DetailPrint `Outpost $OUTPOST_CODE`
+  ${LogSilent} `Outpost code$OUTPOST_CODE`
 
   Call DeleteMyFiles
   ${If} ${Errors}
@@ -284,8 +302,8 @@ Section "Install"
     ${EndIf}
   ${EndIf}
   ${Delete} uninstall.exe
-  FileOpen $R0 "$INSTDIR\uninstallFrom.txt" w
-  FileWrite $R0 $OUTPOST_DATA
+  FileOpen $R0 "uninstallFrom.txt" w
+  FileWrite $R0 "$OUTPOST_DATA"
   FileClose $R0
   FileOpen $R0 "version.txt" w
   FileWrite $R0 "${VersionMajor}.${VersionMinor}"
@@ -382,6 +400,8 @@ Section "Install"
   ${If} ${Errors}
     Abort "dry-run failed"
   ${EndIf}
+  IfSilent +1 +2
+    FileClose $SILENT_LOG
 SectionEnd
 
 Section "Uninstall"
@@ -402,6 +422,7 @@ Section "Uninstall"
     StrCpy $R0 "Some files were not deleted from $INSTDIR."
     MessageBox MB_OK|MB_ICONINFORMATION "$R0" /SD IDOK
   ${EndIf}
+  ${Delete} silent.log
   ${Delete} uninstallFrom.txt
   RMDir "$INSTDIR" # Do nothing if the directory is not empty
 SectionEnd
