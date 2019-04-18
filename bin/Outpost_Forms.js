@@ -169,7 +169,7 @@ function installConfigFiles(myDirectory, addonNames) {
     });
 }
 
-/* Make sure Outpost's Launch.local files include addons/*.launch. */
+/* Make sure Outpost's Launch.ini or Launch.local file includes addons/*.launch. */
 function installIncludes(myDirectory, addonNames) {
     const oldInclude = new RegExp('^INCLUDE[ \\t]+' + enquoteRegex(myDirectory) + '[\\\\/]', 'i');
     var myIncludes = addonNames.map(function(addonName) {
@@ -177,7 +177,14 @@ function installIncludes(myDirectory, addonNames) {
     });
     // Each of the process arguments names a directory that contains Outpost configuration data.
     for (var a = 4; a < process.argv.length; a++) {
-        var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
+        var outpostLaunch = path.resolve(process.argv[a], 'Launch.ini');
+        if (fs.readFileSync(outpostLaunch, ENCODING).split(/[\r\n]+/).some(function(line) {
+            return oldInclude.test(line);
+        })) {
+            log('already included into ' + outpostLaunch);
+            continue;
+        }
+        outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
         // Upsert myIncludes into outpostLaunch:
         if (!fs.existsSync(outpostLaunch)) {
             // Work around a bug: Outpost might ignore the first line of Launch.local.
