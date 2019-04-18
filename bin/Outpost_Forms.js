@@ -177,14 +177,15 @@ function installIncludes(myDirectory, addonNames) {
     });
     // Each of the process arguments names a directory that contains Outpost configuration data.
     for (var a = 4; a < process.argv.length; a++) {
-        var outpostLaunch = path.resolve(process.argv[a], 'Launch.ini');
-        if (fs.readFileSync(outpostLaunch, ENCODING).split(/[\r\n]+/).some(function(line) {
+        var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
+        var launchIni = path.resolve(process.argv[a], 'Launch.ini');
+        if (fs.readFileSync(launchIni, ENCODING).split(/[\r\n]+/).some(function(line) {
             return oldInclude.test(line);
         })) {
-            log('already included into ' + outpostLaunch);
+            log('already included into ' + launchIni);
+            removeIncludes(addonNames, outpostLaunch);
             continue;
         }
-        outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
         // Upsert myIncludes into outpostLaunch:
         if (!fs.existsSync(outpostLaunch)) {
             // Work around a bug: Outpost might ignore the first line of Launch.local.
@@ -233,29 +234,33 @@ function uninstall() {
         const addonNames = getAddonNames();
         log('addons ' + JSON.stringify(addonNames));
         for (a = 3; a < process.argv.length; a++) {
-            var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
-            if (fs.existsSync(outpostLaunch)) {
-                // Remove INCLUDEs from outpostLaunch:
+            removeIncludes(addonNames, path.resolve(process.argv[a], 'Launch.local'));
+        }
+    });
+}
+
+function removeIncludes(addonNames, outpostLaunch) {
+    if (fs.existsSync(outpostLaunch)) {
+        // Remove INCLUDEs from outpostLaunch:
+        fs.readFile(outpostLaunch, ENCODING, function(err, data) {
+            if (err) {
+                log(err);
+            } else {
+                var newData = data;
                 addonNames.forEach(function(addonName) {
                     var myLaunch = enquoteRegex(path.resolve(process.cwd(), 'addons', addonName + '.launch'));
                     var myInclude1 = new RegExp('^INCLUDE[ \\t]+' + myLaunch + '[\r\n]*', 'i');
                     var myInclude = new RegExp('[\r\n]+INCLUDE[ \\t]+' + myLaunch + '[\r\n]+', 'gi');
-                    fs.readFile(outpostLaunch, ENCODING, function(err, data) {
-                        if (err) {
-                            log(err);
-                        } else {
-                            var newData = data.replace(myInclude1, '').replace(myInclude, EOL);
-                            if (newData != data) {
-                                fs.writeFile(outpostLaunch, newData, {encoding: ENCODING}, function(err) {
-                                    log(err ? err : ('removed ' + addonName + ' from ' + outpostLaunch));
-                                });
-                            }
-                        }
-                    });
+                    newData = newData.replace(myInclude1, '').replace(myInclude, EOL);
                 });
+                if (newData != data) {
+                    fs.writeFile(outpostLaunch, newData, {encoding: ENCODING}, function(err) {
+                        log(err ? err : ('removed ' + JSON.stringify(addonNames) + ' from ' + outpostLaunch));
+                    });
+                }
             }
-        }
-    });
+        });
+    }
 }
 
 /** Return a list of names, such that for each name there exists a <name>.launch file in the given directory. */
