@@ -847,9 +847,6 @@ function onSubmit(formId, q, res, fromOutpostURL) {
                 subject = $1;
                 return '';
             });
-        subject = subject.replace(/[^ -~]/g, function(found) {
-            return '~';
-        });
         const foundSeverity = /[\r\n]4.:[ \t]*\[([A-Za-z]*)]/.exec(message);
         const severity = foundSeverity ? foundSeverity[1].toUpperCase() : '';
         const foundHandling = /[\r\n]5.:[ \t]*\[([A-Za-z]*)]/.exec(message);
