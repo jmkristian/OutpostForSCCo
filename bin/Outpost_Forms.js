@@ -643,7 +643,7 @@ function getMessage(environment) {
 function onGetForm(formId, req, res) {
     noCache(res);
     res.set({'Content-Type': TEXT_PLAIN});
-    var form = openForms[formId];
+    const form = openForms[formId];
     if (formId <= 0) {
         res.status(400).end('Form numbers start with 1.', CHARSET);
     } else if (!form) {
@@ -660,70 +660,97 @@ function onGetForm(formId, req, res) {
         log('/form-' + formId + ' viewed');
         try {
             res.set({'Content-Type': TEXT_HTML});
-            if (!form.environment) {
-                form.environment = parseArgs(form.args);
-                form.environment.pingURL = '/ping-' + formId;
-                form.environment.submitURL = '/submit-' + formId;
+            loadForm(formId, form, req);
+            if (form.environment.message_status == 'manual-created') {
+                showManualMessage(form, res);
+            } else {
+                showForm(form, res);
             }
-            if (req.query) {
-                if (req.query.message_status) {
-                    form.environment.message_status = req.query.message_status;
-                }
-                if (req.query.mode) {
-                    form.environment.mode = req.query.mode;
-                }
-            }
-            if (form.message == null) {
-                form.message = getMessage(form.environment);
-                if (form.message) {
-                    if (!form.environment.ADDON_MSG_TYPE) {
-                        const foundType = form.message.split(/[\r\n]+/).map(function(line) {
-                            return /^#\s*(T|FORMFILENAME):\s*(.*)/.exec(line);
-                        }).filter(function(found) {
-                            return !!found;
-                        });
-                        if (foundType.length > 0) {
-                            form.environment.ADDON_MSG_TYPE = foundType[0][2].trim();
-                        } else {
-                            throw new Error(
-                                "I don't know what form to display, since the message doesn't contain"
-                                    + " a line that starts with \"#T:\" or \"#FORMFILENAME:\".");
-                        }
-                    }
-                }
-            }
-            log(form.environment);
-            if (!form.environment.addon_name) {
-                throw new Error('addon_name is ' + form.environment.addon_name);
-            }
-            var formFileName = form.environment.ADDON_MSG_TYPE;
-            if (!formFileName) {
-                throw new Error("I don't know what form to display, since"
-                                + "I received " + JSON.stringify(formFileName)
-                                + " instead of the name of a form.");
-            }
-            if (['draft', 'read', 'unread'].indexOf(form.environment.message_status) >= 0) {
-                const receiverFileName = formFileName.replace(/\.([^.]*)$/, '.receiver.$1');
-                if (fs.existsSync(path.join(PackItForms, receiverFileName))) {
-                    formFileName = receiverFileName;
-                }
-            }
-            try {
-                var html = fs.readFileSync(path.join(PackItForms, formFileName), ENCODING);
-            } catch(err) {
-                throw new Error("I don't know about a form named "
-                                + JSON.stringify(form.environment.ADDON_MSG_TYPE) + ".\n"
-                                + "Perhaps the message came from a newer version of this "
-                                + form.environment.addon_name + " add-on, "
-                                + "so it might help if you install the latest version.\n"
-                                + err);
-            }
-            html = expandDataIncludes(html, form);
-            res.send(html);
         } catch(err) {
-            res.send(errorToHTML(err, form));
+            res.end(errorToHTML(err, form), CHARSET);
         }
     }
+}
+
+function loadForm(formId, form, req) {
+    if (!form.environment) {
+        form.environment = parseArgs(form.args);
+        form.environment.pingURL = '/ping-' + formId;
+        form.environment.submitURL = '/submit-' + formId;
+    }
+    if (req.query) {
+        if (req.query.message_status) {
+            form.environment.message_status = req.query.message_status;
+        }
+        if (req.query.mode) {
+            form.environment.mode = req.query.mode;
+        }
+    }
+    if (form.message == null) {
+        form.message = getMessage(form.environment);
+        if (form.message) {
+            if (!form.environment.ADDON_MSG_TYPE) {
+                const foundType = form.message.split(/[\r\n]+/).map(function(line) {
+                    return /^#\s*(T|FORMFILENAME):\s*(.*)/.exec(line);
+                }).filter(function(found) {
+                    return !!found;
+                });
+                if (foundType.length > 0) {
+                    form.environment.ADDON_MSG_TYPE = foundType[0][2].trim();
+                } else {
+                    throw new Error(
+                        "I don't know what form to display, since the message doesn't contain"
+                            + " a line that starts with \"#T:\" or \"#FORMFILENAME:\".");
+                }
+            }
+        }
+    }
+}
+
+function showForm(form, res) {
+    log(form.environment);
+    if (!form.environment.addon_name) {
+        throw new Error('addon_name is ' + form.environment.addon_name);
+    }
+    var formFileName = form.environment.ADDON_MSG_TYPE;
+    if (!formFileName) {
+        throw new Error("I don't know what form to display, since"
+                        + "I received " + JSON.stringify(formFileName)
+                        + " instead of the name of a form.");
+    }
+    if (['draft', 'read', 'unread'].indexOf(form.environment.message_status) >= 0) {
+        const receiverFileName = formFileName.replace(/\.([^.]*)$/, '.receiver.$1');
+        if (fs.existsSync(path.join(PackItForms, receiverFileName))) {
+            formFileName = receiverFileName;
+        }
+    }
+    try {
+        var html = fs.readFileSync(path.join(PackItForms, formFileName), ENCODING);
+    } catch(err) {
+        throw new Error("I don't know about a form named "
+                        + JSON.stringify(form.environment.ADDON_MSG_TYPE) + ".\n"
+                        + "Perhaps the message came from a newer version of this "
+                        + form.environment.addon_name + " add-on, "
+                        + "so it might help if you install the latest version.\n"
+                        + err);
+    }
+    html = expandDataIncludes(html, form);
+    res.send(html);
+}
+
+function showManualMessage(form, res) {
+    const template = path.join('bin', 'message.html');
+    fs.readFile(template, {encoding: ENCODING}, function(err, data) {
+        try {
+            if (err) throw err;
+            res.end(expandVariables(data,
+                                    {SUBJECT: encodeHTML(form.subject),
+                                     MESSAGE: encodeHTML(form.message)}),
+                    CHARSET);
+        } catch(err) {
+            res.end(errorToHTML(err, form.environment), CHARSET);
+        }
+    });
 }
 
 /* Expand data-include-html elements, for example:
@@ -854,7 +881,10 @@ function onSubmit(formId, q, res, fromOutpostURL) {
         // Outpost requires Windows-style line breaks:
         form.message = message.replace(/([^\r])\n/g, '$1' + EOL);
         if (form.environment.message_status == 'manual') {
-            onSubmitManual(subject, message, res);
+            form.environment.message_status = 'manual-created';
+            form.subject = subject;
+            form.message = message;
+            res.redirect('/form-' + formId);
         } else {
             submitToOpdirect({
                 formId: formId,
@@ -867,23 +897,6 @@ function onSubmit(formId, q, res, fromOutpostURL) {
     } catch(err) {
         callback(err);
     }
-}
-
-/** Handle an HTTP GET /manual request. */
-function onSubmitManual(subject, message, res) {
-    res.set({'Content-Type': TEXT_HTML});
-    const template = path.join('bin', 'message.html');
-    fs.readFile(template, {encoding: ENCODING}, function(err, data) {
-        try {
-            if (err) throw err;
-            res.end(expandVariables(data,
-                                    {SUBJECT: encodeHTML(subject),
-                                     MESSAGE: encodeHTML(message)}),
-                    CHARSET);
-        } catch(err) {
-            res.end(errorToHTML(err, form.environment), CHARSET);
-        }
-    });
 }
 
 function submitToOpdirect(submission, callback) {
