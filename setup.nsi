@@ -341,6 +341,7 @@ Section "Install"
   File built\launch.vbs
   File built\launch-v.cmd
   File built\manual.html
+  File bin\message.html
   SetOutPath "$INSTDIR"
   File built\browse.cmd
   File built\UserGuide.html

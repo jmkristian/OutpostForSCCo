@@ -3,7 +3,13 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
     <link rel="stylesheet" type="text/css" href="resources/css/pack-it-forms.css"/>
-    <title>Message Forms</title>
+    <style>
+      form input[type="submit"] {
+          font-weight: bold;
+          background-color: #bbeeff;
+      }
+    </style>
+    <title>SCCoPIFO</title>
     <script type="text/javascript">
       var ping_sequence = Math.random();
       setInterval(function() {
@@ -12,29 +18,63 @@
           img.src = "/ping-0?i=" + (ping_sequence++);
           img = undefined;
       }, 30000); // call ping every 30 seconds
+      function onMessage(message) {
+          var button = document.getElementById("view-message");
+          button.disabled = !(message.value && message.value.trim());
+      }
+      function onMessageFile(input) {
+          if (input.value) {
+              var reader = new FileReader();
+              reader.onload = function(e) {
+                  var message = document.getElementById("message");
+                  message.value = e.target.result;
+                  onMessage(message);
+              };
+              reader.readAsText(input.files[0]);
+          }
+      }
     </script>
   </head>
-  <body style="padding-top:1em;">
-    <br/>
+  <body style="padding-top:0;">
+    <h3>Santa Clara County ARES/RACES PackItForms</h3>
     <form action="/manual-create" method="POST" target="_blank">
       <fieldset class="horizontal">
-        <input type="submit" value="Create a message:"/>
+        <b>Create a message to send:</b>
         <select name="form">{{form_options}}
         </select>
+        <input type="submit" value="Create"/>
       </fieldset>
     </form>
     <br/>
     <form action="/manual-view" method="POST" target="_blank">
-      <fieldset class="horizontal">
-        <input type="submit" value="View a message:"/>
-        <label class="label-sameline">My Msg #
-          <input type="text" name="MSG_LOCAL_ID" class="call-sign">
-        </label>
-      </fieldset>
-      <textarea name="message"
-                rows="20" style="font-weight:normal;"
-                placeholder="!{{addon_name}}!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
-                ></textarea>
+      <table style="margin-top:0.5em;">
+        <tr>
+          <td colspan="2">
+            <fieldset class="horizontal">
+              <b>View a received message:</b>
+              Enter the message below and then click
+              <input type="submit" id="view-message" value="View" disabled/>
+            </fieldset>
+          </td>
+        </tr><tr>
+          <td style="text-align:right;white-space:nowrap;width:1px;">Local Message Number:</td>
+          <td><input type="text" name="MSG_LOCAL_ID" class="message-number"></td>
+        </tr><tr>
+          <td style="text-align:right;">Message:</td>
+          <td>
+            <fieldset class="horizontal">
+              Paste the message here or upload it from a file.
+              <input id="message-file" type="file"
+                     onchange="onMessageFile(this)" onclick="this.value = ''"/>
+            </fieldset>
+            <textarea name="message" id="message" rows="40" style="font-weight:normal;"
+                      placeholder="!{{addon_name}}!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
+                      onchange="onMessage(this)" oninput="onMessage(this)"
+                      ></textarea>
+          </td>
+        </tr>
+      </table>
+      <input type="text" name="addon_name" value="{{addon_name}}" style="display:none;"/>
     </form>
   </body>
 </html>
