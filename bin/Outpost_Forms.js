@@ -300,8 +300,9 @@ function openMessage() {
             logAndAbort('Goodbye.');
         } else {
             ++retries;
+            log('retries = ' + retries);
             if (retries == 1 || retries == 4) {
-                startServer(programPath);
+                startProcess(programPath, ['serve'], {detached: true, stdio: 'ignore'});
             }
             setTimeout(tryNow, retries * seconds);
         }
@@ -327,25 +328,26 @@ function openForm(args, tryLater) {
         if (err) {
             tryLater(err);
         } else {
+            log('opened form');
             process.exit(0); // mission accomplished
         }
     }).end(postData, CHARSET);
 }
 
-function startServer(programPath) {
-    const command = 'start /B ' + programPath + ' serve';
-    log(command);
-    child_process.exec(
-        command,
-        {windowsHide: true},
-        function(err, stdout, stderr) {
-            // Sadly, this code is never executed.
-            // It appears that the underlying system call blocks until
-            // the server terminates, or perhaps a long time elapses.
-            // So, don't put code here that's needed to make progress.
+function startProcess(program, args, options) {
+    log('startProcess(' + program + ' ' + args.join(' ') + ')');
+    try {
+        const child = child_process.spawn(program, args, options);
+        child.on('error', function(err) {
             log(err);
-            log('started server ' + stdout.toString(ENCODING) + stderr.toString(ENCODING));
         });
+        if (child.disconnect) {
+            child.disconnect();
+        }
+        child.unref();
+    } catch(err) {
+        log(err);
+    }
 }
 
 function stopServers(next) {
@@ -445,14 +447,8 @@ function serve() {
         if (args && args.length > 0) {
             const formId = '' + nextFormId++;
             onOpen(formId, args);
-            const command = 'start "Browse" /B http://' + LOCALHOST + ':' + port + '/form-' + formId;
-            log(command);
-            child_process.exec(
-                command,
-                function(err, stdout, stderr) {
-                    log(err);
-                    log('started browser ' + stdout.toString(ENCODING) + stderr.toString(ENCODING));
-                });
+            startProcess('start', ['http://' + LOCALHOST + ':' + port + '/form-' + formId],
+                         {shell: true, detached: true, stdio: 'ignore'});
         }
     });
     app.get('/form-:formId', function(req, res, next) {
