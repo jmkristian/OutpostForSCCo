@@ -4,12 +4,15 @@
     <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
     <link rel="stylesheet" type="text/css" href="resources/css/pack-it-forms.css"/>
     <style>
-      form input[type="submit"] {
+      form input[type="button"], form input[type="reset"]  {
+          background-color: #bbeeff;
+      }
+      form input[type="submit"]  {
           font-weight: bold;
           background-color: #bbeeff;
       }
     </style>
-    <title>SCCo pack-it-forms</title>
+    <title>SCCo PackItForms</title>
     <script type="text/javascript">
       var ping_sequence = Math.random();
       setInterval(function() {
@@ -18,42 +21,74 @@
           img.src = "/ping-0?i=" + (ping_sequence++);
           img = undefined;
       }, 30000); // call ping every 30 seconds
+      function onFormToCreate(value) {
+          var button = document.getElementById("create-form");
+          button.disabled = !value;
+      }
       function onMessage(message) {
           var button = document.getElementById("view-message");
           button.disabled = !(message.value && message.value.trim());
       }
+      function uploadMessage(file) {
+          var reader = new FileReader();
+          reader.onload = function(e) {
+              var message = document.getElementById("message");
+              message.value = e.target.result;
+              document.getElementById("message-file-name").innerText = file.name;
+              onMessage(message);
+          };
+          reader.readAsText(file);
+      }
       function onMessageFile(input) {
+          document.getElementById("message-file-name").innerText = "";
           if (input.value) {
-              var reader = new FileReader();
-              reader.onload = function(e) {
-                  var message = document.getElementById("message");
-                  message.value = e.target.result;
-                  onMessage(message);
-              };
-              reader.readAsText(input.files[0]);
+              uploadMessage(input.files[0]);
           }
+      }
+      function onMessageDrop(event) {
+          uploadMessage(event.dataTransfer.files[0]);
+          event.preventDefault();
+          event.stopPropagation();
+          return false;
       }
     </script>
   </head>
-  <body style="padding-top:0;">
-    <h3>Santa Clara County ARES/RACES PackItForms</h3>
+  <body style="padding-top:1em;">
+    <table class="same-line-label-layout">
+      <tr>
+        <td style="font-size:125%;font-weight:bold;">Santa Clara County ARES/RACES PackItForms</td>
+        <td style="text-align:right;">Version 1.1</td>
+      </tr>
+    </table>
     <form action="/manual-create" method="POST" target="_blank">
-      <fieldset class="horizontal">
-        <b>Create a message to send:</b>
-        <select name="form">{{form_options}}
-        </select>
-        <input type="submit" value="Create"/>
-      </fieldset>
+      <table style="margin-top:0.5em;">
+        <tr>
+          <td>
+            <fieldset class="horizontal">
+              <b>Create a message to send:</b>
+              <select name="form" onchange="onFormToCreate(this.value)">
+                <option value="" selected disabled>
+                  Select a form type ...
+                </option>{{form_options}}
+              </select>
+              <input id="create-form" type="submit" value="Create" disabled/>
+            </fieldset>
+          </td>
+        </tr>
+      </table>
     </form>
     <br/>
     <form action="/manual-view" method="POST" target="_blank">
-      <table style="margin-top:0.5em;">
+      <table>
         <tr>
           <td colspan="2">
             <fieldset class="horizontal">
               <b>View a received message:</b>
-              Enter the message below and then click
+              Enter the message and (optionally) a message number below, then click
               <input type="submit" id="view-message" value="View" disabled/>
+              To clear, click
+              <input type="reset" value="Clear"
+                     onclick="document.getElementById('view-message').disabled=true"/>
             </fieldset>
           </td>
         </tr><tr>
@@ -63,13 +98,17 @@
           <td style="text-align:right;">Message:</td>
           <td>
             <fieldset class="horizontal">
-              Paste the message here or upload it from a file.
-              <input id="message-file" type="file"
-                     onchange="onMessageFile(this)" onclick="this.value = ''"/>
+              Paste the message below or
+              <input type="button" value="upload it from a file."
+                     onclick="document.getElementById('message-file').click()"/>
+              <input id="message-file" type="file" style="display:none;"
+                     onchange="onMessageFile(this)"/>
+              <span id="message-file-name" style="margin-left:1em;"></span>
             </fieldset>
             <textarea name="message" id="message" rows="40" style="font-weight:normal;"
                       placeholder="!{{addon_name}}!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
                       onchange="onMessage(this)" oninput="onMessage(this)"
+                      ondrop="return onMessageDrop(event)"
                       ></textarea>
           </td>
         </tr>
