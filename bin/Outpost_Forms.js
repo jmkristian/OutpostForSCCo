@@ -694,9 +694,8 @@ function loadForm(formId, form, req) {
                 if (foundType.length > 0) {
                     form.environment.ADDON_MSG_TYPE = foundType[0][2].trim();
                 } else {
-                    throw new Error(
-                        "I don't know what form to display, since the message doesn't contain"
-                            + " a line that starts with \"#T:\" or \"#FORMFILENAME:\".");
+                    throw "I don't know what form to display, since the message doesn't contain"
+                        + " a line that starts with \"#T:\" or \"#FORMFILENAME:\".\n";
                 }
             }
         }
@@ -706,13 +705,13 @@ function loadForm(formId, form, req) {
 function showForm(form, res) {
     log(form.environment);
     if (!form.environment.addon_name) {
-        throw new Error('addon_name is ' + form.environment.addon_name);
+        throw new Error('addon_name is ' + form.environment.addon_name + '\n');
     }
     var formFileName = form.environment.ADDON_MSG_TYPE;
     if (!formFileName) {
-        throw new Error("I don't know what form to display, since"
-                        + "I received " + JSON.stringify(formFileName)
-                        + " instead of the name of a form.");
+        throw "I don't know what form to display, since"
+            + "I received " + JSON.stringify(formFileName)
+            + " instead of the name of a form.\n";
     }
     if (['draft', 'read', 'unread'].indexOf(form.environment.message_status) >= 0) {
         const receiverFileName = formFileName.replace(/\.([^.]*)$/, '.receiver.$1');
@@ -723,12 +722,12 @@ function showForm(form, res) {
     try {
         var html = fs.readFileSync(path.join(PackItForms, formFileName), ENCODING);
     } catch(err) {
-        throw new Error("I don't know about a form named "
-                        + JSON.stringify(form.environment.ADDON_MSG_TYPE) + ".\n"
-                        + "Perhaps the message came from a newer version of this "
-                        + form.environment.addon_name + " add-on, "
-                        + "so it might help if you install the latest version.\n"
-                        + err);
+        throw "I don't know about a form named "
+            + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
+            + " Perhaps the message came from a newer version of this "
+            + form.environment.addon_name + " add-on, "
+            + 'so it might help if you install the latest version.'
+            + '\n\n' + err;
     }
     html = expandDataIncludes(html, form);
     res.send(html);
@@ -897,7 +896,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
 
 function submitToOpdirect(submission, callback) {
     try {
-        if (!submission.addonName) throw 'addonName is required'; 
+        if (!submission.addonName) throw 'addonName is required.\n'; 
         // Outpost requires parameters to appear in a specific order.
         // So don't stringify them from a single object.
         var body = querystring.stringify({adn: submission.addonName});
@@ -1011,7 +1010,7 @@ function submitToAoclient(submission, callback) {
                     try {
                         if (err) throw err;
                         if (fs.existsSync(OpdFAIL)) {
-                            throw (OpdFAIL + ': ' + fs.readFileSync(OpdFAIL, ENCODING) + '\n'
+                            throw (OpdFAIL + ': ' + fs.readFileSync(OpdFAIL, ENCODING) + '\n\n'
                                    + stdout.toString(ENCODING)
                                    + stderr.toString(ENCODING));
                         }
@@ -1110,7 +1109,7 @@ function getAddonForms() {
 
 function errorToHTML(err, state) {
     var message = 'This information might help resolve the problem:<br/><br/>' + EOL
-        + encodeHTML(errorToMessage(err)).replace(/[\r\n]+/g, '<br/>' + EOL) + '<br/>' + EOL;
+        + encodeHTML(errorToMessage(err)).replace(/\r?\n/g, '<br/>' + EOL) + '<br/>' + EOL;
     if (state) {
         var stateString = JSON.stringify(state);
         if (stateString.startsWith('{')) {
