@@ -51,6 +51,10 @@
           event.stopPropagation();
           return false;
       }
+      function onMessageClear() {
+          document.getElementById("view-message").disabled = true;
+          document.getElementById("message-file-name").innerText = "";
+      }
     </script>
   </head>
   <body style="padding-top:1em;">
@@ -80,21 +84,21 @@
           <td colspan="2">
             <fieldset class="horizontal">
               <b>View a received message:</b>
-              Enter the message and (optionally) a message number below, then click
+              Enter information below and then click
               <input type="submit" id="view-message" value="View" disabled/>
-              To clear, click
-              <input type="reset" value="Clear"
-                     onclick="document.getElementById('view-message').disabled=true"/>
+              To clear the information, click
+              <input type="reset" value="Clear" onclick="onMessageClear(event)"/>
             </fieldset>
           </td>
         </tr><tr>
           <td style="text-align:right;white-space:nowrap;width:1px;">Local Message Number:</td>
-          <td><input type="text" name="MSG_LOCAL_ID" class="message-number"></td>
+          <td><input type="text" name="MSG_LOCAL_ID" class="message-number" style="display:inline;">
+            (optional)</td>
         </tr><tr>
           <td style="text-align:right;">Message:</td>
           <td>
             <fieldset class="horizontal">
-              Paste the message below or
+              Paste or drop the message below, or
               <input type="button" value="upload it from a file."
                      onclick="document.getElementById('message-file').click()"/>
               <input id="message-file" type="file" style="display:none;"
