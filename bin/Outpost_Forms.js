@@ -643,7 +643,7 @@ function findForm(formId) {
 function closeForm(formId) {
     var form = openForms[formId];
     if (form) {
-        if (form.message && form.environment.mode != 'readonly') {
+        if (form.environment.mode != 'readonly') {
             if (!fs.existsSync(SAVE_FOLDER)) {
                 fs.mkdirSync(SAVE_FOLDER);
             }
@@ -753,11 +753,6 @@ function loadForm(formId, form, req) {
             form.environment.mode = req.query.mode;
         }
     }
-    if (form.environment.mode == 'readonly') {
-        form.environment.pingURL = '/ping-' + formId;
-    } else {
-        form.environment.saveURL = '/save-' + formId;
-    }
     if (form.message == null) {
         form.message = getMessage(form.environment);
         if (form.message) {
@@ -775,6 +770,11 @@ function loadForm(formId, form, req) {
                 }
             }
         }
+    }
+    if (form.environment.mode == 'readonly') {
+        form.environment.pingURL = '/ping-' + formId;
+    } else {
+        form.environment.saveURL = '/save-' + formId;
     }
 }
 
