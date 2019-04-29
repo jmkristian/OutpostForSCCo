@@ -66,12 +66,13 @@ const querystring = require('querystring');
 const stream = require('stream');
 
 const CHARSET = 'utf-8'; // for HTTP
-const ENCODING = CHARSET; // for reading from files
+const ENCODING = CHARSET; // for files
 const EOL = '\r\n';
 const FORBIDDEN = 403;
 const htmlEntities = new AllHtmlEntities();
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
+const LOG_FOLDER = 'logs';
 const seconds = 1000;
 const hours = 60 * 60 * seconds;
 const NOT_FOUND = 404;
@@ -79,16 +80,18 @@ const OpdFAIL = 'OpdFAIL';
 const OpenOutpostMessage = '/openOutpostMessage';
 const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
-const PortFileName = path.join('logs', 'server-port.txt');
+const PortFileName = path.join(LOG_FOLDER, 'server-port.txt');
 const PROBLEM_HEADER = '<html><head><title>Problem</title></head><body>'
       + EOL + '<h3><img src="icon-warning.png" alt="warning"'
       + ' style="width:24pt;height:24pt;vertical-align:middle;margin-right:1em;">'
       + 'Something went wrong.</h3>';
+const SAVE_FOLDER = 'saved';
 const StopServer = '/stopOutpostForLAARES';
 const SUBMIT_TIMEOUT_SEC = 30;
 const TEXT_HTML = 'text/html; charset=' + CHARSET;
 const TEXT_PLAIN = 'text/plain; charset=' + CHARSET;
 
+var myServerPort = null;
 var logFileName = null;
 
 if (process.argv.length > 2) {
@@ -158,6 +161,16 @@ function install() {
     log('addons ' + JSON.stringify(addonNames));
     installConfigFiles(myDirectory, addonNames);
     installIncludes(myDirectory, addonNames);
+    fs.stat(LOG_FOLDER, function(err, stats) {
+        if (err || !stats) {
+            fs.mkdir(LOG_FOLDER, function(err){});
+        }
+    });
+    fs.stat(SAVE_FOLDER, function(err, stats) {
+        if (err || !stats) {
+            fs.mkdir(SAVE_FOLDER, function(err){});
+        }
+    });
 }
 
 function installConfigFiles(myDirectory, addonNames) {
@@ -354,7 +367,7 @@ function stopServers(next) {
     try {
         // Find the port numbers of all servers (including stopped servers):
         var ports = [];
-        const fileNames = fs.readdirSync('logs', {encoding: ENCODING});
+        const fileNames = fs.readdirSync(LOG_FOLDER, {encoding: ENCODING});
         fileNames.forEach(function(fileName) {
             var found = /^server-(\d*)\.log$/.exec(fileName);
             if (found && found[1]) {
@@ -422,13 +435,12 @@ function request(options, callback) {
     return req;
 }
 
-var openForms = {'0': {quietSeconds: 0}}; // all the forms that are currently open
+var openForms = {'0': {quietTime: 0}}; // all the forms that are currently open
 // Form 0 is a hack to make sure the server doesn't shut down immediately after starting.
 var nextFormId = 1; // Forms are assigned sequence numbers when they're opened.
 
 function serve() {
     const app = express();
-    var port;
     app.set('etag', false); // convenient for troubleshooting
     app.set('trust proxy', ['loopback']); // to find the IP address of a client
     app.get('/ping-:formId', function(req, res, next) {
@@ -447,13 +459,17 @@ function serve() {
         if (args && args.length > 0) {
             const formId = '' + nextFormId++;
             onOpen(formId, args);
-            startProcess('start', ['http://' + LOCALHOST + ':' + port + '/form-' + formId],
+            startProcess('start', ['http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId],
                          {shell: true, detached: true, stdio: 'ignore'});
         }
     });
     app.get('/form-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
         onGetForm(req.params.formId, req, res);
+    });
+    app.post('/save-:formId', function(req, res, next) {
+        onSaveMessage(req.params.formId, req);
+        res.end();
     });
     app.post('/submit-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
@@ -529,40 +545,62 @@ function serve() {
 
     const server = app.listen(0);
     const address = server.address();
-    port = address.port;
-    if (!fs.existsSync('logs')) {
-        fs.mkdirSync('logs');
+    myServerPort = address.port;
+    if (!fs.existsSync(LOG_FOLDER)) {
+        fs.mkdirSync(LOG_FOLDER);
     }
-    fs.writeFileSync(PortFileName, port + '', {encoding: ENCODING}); // advertise my port
-    logToFile('server-' + port);
-    log('Listening for HTTP requests on port ' + port + '...');
+    logToFile('server-' + myServerPort);
+    log('Listening for HTTP requests on port ' + myServerPort + '...');
+    fs.writeFileSync(PortFileName, myServerPort + '', {encoding: ENCODING}); // advertise my port
+    var idleTime = 0;
+    const checkInterval = 5 * seconds;
     const checkSilent = setInterval(function() {
         // Scan openForms and close any that have been quiet too long.
+        var anyForms = false;
         var anyOpen = false;
         for (formId in openForms) {
             var form = openForms[formId];
             if (form) {
-                form.quietSeconds += 5;
+                anyForms = true;
+                form.quietTime += checkInterval;
                 // The client is expected to GET /ping-formId every 30 seconds.
-                if (form.quietSeconds >= 300) {
+                if (form.quietTime >= (300 * seconds)) {
                     closeForm(formId);
                 } else {
                     anyOpen = true;
                 }
             }
         }
-        if (!anyOpen) {
-            log('forms are all closed');
-            clearInterval(checkSilent);
-            server.close();
-            fs.readFile(PortFileName, {encoding: ENCODING}, function(err, data) {
-                if (data.trim() == (port + '')) {
-                    fs.unlink(PortFileName, log);
-                }
-                process.exit(0);
-            });
+        if (anyOpen) {
+            idleTime = 0;
+        } else {
+            if (anyForms) {
+                log('forms are all closed');
+            }
+            idleTime += checkInterval;
+            if (idleTime >= 48 * hours) {
+                clearInterval(checkSilent);
+                deleteOldFiles(SAVE_FOLDER, new RegExp('^form-' + myServerPort + '-\\d*.json$'), -seconds);
+                fs.readFile(PortFileName, {encoding: ENCODING}, function(err, data) {
+                    if (!err && data && (data.trim() == (myServerPort + ''))) {
+                        fs.unlink(PortFileName, log);
+                    }
+                    server.close();
+                    process.exit(0);
+                });
+            } else {
+                fs.readFile(PortFileName, {encoding: ENCODING}, function(err, data) {
+                    if (err || (data && (data.trim() != (myServerPort + '')))) {
+                        clearInterval(checkSilent);
+                        deleteOldFiles(SAVE_FOLDER, new RegExp('^form-' + myServerPort + '-\\d*.json$'), -seconds);
+                        server.close();
+                        process.exit(0);
+                    }
+                });
+            }
         }
-    }, 5000);
+    }, checkInterval);
+    deleteOldFiles(SAVE_FOLDER, /^[^\.].*$/, 60 * seconds);
 }
 
 function onOpen(formId, args) {
@@ -570,23 +608,53 @@ function onOpen(formId, args) {
     // it can't show a problem to the operator.
     openForms[formId] = {
         args: args,
-        quietSeconds: 0
+        quietTime: 0
     };
     log('/form-' + formId + ' opened');
 }
 
 function keepAlive(formId) {
-    form = openForms[formId];
+    form = findForm(formId);
     if (form) {
-        form.quietSeconds = 0;
+        form.quietTime = 0;
     } else if (formId == "0") {
-        openForms[formId] = {quietSeconds: 0};
+        openForms[formId] = {quietTime: 0};
     }
+}
+
+function findForm(formId) {
+    var form = openForms[formId];
+    if (form == null) {
+        try {
+            const fileName = saveFileName(formId);
+            form = JSON.parse(fs.readFileSync(fileName, ENCODING));
+            if (form) {
+                form.quietTime = 0;
+                openForms[formId] = form;
+                log('Read ' + fileName);
+            }
+        } catch(err) {
+            log(err);
+        }
+    }
+    return form;
 }
 
 function closeForm(formId) {
     var form = openForms[formId];
     if (form) {
+        if (form.message && form.environment.mode != 'readonly') {
+            if (!fs.existsSync(SAVE_FOLDER)) {
+                fs.mkdirSync(SAVE_FOLDER);
+            }
+            const fileName = saveFileName(formId);
+            fs.writeFile(
+                fileName, JSON.stringify(form), {encoding: ENCODING},
+                function(err) {
+                    log(err ? err : 'Wrote ' + fileName);
+                });
+            deleteOldFiles(SAVE_FOLDER, /^form-\d+-\d+\.json$/, 7 * 24 * hours);
+        }
         log('/form-' + formId + ' closed');
         if (form.environment && form.environment.MSG_FILENAME) {
             const msgFileName = path.resolve(PackItMsgs, form.environment.MSG_FILENAME);
@@ -597,6 +665,10 @@ function closeForm(formId) {
         }
     }
     delete openForms[formId];
+}
+
+function saveFileName(formId) {
+    return path.join(SAVE_FOLDER, 'form-' + myServerPort + '-' + formId + '.json');
 }
 
 function parseArgs(args) {
@@ -639,7 +711,7 @@ function getMessage(environment) {
 function onGetForm(formId, req, res) {
     noCache(res);
     res.set({'Content-Type': TEXT_PLAIN});
-    const form = openForms[formId];
+    const form = findForm(formId);
     if (formId <= 0) {
         res.status(400).end('Form numbers start with 1.', CHARSET);
     } else if (!form) {
@@ -671,7 +743,6 @@ function onGetForm(formId, req, res) {
 function loadForm(formId, form, req) {
     if (!form.environment) {
         form.environment = parseArgs(form.args);
-        form.environment.pingURL = '/ping-' + formId;
         form.environment.submitURL = '/submit-' + formId;
     }
     if (req.query) {
@@ -681,6 +752,11 @@ function loadForm(formId, form, req) {
         if (req.query.mode) {
             form.environment.mode = req.query.mode;
         }
+    }
+    if (form.environment.mode == 'readonly') {
+        form.environment.pingURL = '/ping-' + formId;
+    } else {
+        form.environment.saveURL = '/save-' + formId;
     }
     if (form.message == null) {
         form.message = getMessage(form.environment);
@@ -827,8 +903,30 @@ function noCache(res) {
              'Expires': '0'}); // proxies
 }
 
+function onSaveMessage(formId, req) {
+    const form = findForm(formId);
+    if (form) {
+        var charset = CHARSET;
+        const contentType = req.headers['content-type'];
+        if (contentType) {
+            const found = /; *charset=([^ ;]+)/i.exec(contentType);
+            if (found) {
+                charset = found[1];
+            }
+        }
+        req.pipe(concat_stream(function(buffer) {
+            var message = buffer.toString(charset);
+            log('/save-' + formId + ' ' + message.length);
+            keepAlive(formId);
+            form.message = message;
+        }));
+    } else {
+        log('form ' + formId + ' not saved');
+    }
+}
+
 function onSubmit(formId, q, res, fromOutpostURL) {
-    const form = openForms[formId];
+    const form = findForm(formId);
     const callback = function callback(err) {
         try {
             if (!err) {
@@ -836,6 +934,11 @@ function onSubmit(formId, q, res, fromOutpostURL) {
                 form.environment.mode = 'readonly';
                 res.redirect('/form-' + formId);
                 // Don't closeForm, so the operator can view it.
+                // But do delete its save file (if any):
+                const fileName = saveFileName(formId);
+                fs.unlink(fileName, function(err) {
+                    if (!err) log("Deleted " + fileName);
+                });
             } else {
                 res.set({'Content-Type': TEXT_HTML});
                 if ((typeof err) != 'object') {

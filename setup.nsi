@@ -242,7 +242,6 @@ Function ${un}DeleteMyFiles
   ${Delete} launch-v.cmd
   ${Delete} version.txt
   ${RMDir} "$INSTDIR\bin"
-  ${RMDir} "$INSTDIR\logs"
   ${RMDir} "$INSTDIR\notes"
   ClearErrors
   ${Delete} browse.cmd
@@ -419,11 +418,13 @@ Section "Uninstall"
   Call un.SetShellVarContextAppropriately
   ${Delete} "$SMPROGRAMS\SCCo Packet\Uninstall ${DisplayName}.lnk"
   Call un.DeleteMyFiles
+  ${Delete} silent.log
+  ${Delete} uninstallFrom.txt
+  ${RMDir} "$INSTDIR\logs"
+  ${RMDir} "$INSTDIR\saved"
   ${If} ${Errors}
     StrCpy $R0 "Some files were not deleted from $INSTDIR."
     MessageBox MB_OK|MB_ICONINFORMATION "$R0" /SD IDOK
   ${EndIf}
-  ${Delete} silent.log
-  ${Delete} uninstallFrom.txt
   RMDir "$INSTDIR" # Do nothing if the directory is not empty
 SectionEnd
