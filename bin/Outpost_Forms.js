@@ -86,7 +86,7 @@ const PROBLEM_HEADER = '<html><head><title>Problem</title></head><body>'
       + ' style="width:24pt;height:24pt;vertical-align:middle;margin-right:1em;">'
       + 'Something went wrong.</h3>';
 const SAVE_FOLDER = 'saved';
-const StopServer = '/stopOutpostForLAARES';
+const StopServer = '/stopSCCoPIFO';
 const SUBMIT_TIMEOUT_SEC = 30;
 const TEXT_HTML = 'text/html; charset=' + CHARSET;
 const TEXT_PLAIN = 'text/plain; charset=' + CHARSET;
@@ -489,7 +489,7 @@ function serve() {
     });
     app.post(StopServer, function(req, res, next) {
         res.end(); // with no body
-        log('stopped');
+        log(StopServer);
         process.exit(0);
     });
     app.get('/manual', function(req, res, next) {
@@ -552,52 +552,61 @@ function serve() {
     logToFile('server-' + myServerPort);
     log('Listening for HTTP requests on port ' + myServerPort + '...');
     fs.writeFileSync(PortFileName, myServerPort + '', {encoding: ENCODING}); // advertise my port
+    const deleteMySaveFiles = function deleteMySaveFiles() {
+        deleteOldFiles(SAVE_FOLDER, new RegExp('^form-' + myServerPort + '-\\d*.json$'), -seconds);
+    };
     var idleTime = 0;
     const checkInterval = 5 * seconds;
     const checkSilent = setInterval(function() {
-        // Scan openForms and close any that have been quiet too long.
-        var anyForms = false;
-        var anyOpen = false;
-        for (formId in openForms) {
-            var form = openForms[formId];
-            if (form) {
-                anyForms = true;
-                form.quietTime += checkInterval;
-                // The client is expected to GET /ping-formId every 30 seconds.
-                if (form.quietTime >= (300 * seconds)) {
-                    closeForm(formId);
-                } else {
-                    anyOpen = true;
+        try {
+            // Scan openForms and close any that have been quiet too long.
+            var anyForms = false;
+            var anyOpen = false;
+            for (formId in openForms) {
+                var form = openForms[formId];
+                if (form) {
+                    anyForms = true;
+                    form.quietTime += checkInterval;
+                    // The client is expected to GET /ping-formId every 30 seconds.
+                    if (form.quietTime >= (300 * seconds)) {
+                        closeForm(formId);
+                    } else {
+                        anyOpen = true;
+                    }
                 }
             }
-        }
-        if (anyOpen) {
-            idleTime = 0;
-        } else {
-            if (anyForms) {
-                log('forms are all closed');
-            }
-            idleTime += checkInterval;
-            if (idleTime >= 48 * hours) {
-                clearInterval(checkSilent);
-                deleteOldFiles(SAVE_FOLDER, new RegExp('^form-' + myServerPort + '-\\d*.json$'), -seconds);
-                fs.readFile(PortFileName, {encoding: ENCODING}, function(err, data) {
-                    if (!err && data && (data.trim() == (myServerPort + ''))) {
-                        fs.unlink(PortFileName, log);
-                    }
-                    server.close();
-                    process.exit(0);
-                });
+            if (anyOpen) {
+                idleTime = 0;
             } else {
-                fs.readFile(PortFileName, {encoding: ENCODING}, function(err, data) {
-                    if (err || (data && (data.trim() != (myServerPort + '')))) {
-                        clearInterval(checkSilent);
-                        deleteOldFiles(SAVE_FOLDER, new RegExp('^form-' + myServerPort + '-\\d*.json$'), -seconds);
+                if (anyForms) {
+                    log('forms are all closed');
+                }
+                idleTime += checkInterval;
+                if (idleTime >= (48 * hours)) {
+                    log('idleTime = ' + (idleTime / hours) + ' hours');
+                    clearInterval(checkSilent);
+                    deleteMySaveFiles();
+                    fs.readFile(PortFileName, {encoding: ENCODING}, function(err, data) {
+                        if (!err && data && (data.trim() == (myServerPort + ''))) {
+                            fs.unlink(PortFileName, log);
+                        }
                         server.close();
                         process.exit(0);
-                    }
-                });
+                    });
+                } else {
+                    fs.readFile(PortFileName, {encoding: ENCODING}, function(err, data) {
+                        if (err || (data && (data.trim() != (myServerPort + '')))) {
+                            log(PortFileName + ' ' + (err ? err : data));
+                            clearInterval(checkSilent);
+                            deleteMySaveFiles();
+                            server.close();
+                            process.exit(0);
+                        }
+                    });
+                }
             }
+        } catch(err) {
+            log(err);
         }
     }, checkInterval);
     deleteOldFiles(SAVE_FOLDER, /^[^\.].*$/, 60 * seconds);
@@ -643,7 +652,9 @@ function findForm(formId) {
 function closeForm(formId) {
     var form = openForms[formId];
     if (form) {
-        if (form.environment.mode != 'readonly') {
+        if (!form.environment) {
+            log('form ' + formId + ' = ' + JSON.stringify(form));
+        } else if (form.environment.mode != 'readonly') {
             if (!fs.existsSync(SAVE_FOLDER)) {
                 fs.mkdirSync(SAVE_FOLDER);
             }
@@ -651,7 +662,7 @@ function closeForm(formId) {
             fs.writeFile(
                 fileName, JSON.stringify(form), {encoding: ENCODING},
                 function(err) {
-                    log(err ? err : 'Wrote ' + fileName);
+                    log(err ? err : ('Wrote ' + fileName));
                 });
             deleteOldFiles(SAVE_FOLDER, /^form-\d+-\d+\.json$/, 7 * 24 * hours);
         }
@@ -1247,8 +1258,7 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
                                     var fileTime = stats.mtime.getTime();
                                     if (fileTime < deadline) {
                                         fs.unlink(fullName, function(err) {
-                                            if (err) log(err);
-                                            else log("Deleted " + fullName);
+                                            log(err ? err : ("Deleted " + fullName));
                                         });
                                     }
                                 }
