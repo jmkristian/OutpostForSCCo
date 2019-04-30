@@ -528,9 +528,6 @@ function serve() {
             res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
         }
     });
-    app.get('/resources/integration/*', function(req, res, next) {
-        getIntegrationFile(req, res);
-    });
     app.get(/^\/.*/, express.static(PackItForms, {setHeaders: function(res, path, stat) {
         if (path) {
             const dot = path.lastIndexOf('.');
@@ -886,27 +883,6 @@ function expandDataInclude(data, form) {
         }
         return result;
     });
-}
-
-function getIntegrationFile(req, res) {
-    try {
-        const fileName =
-              path.join(PackItForms, req.path.substring(1).replace('/integration/', '/integration/scco/'));
-        fs.readFile(fileName, ENCODING, function(err, body) {
-            try {
-                if (err) throw err;
-                res.end(body, CHARSET);
-            } catch(err) {
-                res.set({'Content-Type': TEXT_HTML});
-                res.end(errorToHTML(err, JSON.stringify(fileName)
-                                    + '\n\n' + JSON.stringify(req.headers)),
-                        CHARSET);
-            }
-        });
-    } catch(err) {
-        res.set({'Content-Type': TEXT_HTML});
-        res.end(errorToHTML(err, JSON.stringify(req.path)), CHARSET);
-    }
 }
 
 function noCache(res) {

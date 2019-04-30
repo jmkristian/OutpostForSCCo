@@ -19,7 +19,7 @@
 !define WINDOW_TITLE "Los Altos ARES"
 
 Function ChooseAddonFiles
-  File /r /x "*~" /x .git* /x notes /x pacread \
+  File /r /x "*~" /x .git* /x notes /x pacread /x integration.js \
     /x form-mhoc*.html /x http-request.html /x pdf \
     pack-it-forms
   SetOutPath "$INSTDIR\addons"

@@ -19,7 +19,7 @@
 !define WINDOW_TITLE "Santa Clara County"
 
 Function ChooseAddonFiles
-  File /r /x "*~" /x .git* /x notes /x pacread \
+  File /r /x "*~" /x .git* /x notes /x pacread /x integration.js \
     /x form-los-altos*.html /x http-request.html \
     pack-it-forms
   SetOutPath "$INSTDIR\addons"

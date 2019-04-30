@@ -350,6 +350,7 @@ Section "Install"
   Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"
   File icon-*.png
+  File /oname=resources\integration\integration.js pack-it-forms\resources\integration\scco\integration.js
   SetOutPath "$INSTDIR"
 
   # define uninstaller:
