@@ -650,7 +650,8 @@ function findForm(formId) {
 }
 
 function closeForm(formId) {
-    var form = openForms[formId];
+    const form = openForms[formId];
+    delete openForms[formId];
     if (form) {
         if (!form.environment) {
             log('form ' + formId + ' = ' + JSON.stringify(form));
@@ -675,7 +676,6 @@ function closeForm(formId) {
             });
         }
     }
-    delete openForms[formId];
 }
 
 function saveFileName(formId) {
