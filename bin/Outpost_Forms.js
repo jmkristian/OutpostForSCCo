@@ -471,6 +471,10 @@ function serve() {
         onSaveMessage(req.params.formId, req);
         res.end();
     });
+    app.post('/email-:formId', function(req, res, next) {
+        keepAlive(req.params.formId);
+        onEmail(req.params.formId, req.body, res);
+    });
     app.post('/submit-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
         onSubmit(req.params.formId, req.body, res,
@@ -756,15 +760,8 @@ function onGetForm(formId, req, res) {
 function loadForm(formId, form, req) {
     if (!form.environment) {
         form.environment = parseArgs(form.args);
+        form.environment.emailURL = '/email-' + formId;
         form.environment.submitURL = '/submit-' + formId;
-    }
-    if (req.query) {
-        if (req.query.message_status) {
-            form.environment.message_status = req.query.message_status;
-        }
-        if (req.query.mode) {
-            form.environment.mode = req.query.mode;
-        }
     }
     if (form.message == null) {
         form.message = getMessage(form.environment);
@@ -819,7 +816,10 @@ function showForm(form, res) {
             + '\n\n' + err;
     }
     html = expandDataIncludes(html, form);
-    res.send(html);
+    if (form.environment.message_status == 'emailed') {
+        form.environment.message_status = 'sent';
+    }
+    res.end(html, CHARSET);
 }
 
 function showManualMessage(form, res) {
@@ -846,7 +846,16 @@ function showManualMessage(form, res) {
   </div>
 */
 function expandDataIncludes(data, form) {
-    var oldData = data;
+    var oldData = data.replace(
+        /<\s*script\b[^>]*\bsrc\s*=\s*"resources\/integration\/integration.js"/,
+        '<script type="text/javascript">'
+            + '\n      var integrationEnvironment = ' + JSON.stringify(form.environment)
+            + ';\n      var integrationMessage = ' + JSON.stringify(form.message)
+            + ';\n    </script>\n    $&');
+    // It would be more elegant to inject data into integration.js,
+    // but sadly that file is cached by the Chrome browser.
+    // So changes would be ignored by the browser, for example
+    // the change to message_status after emailing a message.
     while(true) {
         var newData = expandDataInclude(oldData, form);
         if (newData == oldData) {
@@ -881,26 +890,16 @@ function expandDataInclude(data, form) {
 
 function getIntegrationFile(req, res) {
     try {
-        noCache(res);
         const fileName =
               path.join(PackItForms, req.path.substring(1).replace('/integration/', '/integration/scco/'));
-        log('get integration file ' + fileName);
         fs.readFile(fileName, ENCODING, function(err, body) {
             try {
                 if (err) throw err;
-                const referer = req.headers.referer || req.headers.referrer;
-                const formId = parseInt(referer.substring(referer.lastIndexOf('-') + 1));
-                const form = openForms[formId];
-                log('/form-' + formId + ' expand integration file');
-                // Insert some stuff:
-                body = expandVariables(body,
-                                       {message: JSON.stringify(form.message),
-                                        environment: JSON.stringify(form.environment)});
                 res.end(body, CHARSET);
             } catch(err) {
                 res.set({'Content-Type': TEXT_HTML});
                 res.end(errorToHTML(err, JSON.stringify(fileName)
-                                    + EOL + JSON.stringify(req.headers)),
+                                    + '\n\n' + JSON.stringify(req.headers)),
                         CHARSET);
             }
         });
@@ -936,6 +935,27 @@ function onSaveMessage(formId, req) {
     } else {
         log('form ' + formId + ' not saved');
     }
+}
+
+function unpackMessage(q) {
+    var subject = '';
+    const message = q.formtext.replace(
+        /[\r\n]*#[ \t]*Subject:[ \t]*([^\r\n]*)/i,
+        function(found, $1) {
+            subject = $1;
+            return '';
+        });
+    return [message, subject];
+}
+
+function onEmail(formId, q, res) {
+    const form = findForm(formId);
+    const messageSubject = unpackMessage(q);
+    form.message = messageSubject[0];
+    form.environment.subject = messageSubject[1];
+    form.environment.message_status = 'emailed';
+    form.environment.mode = 'readonly';
+    res.redirect('/form-' + formId);
 }
 
 function onSubmit(formId, q, res, fromOutpostURL) {
@@ -978,13 +998,9 @@ function onSubmit(formId, q, res, fromOutpostURL) {
         }
     };
     try {
-        var subject = '';
-        var message = q.formtext.replace(
-            /[\r\n]*#[ \t]*Subject:[ \t]*([^\r\n]*)/i,
-            function(found, $1) {
-                subject = $1;
-                return '';
-            });
+        const messageSubject = unpackMessage(q);
+        const message = messageSubject[0];
+        const subject = messageSubject[1];
         const foundSeverity = /[\r\n]4.:[ \t]*\[([A-Za-z]*)]/.exec(message);
         const severity = foundSeverity ? foundSeverity[1].toUpperCase() : '';
         const foundHandling = /[\r\n]5.:[ \t]*\[([A-Za-z]*)]/.exec(message);
