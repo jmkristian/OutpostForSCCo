@@ -659,11 +659,11 @@ function closeForm(formId) {
             if (!fs.existsSync(SAVE_FOLDER)) {
                 fs.mkdirSync(SAVE_FOLDER);
             }
-            const fileName = saveFileName(formId);
+            const formFileName = saveFileName(formId);
             fs.writeFile(
-                fileName, JSON.stringify(form), {encoding: ENCODING},
+                formFileName, JSON.stringify(form), {encoding: ENCODING},
                 function(err) {
-                    log(err ? err : ('Wrote ' + fileName));
+                    log(err ? err : ('Wrote ' + formFileName));
                 });
             deleteOldFiles(SAVE_FOLDER, /^form-\d+-\d+\.json$/, 7 * 24 * hours);
         }
@@ -671,8 +671,7 @@ function closeForm(formId) {
         if (form.environment && form.environment.MSG_FILENAME) {
             const msgFileName = path.resolve(PackItMsgs, form.environment.MSG_FILENAME);
             fs.unlink(msgFileName, function(err) {
-                if (err) log(err);
-                else log("Deleted " + msgFileName);
+                if (!err) log("Deleted " + msgFileName);
             });
         }
     }
@@ -709,6 +708,9 @@ function getMessage(environment) {
     } else if (environment.MSG_FILENAME) {
         const msgFileName = path.resolve(PackItMsgs, environment.MSG_FILENAME);
         message = fs.readFileSync(msgFileName, {encoding: ENCODING});
+        fs.unlink(msgFileName, function(err) {
+            log(err ? err : ("Deleted " + msgFileName));
+        });
     }
     if (message) {
         // Outpost sometimes appends junk to the end of message.
