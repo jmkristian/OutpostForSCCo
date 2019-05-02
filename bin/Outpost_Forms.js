@@ -97,7 +97,7 @@ var logFileName = null;
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
     const verb = process.argv[2];
-    if (verb != 'serve') {
+    if (!(verb == 'serve' || verb == 'subject')) {
         logToFile(verb);
     }
     try {
@@ -127,6 +127,10 @@ if (process.argv.length > 2) {
         case 'stop':
             // Stop any running servers.
             stopServers(function() {});
+            break;
+        case 'subject':
+            // Output the subject of the message in a given file.
+            outputSubjects(process.argv);
             break;
         default:
             throw 'unknown verb "' + verb + '"';
@@ -473,7 +477,7 @@ function serve() {
     });
     app.post('/email-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
-        onEmail(req.params.formId, req.body, res);
+        onEmail(req.params.formId, req.body.formtext, res);
     });
     app.post('/submit-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
@@ -764,17 +768,7 @@ function loadForm(formId, form, req) {
         form.message = getMessage(form.environment);
         if (form.message) {
             if (!form.environment.ADDON_MSG_TYPE) {
-                const foundType = form.message.split(/[\r\n]+/).map(function(line) {
-                    return /^#\s*(T|FORMFILENAME):\s*(.*)/.exec(line);
-                }).filter(function(found) {
-                    return !!found;
-                });
-                if (foundType.length > 0) {
-                    form.environment.ADDON_MSG_TYPE = foundType[0][2].trim();
-                } else {
-                    throw "I don't know what form to display, since the message doesn't contain"
-                        + " a line that starts with \"#T:\" or \"#FORMFILENAME:\".\n";
-                }
+                form.environment.ADDON_MSG_TYPE = parseMessage(form.message).formType;
             }
         }
     }
@@ -790,20 +784,20 @@ function showForm(form, res) {
     if (!form.environment.addon_name) {
         throw new Error('addon_name is ' + form.environment.addon_name + '\n');
     }
-    var formFileName = form.environment.ADDON_MSG_TYPE;
-    if (!formFileName) {
+    var formType = form.environment.ADDON_MSG_TYPE;
+    if (!formType) {
         throw "I don't know what form to display, since"
-            + "I received " + JSON.stringify(formFileName)
+            + "I received " + JSON.stringify(formType)
             + " instead of the name of a form.\n";
     }
     if (['draft', 'read', 'unread'].indexOf(form.environment.message_status) >= 0) {
-        const receiverFileName = formFileName.replace(/\.([^.]*)$/, '.receiver.$1');
+        const receiverFileName = formType.replace(/\.([^.]*)$/, '.receiver.$1');
         if (fs.existsSync(path.join(PackItForms, receiverFileName))) {
-            formFileName = receiverFileName;
+            formType = receiverFileName;
         }
     }
     try {
-        var html = fs.readFileSync(path.join(PackItForms, formFileName), ENCODING);
+        var html = fs.readFileSync(path.join(PackItForms, formType), ENCODING);
     } catch(err) {
         throw "I don't know about a form named "
             + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
@@ -825,7 +819,7 @@ function showManualMessage(form, res) {
         try {
             if (err) throw err;
             res.end(expandVariables(data,
-                                    {SUBJECT: encodeHTML(form.subject),
+                                    {SUBJECT: encodeHTML(form.environment.subject),
                                      MESSAGE: encodeHTML(form.message)}),
                     CHARSET);
         } catch(err) {
@@ -913,22 +907,10 @@ function onSaveMessage(formId, req) {
     }
 }
 
-function unpackMessage(q) {
-    var subject = '';
-    const message = q.formtext.replace(
-        /[\r\n]*#[ \t]*Subject:[ \t]*([^\r\n]*)/i,
-        function(found, $1) {
-            subject = $1;
-            return '';
-        });
-    return [message, subject];
-}
-
-function onEmail(formId, q, res) {
+function onEmail(formId, message, res) {
     const form = findForm(formId);
-    const messageSubject = unpackMessage(q);
-    form.message = messageSubject[0];
-    form.environment.subject = messageSubject[1];
+    form.message = message;
+    form.environment.subject = subjectFromMessage(parseMessage(message));
     form.environment.message_status = 'emailed';
     form.environment.mode = 'readonly';
     res.redirect('/form-' + formId);
@@ -974,26 +956,24 @@ function onSubmit(formId, q, res, fromOutpostURL) {
         }
     };
     try {
-        const messageSubject = unpackMessage(q);
-        const message = messageSubject[0];
-        const subject = messageSubject[1];
-        const foundSeverity = /[\r\n]4.:[ \t]*\[([A-Za-z]*)]/.exec(message);
-        const severity = foundSeverity ? foundSeverity[1].toUpperCase() : '';
-        const foundHandling = /[\r\n]5.:[ \t]*\[([A-Za-z]*)]/.exec(message);
-        const handling = foundHandling ? foundHandling[1].toUpperCase() : '';
-        // Outpost requires Windows-style line breaks:
-        form.message = message.replace(/([^\r])\n/g, '$1' + EOL);
+        const message = q.formtext;
+        const parsed = parseMessage(message);
+        const fields = parsed.fields;
+        const severity = fields['4.'] || '';
+        const handling = fields['5.'] || '';
+        form.environment.subject = subjectFromMessage(parsed);
         if (form.environment.message_status == 'manual') {
             form.environment.message_status = 'manual-created';
-            form.subject = subject;
             form.message = message;
             res.redirect('/form-' + formId);
         } else {
+            // Outpost requires Windows-style line breaks:
+            form.message = message.replace(/([^\r])\n/g, '$1' + EOL);
             submitToOpdirect({
                 formId: formId,
                 form: form,
                 addonName: form.environment.addon_name,
-                subject: subject,
+                subject: form.environment.subject,
                 urgent: (['IMMEDIATE', 'I'].indexOf(handling) >= 0)
             }, callback);
         }
@@ -1091,7 +1071,6 @@ function submitToOpdirect(submission, callback) {
 }
 
 function submitToAoclient(submission, callback) {
-    const formFileName = submission.form.environment.ADDON_MSG_TYPE;
     const msgFileName = path.resolve(PackItMsgs, 'form-' + submission.formId + '.txt');
     // Remove the first line of the Outpost message header:
     const message = submission.form.message.replace(/^\s*![^\r\n]*[\r\n]+/, '')
@@ -1166,6 +1145,114 @@ function onGetManual(res) {
             }
         }
         res.end();
+    });
+}
+
+function outputSubjects(argv) {
+    const base = process.cwd();
+    process.chdir(argv[3]);
+    for (var a = 4; a < argv.length; ++a) {
+        var message = fs.readFileSync(path.resolve(base, argv[a]), ENCODING);
+        process.stdout.write(subjectFromMessage(parseMessage(message)) + EOL);
+    }
+}
+
+function unbracket_data(data) {
+    var match = /[^`]]\s*$/.exec(data);
+    if (match) {
+        // data is complete
+        data = data.substring(1, data.length - match[0].length + 1);
+        return data.replace(/`]/g, "]");
+    } else {
+        return null;
+    }
+}
+
+function toShortName(fieldName) {
+    if (fieldName != null) {
+        var f = fieldName.lastIndexOf('.');
+        if (f >= 0) {
+            fieldName = fieldName.substring(0, f + 1);
+        }
+    }
+    return fieldName;
+}
+
+function parseMessage(message) {
+    var result = {};
+    var fields = {};
+    var fieldName = null;
+    var fieldValue = "";
+    message.split(/[\r\n]+/).every(function(line) {
+        switch(line.charAt(0)) {
+        case '!':
+            if (line == '!/ADDON!') return false; // ignore subsequent lines
+            break;
+        case '#':
+            var foundType = /^#\s*(T|FORMFILENAME):(.*)/.exec(line);
+            if (foundType) {
+                result.formType = foundType[2].trim();
+            }
+            break;
+        default:
+            var idx = 0;
+            if (fieldName == null) {
+                idx = line.indexOf(':');
+                if (idx >= 0) {
+                    fieldName = line.substring(0, idx);
+                    while (++idx < line.length && line.charAt(idx) != '[');
+                }
+            }
+            if (fieldName != null) {
+                fieldValue += line.substring(idx);
+                var value = unbracket_data(fieldValue);
+                if (value) {
+                    // Field is complete on this line
+                    fields[toShortName(fieldName)] = value;
+                    fieldName = null;
+                    fieldValue = "";
+                }
+            }
+        }
+        return true;
+    });
+    if (!result.formType) {
+        throw "I don't know what form to display, since the message doesn't"
+            + ' contain a line that starts with "#T:" or "#FORMFILENAME:".\n';
+    }
+    result.fields = fields;
+    return result;
+}
+
+function getMetaContents(html) {
+    var values = {};
+    // For example: <meta name="pack-it-forms-subject-suffix" content="_ICS213_{{field:10.subject}}">
+    var pattern = /<\s*meta\b[^>]*\sname\s*=\s*"([^">]*)[^>]*>/gi;
+    var name;
+    while (name = pattern.exec(html)) {
+        var content = /\scontent\s*=\s*"([^"]*)"/i.exec(name[0]);
+        if (content) {
+            values[htmlEntities.decode(name[1])] = htmlEntities.decode(content[1]);
+        }
+    }
+    return values;
+}
+
+function expandTemplate(template, fields) {
+    return template.replace(/\{\{field:([^\}]*)\}\}/g, function(found, fieldName) {
+        return fields[toShortName(fieldName)] || '';
+    });
+}
+
+function subjectFromMessage(parsed) {
+    const fields = parsed.fields;
+    fields['5.'] = fields['5.'] ? fields['5.'].charAt(0) : 'R';
+    const formFile = fs.readFileSync(path.join(PackItForms, parsed.formType), ENCODING);
+    const meta = getMetaContents(formFile);
+    const prefix = meta['pack-it-forms-subject-prefix'] || '{{field:MsgNo}}_{{field:5.handling}}';
+    const suffix = meta['pack-it-forms-subject-suffix'] || '_{{field:10.subject}}';
+    return expandTemplate(prefix + suffix, fields).replace(/[^ -~]/g, function(found) {
+        return '~';
     });
 }
 
