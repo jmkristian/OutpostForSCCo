@@ -469,7 +469,7 @@ function serve() {
             res.set({'Content-Type': TEXT_PLAIN});
             result = 'http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId;
         }
-        res.end(result);
+        res.end(result, CHARSET);
     });
     app.get('/form-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
@@ -952,7 +952,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
                     page += encodeHTML('log file ' + logFileName) + '<br/>' + EOL;
                 }
                 page += '</body></html>';
-                res.end(page);
+                res.end(page, CHARSET);
             }
         } catch(err) {
             res.set({'Content-Type': TEXT_HTML});
