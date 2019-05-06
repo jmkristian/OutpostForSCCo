@@ -341,11 +341,14 @@ function openForm(args, tryLater) {
     log('http://' + options.host + ':' + options.port
         + ' ' + options.method + ' ' + OpenOutpostMessage + ' ' + postData);
     request(options, function(err, data) {
-        data = data && data.trim();
         if (err) {
             tryLater(err);
         } else {
-            log('opened form');
+            data = data && data.trim();
+            log('opened form ' + data);
+            if (data) {
+                startProcess('start', [data], {shell: true, detached: true, stdio: 'ignore'});
+            }
             process.exit(0); // mission accomplished
         }
     }).end(postData, CHARSET);
@@ -458,14 +461,15 @@ function serve() {
     app.use(bodyParser.urlencoded({extended: false}));
     app.post(OpenOutpostMessage, function(req, res, next) {
         // req.body is an array, thanks to bodyParser.json
+        var result = '';
         const args = req.body;
-        res.end();
         if (args && args.length > 0) {
-            const formId = '' + nextFormId++;
+            formId = '' + nextFormId++;
             onOpen(formId, args);
-            startProcess('start', ['http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId],
-                         {shell: true, detached: true, stdio: 'ignore'});
+            res.set({'Content-Type': TEXT_PLAIN});
+            result = 'http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId;
         }
+        res.end(result);
     });
     app.get('/form-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
