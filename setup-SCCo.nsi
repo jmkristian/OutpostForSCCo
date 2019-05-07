@@ -18,10 +18,21 @@
 !define REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\SCCoPackItForms"
 !define WINDOW_TITLE "Santa Clara County"
 
+!include LogicLib.nsh
+
 Function ChooseAddonFiles
   File /r /x "*~" /x .git* /x notes /x pacread /x integration.js \
-    /x form-los-altos*.html /x http-request.html \
+    /x form-los-altos*.html /x pdf /x http-request.html \
     pack-it-forms
+  SetOutPath "$INSTDIR\pack-it-forms\resources\pdf"
+  ${If} "${OutFileSuffix}" == pvt
+    File pack-it-forms\resources\pdf\*.pdf
+  ${Else}
+    File pack-it-forms\resources\pdf\ICS-213_*.pdf
+    File pack-it-forms\resources\pdf\XSC_EOC-213RR_*.pdf
+    File pack-it-forms\resources\pdf\XSC_MuniStat_*.pdf
+    File pack-it-forms\resources\pdf\XSC_SheltStat_*.pdf
+  ${EndIf}
   SetOutPath "$INSTDIR\addons"
   File /oname=${addon_name}.launch "addons\${LaunchFile}"
 FunctionEnd

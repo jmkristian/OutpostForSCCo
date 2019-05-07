@@ -23,7 +23,6 @@ Page instfiles
 UninstPage uninstConfirm
 UninstPage instfiles
 
-!include LogicLib.nsh
 !include nsDialogs.nsh
 !include TextFunc.nsh
 !include WinVer.nsh
