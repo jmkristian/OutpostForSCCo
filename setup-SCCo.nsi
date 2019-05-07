@@ -22,8 +22,17 @@
 
 Function ChooseAddonFiles
   File /r /x "*~" /x .git* /x notes /x pacread /x integration.js \
-    /x form-los-altos*.html /x pdf /x http-request.html \
+    /x form-*.html /x pdf /x http-request.html \
     pack-it-forms
+  SetOutPath "$INSTDIR\pack-it-forms"
+  ${If} "${OutFileSuffix}" == pvt
+    File /x form-los-altos* pack-it-forms\form-*.html
+  ${Else}
+    File pack-it-forms\form-ics213.html
+    File pack-it-forms\form-oa-muni-status.html
+    File pack-it-forms\form-oa-shelter-status.html
+    File pack-it-forms\form-scco-eoc-213rr.html
+  ${EndIf}
   SetOutPath "$INSTDIR\pack-it-forms\resources\pdf"
   ${If} "${OutFileSuffix}" == pvt
     File pack-it-forms\resources\pdf\*.pdf
