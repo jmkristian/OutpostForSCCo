@@ -22,8 +22,10 @@
 
 Function ChooseAddonFiles
   File /r /x "*~" /x .git* /x notes /x pacread /x integration.js \
-    /x form-mhoc*.html /x http-request.html /x pdf \
+    /x form-*.html /x pdf \
     pack-it-forms
+  SetOutPath "$INSTDIR\pack-it-forms"
+  File pack-it-forms\form-los-altos-*.html
   SetOutPath "$INSTDIR\addons"
   File addons\${addon_name}.launch
 FunctionEnd
