@@ -18,14 +18,14 @@
 @mkdir built
 @mkdir built\addons
 @node bin/Outpost_Forms.js build %VersionMajor%.%VersionMinor% ^
-  Los_Altos bin\LAARES_Forms.exe "Outpost for LAARES"
+  Los_Altos bin\Outpost_Forms.exe "Outpost for LAARES"
 @if %errorlevel% neq 0 exit /b %errorlevel%
 @"C:\Program Files (x86)\NSIS\makensis.exe" ^
   /DVersionMajor=%VersionMajor% ^
   /DVersionMinor=%VersionMinor% ^
   /Daddon_name=Los_Altos ^
   /DDisplayName="Outpost for LAARES" ^
-  /DPROGRAM_PATH=bin\LAARES_Forms.exe ^
+  /DPROGRAM_PATH=bin\Outpost_Forms.exe ^
   setup-LAARES.nsi
 @if %errorlevel% neq 0 exit /b %errorlevel%
 
