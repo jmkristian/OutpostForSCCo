@@ -1,7 +1,7 @@
 @REM This can't be a Bash script, because quoting /DDisplayName doesn't work right.
 
 @set VersionMajor=2
-@set VersionMinor=12
+@set VersionMinor=13
 
 @rem rmdir /Q /S built
 @rem mkdir built
