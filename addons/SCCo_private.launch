@@ -8,4 +8,4 @@ ADDON -fn XSC Medical Facility Status       -a SCCoPIFO -t form-medical-facility
 ADDON -fn XSC Medical Resource Request      -a SCCoPIFO -t form-medical-resource-request.html
 ADDON -fn XSC Allied Health Facility Status -a SCCoPIFO -t form-allied-health-facility-status.html
 LINE
-ADDON -fn XSC RACES Mutual Aid Request    -a SCCoPIFO -t form-oa-mutual-aid-request.html
+ADDON -fn XSC RACES Mutual Aid Request      -a SCCoPIFO -t form-oa-mutual-aid-request-v2.html
