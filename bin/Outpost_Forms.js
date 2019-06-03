@@ -811,8 +811,9 @@ function showForm(form, res) {
             + '\n\n' + err;
     }
     html = expandDataIncludes(html, form);
-    if (form.environment.message_status == 'emailed') {
+    if (form.environment.emailing) {
         form.environment.message_status = 'sent';
+        delete form.environment.emailing;
     }
     res.end(html, CHARSET);
 }
@@ -914,8 +915,8 @@ function onSaveMessage(formId, req) {
 function onEmail(formId, message, res) {
     const form = findForm(formId);
     form.message = message;
+    form.environment.emailing = true;
     form.environment.subject = subjectFromMessage(parseMessage(message));
-    form.environment.message_status = 'emailed';
     form.environment.mode = 'readonly';
     res.redirect('/form-' + formId);
 }
