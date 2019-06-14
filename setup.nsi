@@ -128,6 +128,7 @@ FunctionEnd
   IfFileExists "${NAME}" 0 +3
   SetErrors
   DetailPrint `Can't delete ${NAME}`
+
 !macroend
 !define Delete '!insertmacro "Delete"'
 
@@ -137,6 +138,7 @@ FunctionEnd
   IfFileExists "${NAME}" 0 +3
   SetErrors
   DetailPrint `Can't remove ${NAME}`
+
 !macroend
 !define RMDir '!insertmacro "RMDir"'
 
