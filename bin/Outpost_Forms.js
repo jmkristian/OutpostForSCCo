@@ -1163,14 +1163,20 @@ function outputSubjects(argv) {
 }
 
 function unbracket_data(data) {
-    var match = /[^`]]\s*$/.exec(data);
+    var match = /]\s*$/.exec(data);
     if (match) {
-        // data is complete
-        data = data.substring(1, data.length - match[0].length + 1);
-        return data.replace(/`]/g, "]");
-    } else {
-        return null;
+        // Remove the enclosing brackets and trailing white space:
+        data = data.substring(1, data.length - match[0].length);
+        if (data.length <= 1 || data.charAt(data.length - 1) != "`") {
+            // data is complete
+            if (data.substring(data.length - 2) == "]]") {
+                data = data.substring(0, data.length - 2);
+            }
+            // Un-escape the brackets within data:
+            return data.replace(/`]/g, "]");
+        }
     }
+    return null; // The field value continues on the next line.
 }
 
 function toShortName(fieldName) {
@@ -1189,11 +1195,14 @@ function parseMessage(message) {
     var fieldName = null;
     var fieldValue = "";
     message.split(/[\r\n]+/).every(function(line) {
+        if (!line) return true;
         switch(line.charAt(0)) {
         case '!':
+            fieldName = null;
             if (line == '!/ADDON!') return false; // ignore subsequent lines
             break;
         case '#':
+            fieldName = null;
             var foundType = /^#\s*(T|FORMFILENAME):(.*)/.exec(line);
             if (foundType) {
                 result.formType = foundType[2].trim();
@@ -1211,7 +1220,7 @@ function parseMessage(message) {
             if (fieldName != null) {
                 fieldValue += line.substring(idx);
                 var value = unbracket_data(fieldValue);
-                if (value) {
+                if (value != null) {
                     // Field is complete on this line
                     fields[toShortName(fieldName)] = value;
                     fieldName = null;
