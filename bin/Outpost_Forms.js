@@ -391,15 +391,20 @@ function stopServers(next) {
             log(err); // harmless
         }
         var forked = ports.length;
-        function join(err) {
-            log(err);
-            if (--forked <= 0) {
-                next();
-            }
-        }
         ports.forEach(function(port) {
+            const join = function join(err) {
+                log(err || ('stopped server on port ' + port));
+                if (--forked == 0) {
+                    next();
+                }
+            };
             try {
-                stopServer(parseInt(port, 10), join);
+                log('stopping server on port ' + port);
+                request({host: LOCALHOST,
+                         port: parseInt(port, 10),
+                         method: 'POST',
+                         path: StopServer},
+                        join).end();
             } catch(err) {
                 join(err);
             }
@@ -408,15 +413,6 @@ function stopServers(next) {
         log(err);
         next();
     }
-}
-
-function stopServer(port, next) {
-    log('stopping server on port ' + port);
-    request({host: LOCALHOST,
-             port: port,
-             method: 'POST',
-             path: StopServer},
-            next).end();
 }
 
 function request(options, callback) {
