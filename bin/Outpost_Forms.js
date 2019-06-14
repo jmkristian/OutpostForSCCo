@@ -1196,36 +1196,34 @@ function parseMessage(message) {
     var fieldValue = "";
     message.split(/[\r\n]+/).every(function(line) {
         if (!line) return true;
-        switch(line.charAt(0)) {
-        case '!':
-            fieldName = null;
-            if (line == '!/ADDON!') return false; // ignore subsequent lines
-            break;
-        case '#':
-            fieldName = null;
-            var foundType = /^#\s*(T|FORMFILENAME):(.*)/.exec(line);
-            if (foundType) {
-                result.formType = foundType[2].trim();
-            }
-            break;
-        default:
-            var idx = 0;
-            if (fieldName == null) {
+        var idx = 0;
+        if (fieldName == null) {
+            switch(line.charAt(0)) {
+            case '!':
+                if (line == '!/ADDON!') return false; // ignore subsequent lines
+                break;
+            case '#':
+                var foundType = /^#\s*(T|FORMFILENAME):(.*)/.exec(line);
+                if (foundType) {
+                    result.formType = foundType[2].trim();
+                }
+                break;
+            default:
                 idx = line.indexOf(':');
                 if (idx >= 0) {
                     fieldName = line.substring(0, idx);
                     while (++idx < line.length && line.charAt(idx) != '[');
                 }
             }
-            if (fieldName != null) {
-                fieldValue += line.substring(idx);
-                var value = unbracket_data(fieldValue);
-                if (value != null) {
-                    // Field is complete on this line
-                    fields[toShortName(fieldName)] = value;
-                    fieldName = null;
-                    fieldValue = "";
-                }
+        }
+        if (fieldName != null) {
+            fieldValue += line.substring(idx);
+            var value = unbracket_data(fieldValue);
+            if (value != null) {
+                // Field is complete on this line
+                fields[toShortName(fieldName)] = value;
+                fieldName = null;
+                fieldValue = "";
             }
         }
         return true;
