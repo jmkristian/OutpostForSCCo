@@ -33,14 +33,14 @@ Function ChooseAddonFiles
     File pack-it-forms\form-oa-shelter-status.html
     File pack-it-forms\form-scco-eoc-213rr.html
   ${EndIf}
-  SetOutPath "$INSTDIR\pack-it-forms\resources\pdf"
+  SetOutPath "$INSTDIR\pack-it-forms\pdf"
   ${If} "${OutFileSuffix}" == pvt
-    File pack-it-forms\resources\pdf\*.pdf
+    File pack-it-forms\pdf\*.pdf
   ${Else}
-    File pack-it-forms\resources\pdf\ICS-213_*.pdf
-    File pack-it-forms\resources\pdf\XSC_EOC-213RR_*.pdf
-    File pack-it-forms\resources\pdf\XSC_MuniStat_*.pdf
-    File pack-it-forms\resources\pdf\XSC_SheltStat_*.pdf
+    File pack-it-forms\pdf\ICS-213_*.pdf
+    File pack-it-forms\pdf\XSC_EOC-213RR_*.pdf
+    File pack-it-forms\pdf\XSC_MuniStat_*.pdf
+    File pack-it-forms\pdf\XSC_SheltStat_*.pdf
   ${EndIf}
   SetOutPath "$INSTDIR\addons"
   File /oname=${addon_name}.launch "addons\${LaunchFile}"
