@@ -510,7 +510,9 @@ function serve() {
             const space = form.indexOf(' ');
             onOpen(formId, ['--message_status', 'manual',
                             '--addon_name', form.substring(0, space),
-                            '--ADDON_MSG_TYPE', form.substring(space + 1)]);
+                            '--ADDON_MSG_TYPE', form.substring(space + 1),
+                            '--operator_call_sign', req.body.operator_call_sign || '',
+                            '--operator_name', req.body.operator_name || '']);
             res.redirect('/form-' + formId);
         } catch(err) {
             res.set({'Content-Type': TEXT_HTML});

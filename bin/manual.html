@@ -11,6 +11,12 @@
           font-weight: bold;
           background-color: #bbeeff;
       }
+      form td.input-label {
+          text-align: right;
+          vertical-align: middle;
+          white-space: nowrap;
+          width: 1px;
+      }
     </style>
     <title>SCCo PackItForms</title>
     <script type="text/javascript">
@@ -59,21 +65,29 @@
   </head>
   <body style="padding-top:1em;">
     <span style="font-size:125%;font-weight:bold;">Santa Clara County ARES/RACES PackItForms</span>
-    <span style="float:right;">PIF: 1.1</span>
+    <span style="float:right;">PIF: 1.2</span>
     <form action="/manual-create" method="POST" target="_blank">
       <table style="margin-top:0.5em;">
         <tr>
-          <td>
+          <td colspan="2">
             <fieldset class="horizontal">
               <b>Create a message to send:</b>
-              <select name="form" onchange="onFormToCreate(this.value)">
-                <option value="" selected disabled>
-                  Select a form type ...
-                </option>{{form_options}}
-              </select>
+              Enter information below and then click
               <input id="create-form" type="submit" value="Create" disabled/>
-            </fieldset>
           </td>
+        </tr><tr>
+          <td class="input-label">Form type:</td>
+          <td>
+            <select name="form" onchange="onFormToCreate(this.value)">
+              <option value="" selected disabled></option>{{form_options}}
+            </select>
+          </td>
+        </tr><tr>
+          <td class="input-label">Sender's name:</td>
+          <td><input name="operator_name" type="text" style="width:20em;"/></td>
+        </tr><tr>
+          <td class="input-label">Sender's call sign:</td>
+          <td><input name="operator_call_sign" type="text" class="call-sign"/></td>
         </tr>
       </table>
     </form>
@@ -91,7 +105,7 @@
             </fieldset>
           </td>
         </tr><tr>
-          <td style="text-align:right;white-space:nowrap;width:1px;">Local Message Number:</td>
+          <td class="input-label">Local Message Number:</td>
           <td><input type="text" name="MSG_LOCAL_ID" class="message-number" style="display:inline;">
             (optional)</td>
         </tr><tr>
