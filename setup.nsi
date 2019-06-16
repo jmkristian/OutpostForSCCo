@@ -292,10 +292,18 @@ Section "Install"
 
   Call DeleteMyFiles
   ${If} ${Errors}
+    # Sadly, it may take time for ${PROGRAM_PATH} to be deleted.
+    # There are several possible causes, including zealous antivirus.
     StrCpy $R0 "Some files were not deleted from $INSTDIR. Try again?"
     MessageBox MB_YESNO|MB_DEFBUTTON1|MB_ICONINFORMATION "$R0" /SD IDYES IDNO noDeleteAgain
-    Sleep 2000
-    Call DeleteMyFiles
+    StrCpy $R0 0
+    ${DoUntil} $R0 = 10
+      DetailPrint `Wait $R0 seconds`
+      IntOp $R1 $R0 * 1000
+      Sleep $R1
+      IntOp $R0 $R0 + 1
+      Call DeleteMyFiles
+    ${LoopWhile} ${Errors}
     ${If} ${Errors}
       noDeleteAgain:
       Abort "Can't delete old files"
