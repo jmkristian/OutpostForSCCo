@@ -28,10 +28,11 @@ Function ChooseAddonFiles
   ${If} "${OutFileSuffix}" == pvt
     File /x form-los-altos* pack-it-forms\form-*.html
   ${Else}
-    File pack-it-forms\form-ics213.html
-    File pack-it-forms\form-oa-muni-status.html
-    File pack-it-forms\form-oa-shelter-status.html
-    File pack-it-forms\form-scco-eoc-213rr.html
+    File pack-it-forms\form-ics213*.html
+    File pack-it-forms\form-oa-muni-status*.html
+    File pack-it-forms\form-oa-shelter-status*.html
+    File pack-it-forms\form-scco-eoc-213rr*.html
+    File pack-it-forms\form-allied-health-facility-status*.html
   ${EndIf}
   SetOutPath "$INSTDIR\pack-it-forms\pdf"
   ${If} "${OutFileSuffix}" == pvt
@@ -41,6 +42,7 @@ Function ChooseAddonFiles
     File pack-it-forms\pdf\XSC_EOC-213RR_*.pdf
     File pack-it-forms\pdf\XSC_MuniStat_*.pdf
     File pack-it-forms\pdf\XSC_SheltStat_*.pdf
+    File pack-it-forms\pdf\Allied_Health_Facility_Status_*.pdf
   ${EndIf}
   SetOutPath "$INSTDIR\addons"
   File /oname=${addon_name}.launch "addons\${LaunchFile}"
