@@ -96,7 +96,7 @@ FunctionEnd
       FileOpen $DETAIL_LOG_FILE "$7" w
     ${EndIf}
   ${EndIf}
-  ${DetailLog} `[$2-$1-$0T$4:$5:$6]`
+  ${DetailLog} `[$2-$1-$0T$4:$5:$6] version ${VersionMajor}.${VersionMinor}`
   ClearErrors
 !macroend
 !define OpenDetailLogFile '!insertmacro "OpenDetailLogFile"'
@@ -293,7 +293,6 @@ Section "Install"
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
   ${OpenDetailLogFile} setup.log
-  ${DetailLog} "Setup version ${VersionMajor}.${VersionMinor}"
 
   # Stop the server (so it will release its lock on the program and log file):
   ${If} ${FileExists} "${PROGRAM_PATH}"
