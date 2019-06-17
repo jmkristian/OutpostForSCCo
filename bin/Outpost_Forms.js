@@ -534,6 +534,9 @@ function serve() {
             res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
         }
     });
+    app.get('/pdf/\*.pdf', express.static('.', {setHeaders: function(res, path, stat) {
+        res.set('Content-Type', 'application/pdf');
+    }}));
     app.get(/^\/.*/, express.static(PackItForms, {setHeaders: function(res, path, stat) {
         if (path) {
             const dot = path.lastIndexOf('.');

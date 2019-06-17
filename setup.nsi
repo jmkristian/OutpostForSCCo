@@ -272,6 +272,7 @@ Function ${un}DeleteMyFiles
   ${Delete} version.txt
   ${RMDir} "$INSTDIR\bin"
   ${RMDir} "$INSTDIR\notes"
+  ${RMDir} "$INSTDIR\pdf"
   ClearErrors
   ${Delete} browse.cmd
   ${Delete} bin\launch.vbs

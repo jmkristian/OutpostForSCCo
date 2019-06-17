@@ -34,7 +34,7 @@ Function ChooseAddonFiles
     File pack-it-forms\form-scco-eoc-213rr*.html
     File pack-it-forms\form-allied-health-facility-status*.html
   ${EndIf}
-  SetOutPath "$INSTDIR\pack-it-forms\pdf"
+  SetOutPath "$INSTDIR\pdf"
   ${If} "${OutFileSuffix}" == pvt
     File pack-it-forms\pdf\*.pdf
   ${Else}
