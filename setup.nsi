@@ -83,7 +83,9 @@ FunctionEnd
   StrCpy $7 "$INSTDIR\logs\$2-$1-$0-${fileName}"
   ${If} ${FileExists} "$7"
     FileOpen $DETAIL_LOG_FILE "$7" a
-    FileSeek $DETAIL_LOG_FILE 0 END
+    ${If} "$DETAIL_LOG_FILE" != ""
+      FileSeek $DETAIL_LOG_FILE 0 END
+    ${EndIf}
   ${Else}
     CreateDirectory "$INSTDIR\logs"
     ${If} ${Errors}
