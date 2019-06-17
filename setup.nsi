@@ -73,7 +73,9 @@ FunctionEnd
 !define DetailLog '!insertmacro "DetailLog"'
 
 !macro AbortLog message
-  ${DetailLog} `${message}`
+  ${If} "$DETAIL_LOG_FILE" != ""
+    FileWrite $DETAIL_LOG_FILE `Abort: ${message}$\r$\n`
+  ${EndIf}
   Abort `${message}`
 !macroend
 !define AbortLog '!insertmacro "AbortLog"'
@@ -291,7 +293,6 @@ Section "Install"
   SetOutPath "$INSTDIR"
   ${OpenDetailLogFile} setup.log
   ${DetailLog} "Setup version ${VersionMajor}.${VersionMinor}"
-  Call FindOutposts
 
   # Stop the server (so it will release its lock on the program and log file):
   ${If} ${FileExists} "${PROGRAM_PATH}"
@@ -302,6 +303,9 @@ Section "Install"
     ${DetailLog} `No ${PROGRAM_PATH}`
   ${EndIf}
 
+  ${If} ${Silent}
+    Call FindOutposts
+  ${EndIf}
   ${If} "$OUTPOST_DATA" == ""
     StrCpy $R0 "I won't add forms to Outpost"
     StrCpy $R0 "$R0, because I didn't find Outpost's data folder."
