@@ -24,16 +24,18 @@ UninstPage uninstConfirm
 UninstPage instfiles
 
 !include nsDialogs.nsh
+!include FileFunc.nsh
 !include TextFunc.nsh
 !include WinVer.nsh
 
+Var /GLOBAL DETAIL_LOG_FILE
 Var /GLOBAL OUTPOST_CODE
 Var /GLOBAL OUTPOST_DATA
 Var /GLOBAL AOCLIENT_EXE
 Var /GLOBAL WSCRIPT_EXE
-Var /GLOBAL SILENT_LOG
 
 Function .onInit
+  StrCpy $DETAIL_LOG_FILE ""
   StrCpy $OUTPOST_DATA ""
   ${If} "$INSTDIR" == ""
     ReadEnvStr $0 SystemDrive
@@ -62,38 +64,58 @@ Function ifOutpostDataDefined
   ${EndIf}
 FunctionEnd
 
-Function LogSilent
-  Exch $R0
-  DetailPrint "$R0"
-  IfSilent +1 +2
-    FileWrite $SILENT_LOG "$R0$\r$\n"
-  Pop $R0
-FunctionEnd
-!macro LogSilent message
-  Push "${message}"
-  Call LogSilent
+!macro DetailLog message
+  DetailPrint `${message}`
+  ${If} "$DETAIL_LOG_FILE" != ""
+    FileWrite $DETAIL_LOG_FILE `${message}$\r$\n`
+  ${EndIf}
 !macroend
-!define LogSilent '!insertmacro "LogSilent"'
+!define DetailLog '!insertmacro "DetailLog"'
+
+!macro AbortLog message
+  ${DetailLog} `${message}`
+  Abort `${message}`
+!macroend
+!define AbortLog '!insertmacro "AbortLog"'
+
+!macro OpenDetailLogFile fileName
+  ${GetTime} "" "LS" $0 $1 $2 $3 $4 $5 $6
+  StrCpy $7 "$INSTDIR\logs\$2-$1-$0-${fileName}"
+  ${If} ${FileExists} "$7"
+    FileOpen $DETAIL_LOG_FILE "$7" a
+    FileSeek $DETAIL_LOG_FILE 0 END
+  ${Else}
+    CreateDirectory "$INSTDIR\logs"
+    ${If} ${Errors}
+      DetailPrint `Can't create $INSTDIR\logs`
+    ${Else}
+      FileOpen $DETAIL_LOG_FILE "$7" w
+    ${EndIf}
+  ${EndIf}
+  ${DetailLog} `[$2-$1-$0T$4:$5:$6]`
+  ClearErrors
+!macroend
+!define OpenDetailLogFile '!insertmacro "OpenDetailLogFile"'
 
 Function FindOutpost
   Exch $R0
   Push $R1
   ${IfNot} ${FileExists} "$R0"
-    ${LogSilent} `No $R0`
+    ${DetailLog} `No $R0`
   ${Else}
     ${IfNot} ${FileExists} "$R0\Outpost.conf"
-      ${LogSilent} `No $R0\Outpost.conf`
+      ${DetailLog} `No $R0\Outpost.conf`
     ${Else}
       StrCpy $R1 ""
       ReadINIStr $R1 "$R0\Outpost.conf" DataDirectory DataDir
       ${If} "$R1" == ""
-        ${LogSilent} `No DataDir in $R0\Outpost.conf`
+        ${DetailLog} `No DataDir in $R0\Outpost.conf`
       ${Else}
         StrCpy $OUTPOST_CODE "$OUTPOST_CODE $\"$R0$\""
         ${IfNot} ${FileExists} "$R1"
-          ${LogSilent} `No $R1`
+          ${DetailLog} `No $R1`
         ${Else}
-          ${LogSilent} `Found Outpost data $R1`
+          ${DetailLog} `Found Outpost data $R1`
           StrCpy $OUTPOST_DATA '$OUTPOST_DATA "$R1"'
         ${EndIf}
       ${EndIf}
@@ -111,34 +133,36 @@ FunctionEnd
 
 !macro Execute COMMAND
   Push $R0
-  DetailPrint `Execute: ${COMMAND}`
+  ${DetailLog} `Execute: ${COMMAND}`
   nsExec::ExecToLog '${COMMAND}'
   Pop $R0
   ${If} "$R0" != 0
     SetErrors
-    DetailPrint `nsExec::ExecToLog returned $R0`
+    ${DetailLog} `nsExec::ExecToLog returned $R0`
   ${EndIf}
   Pop $R0
 !macroend
 !define Execute '!insertmacro "Execute"'
 
 !macro Delete NAME
-  IfFileExists "${NAME}" 0 +5
-  Delete "${NAME}"
-  IfFileExists "${NAME}" 0 +3
-  SetErrors
-  DetailPrint `Can't delete ${NAME}`
-
+  ${If} ${FileExists} "${NAME}"
+    Delete "${NAME}"
+    ${If} ${FileExists} "${NAME}"
+      ${DetailLog} `Can't delete ${NAME}`
+      SetErrors
+    ${Endif}
+  ${Endif}
 !macroend
 !define Delete '!insertmacro "Delete"'
 
 !macro RMDir NAME
-  IfFileExists "${NAME}" 0 +5
-  RMDir /r "${NAME}"
-  IfFileExists "${NAME}" 0 +3
-  SetErrors
-  DetailPrint `Can't remove ${NAME}`
-
+  ${If} ${FileExists} "${NAME}"
+    RMDir /r "${NAME}"
+    ${If} ${FileExists} "${NAME}"
+      ${DetailLog} `Can't remove ${NAME}`
+      SetErrors
+    ${EndIf}
+  ${EndIf}
 !macroend
 !define RMDir '!insertmacro "RMDir"'
 
@@ -168,13 +192,13 @@ Function FindOutposts
       ${If} "$R2" == "SCCo Packet"
         ReadRegStr $R2 HKLM "${InstalledKey}\$R1" "InstallLocation"
         ${If} "$R2" == ""
-          ${LogSilent} `No InstallLocation in $R1`
+          ${DetailLog} `No InstallLocation in $R1`
         ${Else}
           StrCpy $R3 $R2 1 -1
           ${If} "$R3" == "\"
             StrCpy $R2 $R2 -1
           ${EndIf}
-          ${LogSilent} `InstallLocation: $R2 in $R1`
+          ${DetailLog} `InstallLocation: $R2 in $R1`
           Push "$R2"
           Call FindOutpost
         ${EndIf}
@@ -263,6 +287,9 @@ Section "Install"
   # Where to install files:
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
+  ${OpenDetailLogFile} setup.log
+  ${DetailLog} "Setup version ${VersionMajor}.${VersionMinor}"
+  Call FindOutposts
 
   # Stop the server (so it will release its lock on the program and log file):
   ${If} ${FileExists} "${PROGRAM_PATH}"
@@ -270,25 +297,21 @@ Section "Install"
   ${ElseIf} ${FileExists} "bin\Outpost_Forms.exe"
     ${Execute} "bin\Outpost_Forms.exe stop"
   ${Else}
-    DetailPrint `No ${PROGRAM_PATH}`
+    ${DetailLog} `No ${PROGRAM_PATH}`
   ${EndIf}
 
-  IfSilent +1 +3
-    FileOpen $SILENT_LOG silent.log w
-    Call FindOutposts
   ${If} "$OUTPOST_DATA" == ""
     StrCpy $R0 "I won't add forms to Outpost"
     StrCpy $R0 "$R0, because I didn't find Outpost's data folder."
     StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
     MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noFormsOK
     Call FindOutposts # DetailPrint diagnostic information
-    ${LogSilent} "No Outpost data folder"
-    Abort "No Outpost data folder"
+    ${AbortLog} `No Outpost data folder`
     noFormsOK:
   ${Else}
-    ${LogSilent} `Outpost data$OUTPOST_DATA`
+    ${DetailLog} `Outpost data$OUTPOST_DATA`
   ${EndIf}
-  ${LogSilent} `Outpost code$OUTPOST_CODE`
+  ${DetailLog} `Outpost code$OUTPOST_CODE`
 
   Call DeleteMyFiles
   ${If} ${Errors}
@@ -298,7 +321,7 @@ Section "Install"
     MessageBox MB_YESNO|MB_DEFBUTTON1|MB_ICONINFORMATION "$R0" /SD IDYES IDNO noDeleteAgain
     StrCpy $R0 0
     ${DoUntil} $R0 = 10
-      DetailPrint `Wait $R0 seconds`
+      ${DetailLog} `Wait $R0 seconds`
       IntOp $R1 $R0 * 1000
       Sleep $R1
       IntOp $R0 $R0 + 1
@@ -306,7 +329,7 @@ Section "Install"
     ${LoopWhile} ${Errors}
     ${If} ${Errors}
       noDeleteAgain:
-      Abort "Can't delete old files"
+      ${AbortLog} `Can't delete old files`
     ${EndIf}
   ${EndIf}
   ${Delete} uninstall.exe
@@ -325,7 +348,7 @@ Section "Install"
   ${ElseIf} "$AOCLIENT_EXE" == ""
     StrCpy $R0 "$R0, because I can't find Aoclient.exe in $OUTPOST_CODE."
   ${Else}
-    DetailPrint `Copy from $AOCLIENT_EXE`
+    ${DetailLog} `Copy from $AOCLIENT_EXE`
     ClearErrors
     CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
     ${If} ${Errors}
@@ -341,7 +364,7 @@ Section "Install"
   ${EndIf}
   StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
   MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK AoclientOK
-  Abort "Can't copy Aoclient.exe"
+  ${AbortLog} `Can't copy Aoclient.exe`
   AoclientOK:
 
   # Files to install:
@@ -369,7 +392,7 @@ Section "Install"
   WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "${DisplayName} v${VersionMajor}.${VersionMinor}"
   WriteRegStr   HKLM "${REG_SUBKEY}" UninstallString "$\"$INSTDIR\uninstall.exe$\""
   ${If} ${Errors}
-    DetailPrint `not registered`
+    ${DetailLog} `not registered`
     StrCpy $0 "${DisplayName} wasn't registered with Windows as a program."
     StrCpy $0 "$0 You can still use it, but to uninstall it you'll have to run uninstall.exe in $INSTDIR."
     Call IsUserAdmin
@@ -395,23 +418,24 @@ Section "Install"
   ${EndIf}
 
   StrCpy $WSCRIPT_EXE "$SYSDIR\wscript.exe"
-  IfFileExists $WSCRIPT_EXE +2
+  ${IfNot} ${FileExists} "$WSCRIPT_EXE"
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
-
+  ${EndIf}
   ClearErrors
   ${Execute} '${PROGRAM_PATH} install "$WSCRIPT_EXE" $OUTPOST_DATA'
   ${If} ${Errors}
-    Abort "${PROGRAM_PATH} install failed"
+    ${AbortLog} `${PROGRAM_PATH} install failed`
   ${EndIf}
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ClearErrors
   ${Execute} '"$WSCRIPT_EXE" bin\launch.vbs dry-run ${PROGRAM_PATH}'
   ${If} ${Errors}
-    Abort "dry-run failed"
+    ${AbortLog} `dry-run failed`
   ${EndIf}
-  IfSilent +1 +2
-    FileClose $SILENT_LOG
+  ${If} "$DETAIL_LOG_FILE" != ""
+    FileClose "$DETAIL_LOG_FILE"
+  ${EndIf}
 SectionEnd
 
 Section "Uninstall"
