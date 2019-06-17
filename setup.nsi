@@ -326,7 +326,7 @@ Section "Install"
     StrCpy $R0 "Some files were not deleted from $INSTDIR. Try again?"
     MessageBox MB_YESNO|MB_DEFBUTTON1|MB_ICONINFORMATION "$R0" /SD IDYES IDNO noDeleteAgain
     StrCpy $R0 0
-    ${DoUntil} $R0 = 10
+    ${DoUntil} $R0 = 12
       ${DetailLog} `Wait $R0 seconds`
       IntOp $R1 $R0 * 1000
       Sleep $R1
