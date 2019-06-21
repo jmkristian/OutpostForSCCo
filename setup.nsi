@@ -14,7 +14,7 @@
 
 !define InstalledKey SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall
 
-Name "${WINDOW_TITLE}" "web forms"
+Name "${WINDOW_TITLE}" "forms"
 
 RequestExecutionLevel highest
 Page custom selectOutpostCode "" "${WINDOW_TITLE} Setup"
