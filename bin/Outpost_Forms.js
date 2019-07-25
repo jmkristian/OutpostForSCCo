@@ -28,18 +28,18 @@
   or opens an existing message that belongs to this add-on,
   a fairly complex sequence of events ensues.
   - Outpost executes this program with arguments specified in addon.ini.
-  - This program POSTs the arguments to a server, which then
+  - This program POSTs the arguments to a server, and then
   - launches a browser, which GETs an HTML form from the server.
   - When the operator clicks "Submit", the browser POSTs a message to the server,
-  - and the server runs Aoclient.exe, which submits the message to Outpost.
+  - and the server POSTs a request to Opdirect, which submits the message to Outpost.
 
   The server is a process running this program with a single argument "serve".
   The server is started as a side-effect of creating or opening a message.
   When this program tries and fails to POST arguments to the server,
   it tries to start the server, delays a bit and retries the POST.
   The server continues to run as long as any of the forms it serves are open,
-  plus a couple minutes. To implement this, the browser pings the server
-  periodically, and the server notices when the pings stop.
+  plus a time period (look for idleTime). To implement this, the browser pings
+  the server periodically, and the server notices when the pings stop.
 
   It's kind of weird to implement all of this behavior in a single program.
   Splitting it into several programs would have drawbacks:
@@ -52,6 +52,7 @@
   To address the issue of operators waiting for antivirus scan, the
   installation script runs "Outpost_Forms.exe dry-run", which runs this program
   as though it were handling a message, but doesn't launch a browser.
+  So the scan happens during installation, not when opening a message.
 */
 const AllHtmlEntities = require('html-entities').AllHtmlEntities;
 const bodyParser = require('body-parser');
