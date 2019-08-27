@@ -527,6 +527,10 @@ function serve() {
                 args.push('--' + name);
                 args.push(req.body[name]);
             }
+            if (req.body.OpDate && req.body.OpTime) {
+                args.push('--MSG_DATETIME_OP_RCVD')
+                args.push(req.body.OpDate + " " + req.body.OpTime)
+            }
             const formId = '' + nextFormId++;
             onOpen(formId, args);
             res.redirect('/form-' + formId);
