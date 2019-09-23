@@ -5,7 +5,7 @@ in Santa Clara County, California.
 It uses the [add-on interface](http://www.outpostpm.org/docs/Outpost320-AddonUG.pdf)
 to Outpost, and a web browser to display and edit forms.
 
-For installation and usage instructions, see the UserGuide.html file in each [release](releases).
+For installation and usage instructions, see the UserGuide.html file in each [release](./releases).
 
 Source code is stored in this repository.
 To build it, you'll need
