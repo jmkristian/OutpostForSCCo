@@ -13,13 +13,14 @@ pkg.cmd -t node4-win-x86 bin/Outpost_Forms.js || exit $?
 mv Outpost_Forms.exe built/
 rm -f pack-it-forms/resources/integration/integration.js
 
-for FORMS in pack-it-forms "$@"; do
+for REPO in jmkristian/pack-it-forms "$@"; do
+    FORMS=$(basename "$REPO")
     if [ ! -e "$FORMS"/.git ]; then # Don't delete an experimental copy.
         rm -rf "$FORMS"
     fi
     if [ ! -e "$FORMS" ]; then
-        git clone "https://github.com/jmkristian/"$FORMS".git" || exit $?
-        (cd "$FORMS" && git checkout vSCCo.27)
+        git clone https://github.com/"$REPO".git || exit $?
+        (cd "$FORMS" && git checkout vSCCo.27a)
         rm -rf "$FORMS"/.git*
     fi
     "$FORMS"/resources/integration/scco/build.cmd || exit
