@@ -14,6 +14,9 @@
 
 !define InstalledKey SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall
 
+!include LogicLib.nsh
+!include built\addon.nsi
+
 Name "${WINDOW_TITLE}" "forms"
 
 RequestExecutionLevel highest
@@ -384,7 +387,7 @@ Section "Install"
   File built\UserGuide.html
   File /r built\addons
   File /r /x "*~" /x *.txt /x *.ini /x *.html /x *.log /x notes bin
-  File /oname=${PROGRAM_PATH} Outpost_Forms.exe
+  File /oname=${PROGRAM_PATH} built\Outpost_Forms.exe
   Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"
   File icon-*.png
