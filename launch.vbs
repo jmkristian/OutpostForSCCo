@@ -7,7 +7,7 @@ my_folder = FSO.GetParentFolderName(FSO.GetParentFolderName(Wscript.ScriptFullNa
 
 ' Construct a command line as a string:
 ReDim arguments(WScript.Arguments.Count)
-arguments(0) = FSO.BuildPath(my_folder, "{{PROGRAM_PATH}}")
+arguments(0) = Chr(34) & FSO.BuildPath(my_folder, "{{PROGRAM_PATH}}") & Chr(34)
 For i = 0 To WScript.Arguments.Count-1
   arg = WScript.Arguments(i)
   If Len(arg) = 0 Or InStr(arg, " ") > 0 Or InStr(arg, Chr(34)) > 0 Then

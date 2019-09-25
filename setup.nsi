@@ -299,7 +299,9 @@ Section "Install"
 
   # Stop the server (so it will release its lock on the program and log file):
   ${If} ${FileExists} "${PROGRAM_PATH}"
-    ${Execute} "${PROGRAM_PATH} stop"
+    ${Execute} '"${PROGRAM_PATH}" stop'
+  ${ElseIf} ${FileExists} "bin\SCCoPIFO.exe"
+    ${Execute} "bin\SCCoPIFO.exe stop"
   ${ElseIf} ${FileExists} "bin\Outpost_Forms.exe"
     ${Execute} "bin\Outpost_Forms.exe stop"
   ${Else}
@@ -387,7 +389,7 @@ Section "Install"
   File built\UserGuide.html
   File /r built\addons
   File /r /x "*~" /x *.txt /x *.ini /x *.html /x *.log /x notes bin
-  File /oname=${PROGRAM_PATH} built\Outpost_Forms.exe
+  File "/oname=${PROGRAM_PATH}" built\Outpost_Forms.exe
   Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"
   File icon-*.png
@@ -430,15 +432,16 @@ Section "Install"
   ${IfNot} ${FileExists} "$WSCRIPT_EXE"
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
   ${EndIf}
+  SimpleFC::addApplication "${DisplayName}" "${PROGRAM_PATH}" 1 2 "" 1
   ClearErrors
-  ${Execute} '${PROGRAM_PATH} install "$WSCRIPT_EXE" $OUTPOST_DATA'
+  ${Execute} '"${PROGRAM_PATH}" install "$WSCRIPT_EXE" $OUTPOST_DATA'
   ${If} ${Errors}
-    ${AbortLog} `${PROGRAM_PATH} install failed`
+    ${AbortLog} `"${PROGRAM_PATH}" install failed`
   ${EndIf}
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ClearErrors
-  ${Execute} '"$WSCRIPT_EXE" bin\launch.vbs dry-run ${PROGRAM_PATH}'
+  ${Execute} '"$WSCRIPT_EXE" bin\launch.vbs dry-run "${PROGRAM_PATH}"'
   ${If} ${Errors}
     ${AbortLog} `dry-run failed`
   ${EndIf}
@@ -456,7 +459,7 @@ Section "Uninstall"
 
   # Remove our line from Outpost configuration files
   Call un.FindOutposts
-  ${Execute} "${PROGRAM_PATH} uninstall$OUTPOST_DATA"
+  ${Execute} '"${PROGRAM_PATH}" uninstall$OUTPOST_DATA'
 
   Call un.SetShellVarContextAppropriately
   ${Delete} "$SMPROGRAMS\SCCo Packet\Uninstall ${DisplayName}.lnk"
