@@ -1437,7 +1437,7 @@ function expandVariablesInFile(variables, fromFile, intoFile) {
         if (newData != data || intoFile != fromFile) {
             fs.writeFile(intoFile, newData, {encoding: ENCODING}, function(err) {
                 if (err) logAndAbort(err);
-                log('wrote ' + intoFile);
+                log(JSON.stringify(variables) + ' in ' + intoFile);
             });
         }
     });
