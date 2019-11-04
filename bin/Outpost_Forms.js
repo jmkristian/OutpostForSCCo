@@ -83,7 +83,7 @@ const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join(LOG_FOLDER, 'server-port.txt');
 const PROBLEM_HEADER = '<html><head><title>Problem</title></head><body>'
-      + EOL + '<h3><img src="icon-warning.png" alt="warning"'
+      + EOL + '<h3><img src="/icon-warning.png" alt="warning"'
       + ' style="width:24pt;height:24pt;vertical-align:middle;margin-right:1em;">'
       + 'Something went wrong.</h3>';
 const SAVE_FOLDER = 'saved';
@@ -472,6 +472,10 @@ function serve() {
         keepAlive(req.params.formId);
         onGetForm(req.params.formId, req, res);
     });
+    app.get('/message-:formId/:subject', function(req, res, next) {
+        keepAlive(req.params.formId);
+        onGetMessage(req.params.formId, req, res);
+    });
     app.post('/save-:formId', function(req, res, next) {
         onSaveMessage(req.params.formId, req);
         res.end();
@@ -735,6 +739,24 @@ function getMessage(environment) {
     return message;
 }
 
+function onGetMessage(formId, req, res) {
+    noCache(res);
+    try {
+        const form = findForm(formId);
+        if (form) {
+            res.set({'Content-Type': TEXT_PLAIN});
+            res.end('#Subject: ' + form.environment.subject + EOL + form.message);
+        } else if (formId < nextFormId) {
+            throw new Error('message ' + formId + ' was discarded, since it was closed.');
+        } else {
+            throw new Error('message ' + formId + ' has not been opened.');
+        }
+    } catch(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err, form), CHARSET);
+    }
+}
+
 /** Handle an HTTP GET /form-id request. */
 function onGetForm(formId, req, res) {
     noCache(res);
@@ -758,7 +780,7 @@ function onGetForm(formId, req, res) {
             res.set({'Content-Type': TEXT_HTML});
             loadForm(formId, form, req);
             if (form.environment.message_status == 'manual-created') {
-                showManualMessage(form, res);
+                showManualMessage(formId, form, res);
             } else {
                 showForm(form, res);
             }
@@ -824,14 +846,16 @@ function showForm(form, res) {
     res.end(html, CHARSET);
 }
 
-function showManualMessage(form, res) {
+function showManualMessage(formId, form, res) {
     const template = path.join('bin', 'message.html');
     fs.readFile(template, {encoding: ENCODING}, function(err, data) {
         try {
             if (err) throw err;
             res.end(expandVariables(data,
                                     {SUBJECT: encodeHTML(form.environment.subject),
-                                     MESSAGE: encodeHTML(form.message)}),
+                                     MESSAGE: encodeHTML(form.message),
+                                     MESSAGE_URL: '/message-' + formId
+                                     + '/' + encodeURIComponent(form.environment.subject)}),
                     CHARSET);
         } catch(err) {
             res.end(errorToHTML(err, form.environment), CHARSET);
