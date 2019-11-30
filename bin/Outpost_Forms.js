@@ -965,11 +965,10 @@ function onSubmit(formId, q, res, fromOutpostURL) {
                 fs.unlink(fileName, function(err) {
                     if (!err) log("Deleted " + fileName);
                 });
+            } else if ((typeof err) != 'object') {
+                throw err;
             } else {
                 res.set({'Content-Type': TEXT_HTML});
-                if ((typeof err) != 'object') {
-                    throw err;
-                }
                 form.fromOutpost = err;
                 log('/form-' + formId + ' from Outpost ' + JSON.stringify(err));
                 var page = PROBLEM_HEADER + EOL
@@ -1017,6 +1016,34 @@ function onSubmit(formId, q, res, fromOutpostURL) {
     }
 }
 
+const INI = {
+    comment: /^\s*;/,
+    section: /^\s*\[\s*([^\]]*)\s*\]\s*$/,
+    property: /^\s*([\w\.\-\_]+)\s*=(.*)$/
+};
+
+function parseIni(data) {
+    var value = {};
+    var section = null;
+    data.split(/[\r\n]+/).forEach(function(line) {
+	if (INI.comment.test(line)){
+	    return;
+	} else if (INI.section.test(line)) {
+	    var match = line.match(INI.section);
+	    section = match[1].toLowerCase();
+	    value[section] = {};
+	} else if (INI.property.test(line)) {
+	    var match = line.match(INI.property);
+	    if (section) {
+		value[section][match[1].toLowerCase()] = match[2];
+	    } else {
+		value[match[1].toLowerCase()] = match[2];
+	    }
+	};
+    });
+    return value;
+}
+
 function submitToOpdirect(submission, callback) {
     try {
         if (!submission.addonName) throw 'addonName is required.\n'; 
@@ -1033,7 +1060,16 @@ function submitToOpdirect(submission, callback) {
         const message = submission.form.message
               ? '&' + querystring.stringify({msg: submission.form.message})
               : '';
-        const options = {method: 'POST', host: LOCALHOST, port: 9334, path: '/TBD'};
+        const options = parseIni(fs.readFileSync(path.join('bin', 'server.ini'), ENCODING)).opdirect;
+        if (options.port) {
+            if (/^\d+$/.test(options.port)) {
+                options.port = parseInt(options.port);
+            } else {
+                callback('"' + options.port + '" isn\'t a port number.'
+                         + EOL + JSON.stringify(options));
+                return;
+            }
+        }
         // Send an HTTP request.
         const server = request(
             options,

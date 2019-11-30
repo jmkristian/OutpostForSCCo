@@ -384,6 +384,7 @@ Section "Install"
   File built\launch-v.cmd
   File built\manual.html
   File bin\message.html
+  File bin\server.ini
   SetOutPath "$INSTDIR"
   File built\browse.cmd
   File built\UserGuide.html
