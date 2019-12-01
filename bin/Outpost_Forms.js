@@ -71,6 +71,11 @@ const ENCODING = CHARSET; // for files
 const EOL = '\r\n';
 const FORBIDDEN = 403;
 const htmlEntities = new AllHtmlEntities();
+const INI = { // patterns that match lines from a .ini file.
+    comment: /^\s*;/,
+    section: /^\s*\[\s*([^\]]*)\s*\]\s*$/,
+    property: /^\s*([\w\.\-\_]+)\s*=(.*)$/
+};
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
 const LOG_FOLDER = 'logs';
@@ -87,6 +92,7 @@ const PROBLEM_HEADER = '<html><head><title>Problem</title></head><body>'
       + ' style="width:24pt;height:24pt;vertical-align:middle;margin-right:1em;">'
       + 'Something went wrong.</h3>';
 const SAVE_FOLDER = 'saved';
+const SETTINGS_FILE = path.join('bin', 'server.ini');
 const StopServer = '/stopSCCoPIFO';
 const SUBMIT_TIMEOUT_SEC = 30;
 const TEXT_HTML = 'text/html; charset=' + CHARSET;
@@ -94,6 +100,15 @@ const TEXT_PLAIN = 'text/plain; charset=' + CHARSET;
 
 var myServerPort = null;
 var logFileName = null;
+var settingsUpdatedTime = null;
+var settings = {
+    Opdirect: {
+        host: LOCALHOST,
+        port: 9334,
+        method: 'POST',
+        path: '/TBD'
+    }
+};
 
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
@@ -778,6 +793,7 @@ function onGetForm(formId, req, res) {
         log('/form-' + formId + ' viewed');
         try {
             res.set({'Content-Type': TEXT_HTML});
+            updateSettings();
             loadForm(formId, form, req);
             if (form.environment.message_status == 'manual-created') {
                 showManualMessage(formId, form, res);
@@ -859,6 +875,47 @@ function showManualMessage(formId, form, res) {
                     CHARSET);
         } catch(err) {
             res.end(errorToHTML(err, form.environment), CHARSET);
+        }
+    });
+}
+
+function updateSettings() {
+    fs.stat(SETTINGS_FILE, function(err, stats) {
+        if (!err && stats && stats.mtime) {
+            const fileTime = stats.mtime.getTime();
+            if (fileTime != settingsUpdatedTime) {
+                fs.readFile(SETTINGS_FILE, {encoding: ENCODING}, function(err, data) {
+                    try {
+                        if (err) throw err;
+                        settingsUpdatedTime = fileTime;
+                        var section = null;
+                        data.split(/[\r\n]+/).forEach(function(line) {
+	                    if (INI.comment.test(line)) {
+	                        return;
+	                    } else if (INI.section.test(line)) {
+	                        var match = line.match(INI.section);
+	                        section = match[1];
+                                if (settings[section] == null) {
+	                            settings[section] = {};
+                                }
+	                    } else if (INI.property.test(line)) {
+	                        var match = line.match(INI.property);
+	                        if (section) {
+		                    settings[section][match[1]] = match[2];
+	                        } else {
+		                    settings[match[1]] = match[2];
+	                        }
+	                    };
+                        });
+                        if ((typeof settings.Opdirect.port) == 'string') {
+                            settings.Opdirect.port = parseInt(settings.Opdirect.port);
+                        }
+                        log('settings = ' + JSON.stringify(settings));
+                    } catch(err) {
+                        log(err);
+                    }
+                });
+            }
         }
     });
 }
@@ -1016,34 +1073,6 @@ function onSubmit(formId, q, res, fromOutpostURL) {
     }
 }
 
-const INI = {
-    comment: /^\s*;/,
-    section: /^\s*\[\s*([^\]]*)\s*\]\s*$/,
-    property: /^\s*([\w\.\-\_]+)\s*=(.*)$/
-};
-
-function parseIni(data) {
-    var value = {};
-    var section = null;
-    data.split(/[\r\n]+/).forEach(function(line) {
-	if (INI.comment.test(line)){
-	    return;
-	} else if (INI.section.test(line)) {
-	    var match = line.match(INI.section);
-	    section = match[1].toLowerCase();
-	    value[section] = {};
-	} else if (INI.property.test(line)) {
-	    var match = line.match(INI.property);
-	    if (section) {
-		value[section][match[1].toLowerCase()] = match[2];
-	    } else {
-		value[match[1].toLowerCase()] = match[2];
-	    }
-	};
-    });
-    return value;
-}
-
 function submitToOpdirect(submission, callback) {
     try {
         if (!submission.addonName) throw 'addonName is required.\n'; 
@@ -1060,16 +1089,7 @@ function submitToOpdirect(submission, callback) {
         const message = submission.form.message
               ? '&' + querystring.stringify({msg: submission.form.message})
               : '';
-        const options = parseIni(fs.readFileSync(path.join('bin', 'server.ini'), ENCODING)).opdirect;
-        if (options.port) {
-            if (/^\d+$/.test(options.port)) {
-                options.port = parseInt(options.port);
-            } else {
-                callback('"' + options.port + '" isn\'t a port number.'
-                         + EOL + JSON.stringify(options));
-                return;
-            }
-        }
+        const options = settings.Opdirect;
         // Send an HTTP request.
         const server = request(
             options,
