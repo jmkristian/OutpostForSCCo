@@ -101,7 +101,7 @@ const TEXT_PLAIN = 'text/plain; charset=' + CHARSET;
 var myServerPort = null;
 var logFileName = null;
 var settingsUpdatedTime = null;
-var settings = {
+const DEFAULT_SETTINGS = {
     Opdirect: {
         host: LOCALHOST,
         port: 9334,
@@ -109,6 +109,7 @@ var settings = {
         path: '/TBD'
     }
 };
+var settings = DEFAULT_SETTINGS;
 
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
@@ -879,15 +880,31 @@ function showManualMessage(formId, form, res) {
     });
 }
 
+function merge(a, b) {
+    if ((typeof b) == 'undefined') return a;
+    if (b == null || (typeof b) != 'object' || (typeof a) != 'object') return b;
+    var result = {};
+    for (key in a) {
+        result[key] = a[key];
+    }
+    for (key in b) {
+        result[key] = merge(a[key], b[key]);
+    }
+    return result;
+}
+
 function updateSettings() {
     fs.stat(SETTINGS_FILE, function(err, stats) {
-        if (!err && stats && stats.mtime) {
+        if (err || !(stats && stats.mtime)) {
+            settings = DEFAULT_SETTINGS;
+        } else {
             const fileTime = stats.mtime.getTime();
             if (fileTime != settingsUpdatedTime) {
                 fs.readFile(SETTINGS_FILE, {encoding: ENCODING}, function(err, data) {
                     try {
                         if (err) throw err;
                         settingsUpdatedTime = fileTime;
+                        var fileSettings = {};
                         var section = null;
                         data.split(/[\r\n]+/).forEach(function(line) {
 	                    if (INI.comment.test(line)) {
@@ -895,21 +912,22 @@ function updateSettings() {
 	                    } else if (INI.section.test(line)) {
 	                        var match = line.match(INI.section);
 	                        section = match[1];
-                                if (settings[section] == null) {
-	                            settings[section] = {};
+                                if (fileSettings[section] == null) {
+	                            fileSettings[section] = {};
                                 }
 	                    } else if (INI.property.test(line)) {
 	                        var match = line.match(INI.property);
 	                        if (section) {
-		                    settings[section][match[1]] = match[2];
+		                    fileSettings[section][match[1]] = match[2];
 	                        } else {
-		                    settings[match[1]] = match[2];
+		                    fileSettings[match[1]] = match[2];
 	                        }
 	                    };
                         });
-                        if ((typeof settings.Opdirect.port) == 'string') {
-                            settings.Opdirect.port = parseInt(settings.Opdirect.port);
+                        if ((typeof fileSettings.Opdirect.port) == 'string') {
+                            fileSettings.Opdirect.port = parseInt(fileSettings.Opdirect.port);
                         }
+                        settings = merge(DEFAULT_SETTINGS, fileSettings);
                         log('settings = ' + JSON.stringify(settings));
                     } catch(err) {
                         log(err);
