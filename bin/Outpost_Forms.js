@@ -478,9 +478,19 @@ function serve() {
         const args = req.body;
         if (args && args.length > 0) {
             formId = '' + nextFormId++;
-            onOpen(formId, args);
-            res.set({'Content-Type': TEXT_PLAIN});
-            result = 'http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId;
+            try {
+                onOpen(formId, args);
+                res.set({'Content-Type': TEXT_PLAIN});
+                result = 'http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId;
+            } catch(err) {
+                log(err);
+                req.socket.end(); // abort the HTTP connection
+                // The client will log "Error: socket hang up" into logs/*-open.log,
+                // and start another server. It would be better for the client to
+                // log something more informative, but client versions <= 2.18
+                // can't be induced to do that.
+                res.writeHead(421, {});
+            }
         }
         res.end(result, CHARSET);
     });
@@ -650,6 +660,15 @@ function serve() {
 function onOpen(formId, args) {
     // This code should be kept dead simple, since
     // it can't show a problem to the operator.
+    for (var i = 0; i+1 < args.length; ++i) {
+        if (args[i] == '--addon_name') {
+            var addon_name = args[i+1];
+            if (!fs.statSync(path.join('addons', addon_name + '.ini'))) {
+                throw new Error('This is not a server for ' + addon_name + '.');
+            }
+            break;
+        }
+    }
     openForms[formId] = {
         args: args,
         quietTime: 0
