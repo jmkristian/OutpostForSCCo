@@ -66,10 +66,14 @@ const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
 
+const HTTP_OK = 200;
+const SEE_OTHER = 303;
+const FORBIDDEN = 403;
+const NOT_FOUND = 404;
+
 const CHARSET = 'utf-8'; // for HTTP
 const ENCODING = CHARSET; // for files
 const EOL = '\r\n';
-const FORBIDDEN = 403;
 const htmlEntities = new AllHtmlEntities();
 const INI = { // patterns that match lines from a .ini file.
     comment: /^\s*;/,
@@ -81,7 +85,6 @@ const LOCALHOST = '127.0.0.1';
 const LOG_FOLDER = 'logs';
 const seconds = 1000;
 const hours = 60 * 60 * seconds;
-const NOT_FOUND = 404;
 const OpdFAIL = 'OpdFAIL';
 const OpenOutpostMessage = '/openOutpostMessage';
 const PackItForms = 'pack-it-forms';
@@ -357,16 +360,21 @@ function openForm(args, tryLater) {
     var postData = JSON.stringify(args);
     log('http://' + options.host + ':' + options.port
         + ' ' + options.method + ' ' + OpenOutpostMessage + ' ' + postData);
-    request(options, function(err, data) {
+    request(options, function(err, data, res) {
         if (err) {
             tryLater(err);
-        } else {
-            data = data && data.trim();
-            log('opened form ' + data);
-            if (data) {
-                startProcess('start', [data], {shell: true, detached: true, stdio: 'ignore'});
-            }
+        } else if (res.statusCode == SEE_OTHER) {
+            var location = res.headers.location;
+            log('opened form ' + location + EOL + data);
+            startProcess('start', [location], {shell: true, detached: true, stdio: 'ignore'});
             process.exit(0); // mission accomplished
+        } else if (args && args.length) {
+            // Probably an old server, version <= 2.18.
+            // Or perhaps something went wrong on the server side.
+            tryLater('HTTP response ' + res.statusCode + ' ' + res.statusMessage + EOL + data);
+        } else if (res.statusCode == HTTP_OK) {
+            log('HTTP response ' + res.statusCode + ' ' + res.statusMessage + EOL + data);
+            process.exit(0); // dry run accomplished
         }
     }).end(postData, CHARSET);
 }
@@ -473,15 +481,15 @@ function serve() {
     app.use(bodyParser.json({type: JSON_TYPE}));
     app.use(bodyParser.urlencoded({extended: false}));
     app.post(OpenOutpostMessage, function(req, res, next) {
-        // req.body is an array, thanks to bodyParser.json
+        const args = req.body; // an array, thanks to bodyParser.json
         var result = '';
-        const args = req.body;
-        if (args && args.length > 0) {
+        if (!args || !args.length) { // a dry run
+            res.end(result, CHARSET);
+        } else {
             formId = '' + nextFormId++;
             try {
                 onOpen(formId, args);
-                res.set({'Content-Type': TEXT_PLAIN});
-                result = 'http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId;
+                res.redirect(SEE_OTHER, 'http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId);
             } catch(err) {
                 log(err);
                 req.socket.end(); // abort the HTTP connection
@@ -492,7 +500,6 @@ function serve() {
                 res.writeHead(421, {});
             }
         }
-        res.end(result, CHARSET);
     });
     app.get('/form-:formId', function(req, res, next) {
         keepAlive(req.params.formId);
@@ -660,9 +667,9 @@ function serve() {
 function onOpen(formId, args) {
     // This code should be kept dead simple, since
     // it can't show a problem to the operator.
-    for (var i = 0; i+1 < args.length; ++i) {
-        if (args[i] == '--addon_name') {
-            var addon_name = args[i+1];
+    for (var a = 0; a+1 < args.length; ++a) {
+        if (args[a] == '--addon_name') {
+            var addon_name = args[a+1];
             if (!fs.statSync(path.join('addons', addon_name + '.ini'))) {
                 throw new Error('This is not a server for ' + addon_name + '.');
             }
@@ -1146,7 +1153,7 @@ function submitToOpdirect(submission, callback) {
                     } else if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
                         // It's an old version of Outpost. Maybe Aoclient will work:
                         submitToAoclient(submission, callback);
-                    } else if (res.statusCode < 200 || res.statusCode >= 300) {
+                    } else if (res.statusCode < HTTP_OK || res.statusCode >= 300) {
                         callback({message: 'HTTP status ' + res.statusCode + ' ' + res.statusMessage,
                                   headers: copyHeaders(res.headers),
                                   body: data});
@@ -1160,7 +1167,7 @@ function submitToOpdirect(submission, callback) {
                                 returnCode = parseInt(matches[1]);
                             }
                         }
-                        if (returnCode < 200 || returnCode >= 300) {
+                        if (returnCode < HTTP_OK || returnCode >= 300) {
                             callback({message: 'OpDirectReturnCode ' + returnCode,
                                       headers: copyHeaders(res.headers),
                                       body: data});
