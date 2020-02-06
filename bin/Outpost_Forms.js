@@ -368,13 +368,13 @@ function openForm(args, tryLater) {
             log('opened form ' + location + EOL + data);
             startProcess('start', [location], {shell: true, detached: true, stdio: 'ignore'});
             process.exit(0); // mission accomplished
-        } else if (args && args.length) {
-            // Probably an old server, version <= 2.18.
-            // Or perhaps something went wrong on the server side.
-            tryLater('HTTP response ' + res.statusCode + ' ' + res.statusMessage + EOL + data);
-        } else if (res.statusCode == HTTP_OK) {
+        } else if (res.statusCode == HTTP_OK && args.length == 0) {
             log('HTTP response ' + res.statusCode + ' ' + res.statusMessage + EOL + data);
             process.exit(0); // dry run accomplished
+        } else {
+            // Could be an old server, version <= 2.18,
+            // or something went wrong on the server side.
+            tryLater('HTTP response ' + res.statusCode + ' ' + res.statusMessage + EOL + data);
         }
     }).end(postData, CHARSET);
 }
