@@ -25,5 +25,3 @@ for REPO in jmkristian/pack-it-forms "$@"; do
     fi
     "$FORMS"/resources/integration/scco/build.cmd || exit
 done
-
-cp -p pack-it-forms/resources/integration/pacread/* pack-it-forms/resources/integration/
