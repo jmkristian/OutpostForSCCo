@@ -2,7 +2,7 @@
 # This script can be executed by the bash that's packaged with git for Windows.
 cd `dirname "$0"` || exit $?
 export VersionMajor=2
-export VersionMinor=20
+export VersionMinor=21
 rm -r built logs
 mkdir built
 if [ ! -e node_modules ]; then
