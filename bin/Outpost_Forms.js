@@ -865,7 +865,7 @@ function showForm(form, res) {
             + "I received " + JSON.stringify(formType)
             + " instead of the name of a form.\n";
     }
-    if (['draft', 'read', 'unread'].indexOf(form.environment.message_status) >= 0) {
+    if (['read', 'unread'].indexOf(form.environment.message_status) >= 0) {
         const receiverFileName = formType.replace(/\.([^.]*)$/, '.receiver.$1');
         if (fs.existsSync(path.join(PackItForms, receiverFileName))) {
             formType = receiverFileName;
