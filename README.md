@@ -10,6 +10,7 @@ For installation and usage instructions, see the UserGuide.html file in each [re
 Source code is stored in this repository.
 To build it, you'll need
 [Git](https://git-scm.com/downloads),
+[nvm for Windows](https://github.com/coreybutler/nvm-windows),
 [Node.js](https://nodejs.org/en/download/)
 [version 4](https://nodejs.org/download/release/v4.9.1/) (yes that old),
 [NSIS](http://nsis.sourceforge.net) version 3 or later

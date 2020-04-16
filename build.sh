@@ -6,9 +6,11 @@ export VersionMinor=21
 rm -r built logs
 mkdir built
 if [ `node --version` != "v4.9.1" ]; then
-    nvm use 4.9.1 32
+    nvm use 4.9.1 32 || exit $? # https://github.com/coreybutler/nvm-windows
 fi
-npm install # https://nodejs.org
+if [ ! -e node_modules ]; then
+    npm install || exit $? # https://docs.npmjs.com/cli/install
+fi
 node_modules/.bin/pkg.cmd -t node4-win-x86 bin/Outpost_Forms.js || exit $?
 mv Outpost_Forms.exe built/
 rm -f pack-it-forms/resources/integration/integration.js
