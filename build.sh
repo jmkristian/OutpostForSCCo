@@ -5,7 +5,9 @@ export VersionMajor=2
 export VersionMinor=21
 rm -r built logs
 mkdir built
-nvm use 4.9.1 32
+if [ `node --version` != "v4.9.1" ]; then
+    nvm use 4.9.1 32
+fi
 npm install # https://nodejs.org
 node_modules/.bin/pkg.cmd -t node4-win-x86 bin/Outpost_Forms.js || exit $?
 mv Outpost_Forms.exe built/
