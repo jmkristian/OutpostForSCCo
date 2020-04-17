@@ -135,10 +135,13 @@ if (process.argv.length > 2) {
             // Remove this add-on from Outpost's configuration.
             uninstall();
             break;
+        case 'convert':
+            convertMessage();
+            break;
         case 'open':
         case 'dry-run':
             // Make sure a server is running, and then send process.argv[4..] to it.
-            openMessage();
+            browseMessage();
             break;
         case 'serve':
             // Serve HTTP requests until a few minutes after there are no forms open.
@@ -157,7 +160,9 @@ if (process.argv.length > 2) {
         }
     } catch(err) {
         log(err);
-        process.exit(1);
+        setTimeout( // Wait for log output to flush to disk.
+            function() {process.exit(1);},
+            2 * seconds);
     }
 }
 
@@ -165,6 +170,9 @@ function build(addonVersion, addonName, programPath, displayName) {
     expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
                           path.join('bin', 'addon.ini'),
                           path.join('built', 'addons', addonName + '.ini'));
+    expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
+                          path.join('bin', 'cmd-convert.ini'),
+                          path.join('built', 'cmd-convert.ini'));
     expandVariablesInFile({addon_name: addonName},
                           path.join('bin', 'Aoclient.ini'),
                           path.join('built', 'addons', addonName, 'Aoclient.ini'));
@@ -182,7 +190,7 @@ function install() {
     // might execute it repeatedly while scrutinizing the .exe for viruses.
     const myDirectory = process.cwd();
     const addonNames = getAddonNames();
-    log('addons ' + JSON.stringify(addonNames));
+    log('install addons ' + JSON.stringify(addonNames));
     installConfigFiles(myDirectory, addonNames);
     installIncludes(myDirectory, addonNames);
     fs.stat(LOG_FOLDER, function(err, stats) {
@@ -316,7 +324,41 @@ function getAddonNames(directoryName) {
     return addonNames;
 }
 
-function openMessage() {
+function convertMessage() {
+    openMessage(function convert(page) {
+        try {
+            const child = child_process.spawn(
+                'bin\\WebToPDF.cmd', [page, 'form.pdf'], {
+                    shell: true, detached: true,
+                    stdio: ['ignore', 'pipe', 'pipe']
+                });
+            child.on('error', function(err) {
+                log('WebToPDF spawn error');
+                log(err);
+            });
+            child.on('exit', function(code) {
+                log('WebToPDF exit code ' + code);
+                process.exit(code);
+            });
+            child.stdout.pipe(process.stdout);
+            child.stderr.pipe(process.stderr);
+        } catch(err) {
+            log(err);
+            setTimeout( // Wait for log output to flush to disk.
+                function() {process.exit(1);},
+                2 * seconds);
+        }
+    });
+}
+
+function browseMessage() {
+    openMessage(function browse(page) {
+        startProcess('start', [page], {shell: true, detached: true, stdio: 'ignore'});
+        process.exit(0); // mission accomplished
+    });
+}
+
+function openMessage(afterOpen) {
     const programPath = process.argv[3];
     var args = [];
     for (var i = 4; i < process.argv.length; i++) {
@@ -325,7 +367,7 @@ function openMessage() {
     var retries = 0;
     function tryNow() {
         try {
-            openForm(args, tryLater);
+            openForm(args, tryLater, afterOpen);
         } catch(err) {
             tryLater(err);
         }
@@ -347,7 +389,7 @@ function openMessage() {
     tryNow();
 }
 
-function openForm(args, tryLater) {
+function openForm(args, tryLater, afterOpen) {
     if (!fs.existsSync(PortFileName)) {
         // There's definitely no server running. Start one now:
         throw PortFileName + " doesn't exist";
@@ -366,8 +408,7 @@ function openForm(args, tryLater) {
         } else if (res.statusCode == SEE_OTHER) {
             var location = res.headers.location;
             log('opened form ' + location + EOL + data);
-            startProcess('start', [location], {shell: true, detached: true, stdio: 'ignore'});
-            process.exit(0); // mission accomplished
+            afterOpen(location);
         } else if (res.statusCode == HTTP_OK && args.length == 0) {
             log('HTTP response ' + res.statusCode + ' ' + res.statusMessage + EOL + data);
             process.exit(0); // dry run accomplished
@@ -861,7 +902,7 @@ function showForm(form, res) {
     }
     var formType = form.environment.ADDON_MSG_TYPE;
     if (!formType) {
-        throw "I don't know what form to display, since"
+        throw "I don't know what form to display, since "
             + "I received " + JSON.stringify(formType)
             + " instead of the name of a form.\n";
     }

@@ -173,6 +173,32 @@ FunctionEnd
 !macroend
 !define RMDir '!insertmacro "RMDir"'
 
+!macro AppendFile INTO FROM
+  Push $R0
+  Push $R1
+  Push $R2
+  ClearErrors
+  FileOpen $R1 "${FROM}" r
+  FileOpen $R2 "${INTO}" a
+  FileSeek $R2 0 END
+  ${Do}
+    FileRead $R1 $R0
+    ${If} ${Errors}
+      ${Break}
+    ${EndIf}
+    FileWrite $R2 $R0
+  ${Loop}
+  FileClose $R1
+  FileClose $R2
+  ${If} ${Errors}
+    ${DetailLog} `Can't append cmd-convert to ${INTO}`
+  ${EndIf}
+  Pop $R2
+  Pop $R1
+  Pop $R0
+!macroend
+!define AppendFile '!insertmacro "AppendFile"'
+
 # Set $OUTPOST_DATA = a space-separated list of folders that contain Outpost configuration files.
 # If no such folders are found, set it to "".
 Function FindOutposts
@@ -380,11 +406,17 @@ Section "Install"
 
   # Files to install:
   SetOutPath "$INSTDIR\bin"
+  File built\cmd-convert.ini
   File built\launch.vbs
   File built\launch-v.cmd
   File built\manual.html
   File bin\message.html
   File bin\server.ini
+  ${IfNot} ${IsWinXP}
+     File WebToPDF\WebToPDF.cmd
+     File WebToPDF\WebToPDF.exe
+#     File /r WebToPDF\Chromium-81.0.4044.92
+  ${EndIf}
   SetOutPath "$INSTDIR"
   File built\browse.cmd
   File built\UserGuide.html
@@ -434,6 +466,10 @@ Section "Install"
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
   ${EndIf}
   SimpleFC::addApplication "${DisplayName}" "${PROGRAM_PATH}" 1 2 "" 1
+  ${IfNot} ${IsWinXP}
+    ${AppendFile} "$INSTDIR\addons\${addon_name}.ini" "$INSTDIR\bin\cmd-convert.ini"
+  ${EndIf}
+  ${Delete} "$INSTDIR\bin\cmd-convert.ini"
   ClearErrors
   ${Execute} '"${PROGRAM_PATH}" install "$WSCRIPT_EXE" $OUTPOST_DATA'
   ${If} ${Errors}
