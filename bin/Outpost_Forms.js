@@ -324,45 +324,84 @@ function getAddonNames(directoryName) {
     return addonNames;
 }
 
-function convertMessage() {
-    openMessage(function convert(page) {
-        try {
+function argvSlice(start) {
+    var args = [];
+    for (var i = start; i < process.argv.length; i++) {
+        args.push(process.argv[i]);
+    }
+    return args;
+}
+
+function convertPages(page, copyNames) {
+    try {
+        var exitCode = 0;
+        var copies = copyNames.length;
+        for (var c = 0; c < copyNames.length; ++c) {
+            var args = ['bin/Chromium', page];
+            args.push(page.substring(page.lastIndexOf('/') + 1) + '.pdf')
+            var copyName = copyNames[c];
+            if (copyName) {
+                args.push(copyName);
+            }
             const child = child_process.spawn(
-                'bin/WebToPDF.exe', ['bin/Chromium', page, 'form.pdf'], {
+                'bin/WebToPDF.exe', args, {
                     stdio: ['ignore', 'pipe', 'pipe']
                 });
             child.stdout.pipe(process.stdout);
             child.stderr.pipe(process.stdout);
             child.on('exit', function(code) {
                 log('WebToPDF exit code ' + code);
-                setTimeout( // Wait for log output to flush to disk.
-                    function() {process.exit(code);}, (code == 0) ? 0 : (2 * seconds));
-                });
+                if (code != 0) exitCode = code;
+                if (--copies <= 0) {
+                    setTimeout( // Wait for log output to flush to disk.
+                        function() {process.exit(exitCode);},
+                        exitCode ? (2 * seconds) : 10);
+                }
+            });
             child.on('error', function(err) {
                 log('WebToPDF spawn error');
                 log(err);
+                exitCode = 1;
             });
-        } catch(err) {
-            log(err);
-            setTimeout( // Wait for log output to flush to disk.
-                function() {process.exit(1);}, 2 * seconds);
         }
+    } catch(err) {
+        log(err);
+        setTimeout( // Wait for log output to flush to disk.
+            function() {process.exit(1);}, 2 * seconds);
+    }
+}
+
+function convertMessage() {
+    var allArgs = argvSlice(4);
+    var args = [];
+    var copyNames = '';
+    for (var a = 0; a < allArgs.length; ++a) {
+        var arg = allArgs[a];
+        if (arg == '--COPY_NAMES') {
+            copyNames = allArgs[++a];
+            if (copyNames == '{{COPY_NAMES}}') copyNames = '';
+        } else {
+            args.push(arg);
+        }
+    }
+    copyNames = copyNames.split('\\n');
+    for (var c = 0; c < copyNames.length; ++c) {
+        copyNames[c] = copyNames[c].replace(/\\\\/g, '\\');
+    }
+    openMessage(args, function convert(page) {
+        convertPages(page, copyNames);
     });
 }
 
 function browseMessage() {
-    openMessage(function browse(page) {
+    openMessage(argvSlice(4), function browse(page) {
         startProcess('start', [page], {shell: true, detached: true, stdio: 'ignore'});
         process.exit(0); // mission accomplished
     });
 }
 
-function openMessage(afterOpen) {
+function openMessage(args, afterOpen) {
     const programPath = process.argv[3];
-    var args = [];
-    for (var i = 4; i < process.argv.length; i++) {
-        args.push(process.argv[i]);
-    }
     var retries = 0;
     function tryNow() {
         try {
