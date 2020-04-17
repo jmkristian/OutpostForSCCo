@@ -117,7 +117,7 @@ var settings = DEFAULT_SETTINGS;
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
     const verb = process.argv[2];
-    if (!(verb == 'serve' || verb == 'subject')) {
+    if (!(verb == 'install' || verb == 'serve' || verb == 'subject')) {
         logToFile(verb);
     }
     try {
