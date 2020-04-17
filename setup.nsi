@@ -415,7 +415,7 @@ Section "Install"
   ${IfNot} ${IsWinXP}
      File WebToPDF\WebToPDF.cmd
      File WebToPDF\WebToPDF.exe
-#     File /r WebToPDF\Chromium-81.0.4044.92
+     File /r WebToPDF\Chromium
   ${EndIf}
   SetOutPath "$INSTDIR"
   File built\browse.cmd
