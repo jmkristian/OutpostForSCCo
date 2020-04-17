@@ -327,26 +327,37 @@ function getAddonNames(directoryName) {
 function convertMessage() {
     openMessage(function convert(page) {
         try {
+            const child = child_process.execFile(
+                'bin\\WebToPDF.exe',
+                ['bin/Chromium', page, 'form.pdf'],
+                function onExit(error, stdout, stderr) {
+                    if (error) log(error);
+                    if (stdout) process.stdout.write(stdout);
+                    if (stderr) process.stdout.write(stderr);
+                }
+            );
+/*
             const child = child_process.spawn(
-                'bin\\WebToPDF.cmd', [page, 'form.pdf'], {
-                    shell: true, detached: true,
+                'bin\\WebToPDF.exe', ['bin/Chromium', page, 'form.pdf'], {
+                    shell: true,
                     stdio: ['ignore', 'pipe', 'pipe']
                 });
+            child.stdout.pipe(process.stdout);
+            child.stderr.pipe(process.stdout);
+            child.on('exit', function(code) {
+                log('WebToPDF exit code ' + code);
+                setTimeout( // Wait for log output to flush to disk.
+                    function() {process.exit(code);}, (code == 0) ? 0 : (2 * seconds));
+                });
+*/
             child.on('error', function(err) {
                 log('WebToPDF spawn error');
                 log(err);
             });
-            child.on('exit', function(code) {
-                log('WebToPDF exit code ' + code);
-                process.exit(code);
-            });
-            child.stdout.pipe(process.stdout);
-            child.stderr.pipe(process.stderr);
         } catch(err) {
             log(err);
             setTimeout( // Wait for log output to flush to disk.
-                function() {process.exit(1);},
-                2 * seconds);
+                function() {process.exit(1);}, 2 * seconds);
         }
     });
 }
