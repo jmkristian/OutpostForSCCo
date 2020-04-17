@@ -2,7 +2,7 @@
 # This script can be executed by the bash that's packaged with git for Windows.
 cd `dirname "$0"` || exit $?
 export VersionMajor=2
-export VersionMinor=21
+export VersionMinor=21a
 rm -r built logs
 mkdir built
 if [ `node --version` != "v4.9.1" ]; then
