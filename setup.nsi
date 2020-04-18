@@ -191,7 +191,7 @@ FunctionEnd
   FileClose $R1
   FileClose $R2
   ${If} ${Errors}
-    ${DetailLog} `Can't append cmd-convert to ${INTO}`
+    ${DetailLog} `Can't append "${FROM}" to ${INTO}`
   ${EndIf}
   Pop $R2
   Pop $R1
@@ -407,15 +407,15 @@ Section "Install"
 
   # Files to install:
   SetOutPath "$INSTDIR\bin"
-  File built\cmd-convert.ini
   File built\launch.vbs
   File built\launch-v.cmd
   File built\manual.html
   File bin\message.html
   File bin\server.ini
   ${IfNot} ${IsWinXP}
-     File WebToPDF\WebToPDF.exe
-     File /r WebToPDF\Chromium
+     File webToPDF\WebToPDF.exe
+#     File /r webToPDF\Chromium
+     File bin\cmd-convert.ini
   ${EndIf}
   SetOutPath "$INSTDIR"
   File built\browse.cmd
@@ -466,10 +466,10 @@ Section "Install"
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
   ${EndIf}
   SimpleFC::addApplication "${DisplayName}" "${PROGRAM_PATH}" 1 2 "" 1
-  ${IfNot} ${IsWinXP}
+  ${If} ${FileExists} "$INSTDIR\bin\cmd-convert.ini"
     ${AppendFile} "$INSTDIR\addons\${addon_name}.ini" "$INSTDIR\bin\cmd-convert.ini"
+    ${Delete} "$INSTDIR\bin\cmd-convert.ini"
   ${EndIf}
-  ${Delete} "$INSTDIR\bin\cmd-convert.ini"
   ClearErrors
   ${Execute} '"${PROGRAM_PATH}" install "$WSCRIPT_EXE" $OUTPOST_DATA'
   ${If} ${Errors}

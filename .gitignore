@@ -18,4 +18,6 @@
 /README.html
 /scco-pvt-forms
 /sh.exe.stackdump
-/WebToPDF
+/webToPDF/*.exe
+/webToPDF/Chromium
+/webToPDF/node_modules

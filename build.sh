@@ -3,7 +3,7 @@
 cd `dirname "$0"` || exit $?
 export VersionMajor=2
 export VersionMinor=21a
-rm -r built logs
+rm -rf built logs
 mkdir built
 if [ `node --version` != "v4.9.1" ]; then
     nvm use 4.9.1 32 || exit $? # https://github.com/coreybutler/nvm-windows
