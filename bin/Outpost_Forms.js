@@ -73,6 +73,7 @@ const FORBIDDEN = 403;
 const NOT_FOUND = 404;
 
 const CHARSET = 'utf-8'; // for HTTP
+const CHROMIUM = path.join('bin', 'Chromium');
 const CONVERTED_FOLDER = 'converted';
 const ENCODING = CHARSET; // for files
 const EOL = '\r\n';
@@ -96,12 +97,15 @@ const PROBLEM_HEADER = '<html><head><title>Problem</title></head><body>'
       + EOL + '<h3><img src="/icon-warning.png" alt="warning"'
       + ' style="width:24pt;height:24pt;vertical-align:middle;margin-right:1em;">'
       + 'Something went wrong.</h3>';
+const realStdout = process.stdout;
+const realStderr = process.stderr;
 const SAVE_FOLDER = 'saved';
 const SETTINGS_FILE = path.join('bin', 'server.ini');
 const StopServer = '/stopSCCoPIFO';
 const SUBMIT_TIMEOUT_SEC = 30;
 const TEXT_HTML = 'text/html; charset=' + CHARSET;
 const TEXT_PLAIN = 'text/plain; charset=' + CHARSET;
+const WEB_TO_PDF = path.join('bin', 'WebToPDF.exe');
 
 var myServerPort = null;
 var logFileName = null;
@@ -119,7 +123,7 @@ var settings = DEFAULT_SETTINGS;
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
     const verb = process.argv[2];
-    if (!(verb == 'install' || verb == 'serve' || verb == 'subject')) {
+    if (!(verb == 'serve' || verb == 'subject')) {
         logToFile(verb);
     }
     try {
@@ -162,9 +166,7 @@ if (process.argv.length > 2) {
         }
     } catch(err) {
         log(err);
-        setTimeout( // Wait for log output to flush to disk.
-            function() {process.exit(1);},
-            2 * seconds);
+        flushAndExit(1);
     }
 }
 
@@ -209,10 +211,37 @@ function installFolder(name) {
 }
 
 function installConfigFiles(myDirectory, addonNames) {
+    var cmdConvert = '';
+    const cmdConvertFile = path.join('bin', 'cmd-convert.ini');
+    try {
+        // Dry run WEB_TO_PDF:
+        const child = child_process.spawn(
+            WEB_TO_PDF, [CHROMIUM], {stdio: ['ignore', 'pipe', 'pipe']});
+        child.stdout.pipe(process.stdout);
+        child.stderr.pipe(process.stdout);
+        child.on('error', log);
+        child.on('exit', function(code) {
+            if (code) {
+                log(`${WEB_TO_PDF} exit code ${code}`);
+            } else {
+                fs.readFile(cmdConvertFile, ENCODING, function(err, data) {
+                    if (err) {
+                        log(err);
+                    } else {
+                        // Success! Add cmdConvert to the addon.ini files.
+                        cmdConvert = data;
+                    }
+                });
+            }
+        });
+    } catch(err) {
+        log(err);
+    }
+    fs.unlink(cmdConvertFile, log);
     var launch = process.argv[3] + ' ' + path.join(myDirectory, 'bin', 'launch.vbs');
     expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch}, 'UserGuide.html');
     addonNames.forEach(function(addon_name) {
-        expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch},
+        expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch, cmdConvert: cmdConvert},
                               path.join('addons', addon_name + '.ini'));
     });
 }
@@ -368,7 +397,9 @@ function convertMessageToFiles() {
 function convertPageToFiles(addon_name, page, copyNames) {
     const fileNames = [];
     const finish = function finish(err) {
-        if (err) {
+        if (!err) {
+            flushAndExit(0);
+        } else {
             log(err);
             // Delete all the files:
             for (var f = 0; f < fileNames.length; ++f) {
@@ -378,15 +409,11 @@ function convertPageToFiles(addon_name, page, copyNames) {
                     log(err);
                 }
             }
-            setTimeout( // Wait for log output to flush.
-                function() {process.exit(1);}, 2 * seconds);
-        } else {
-            setTimeout( // Wait for log output to flush.
-                function() {process.exit(0);}, 1 * seconds);
+            flushAndExit(1);
         }
     };
     try {
-        var args = ['bin\\Chromium', page];
+        var args = [CHROMIUM, page];
         for (var c = 0; c < copyNames.length; ++c) {
             var tempFile = makeTemp.fileSync({
                 dir: CONVERTED_FOLDER,
@@ -397,9 +424,9 @@ function convertPageToFiles(addon_name, page, copyNames) {
             args.push(tempFile.name);
             args.push(copyNames[c] || '');
         }
-        log('bin\\WebToPDF.exe "' + args.join('" "') + '"')
+        log(`${WEB_TO_PDF} "` + args.join('" "') + '"')
         const child = child_process.spawn(
-            'bin\\WebToPDF.exe', args, {
+            WEB_TO_PDF, args, {
                 stdio: ['ignore', 'pipe', 'pipe']
             });
         child.stdout.pipe(process.stdout);
@@ -407,7 +434,7 @@ function convertPageToFiles(addon_name, page, copyNames) {
         child.on('error', finish);
         child.on('exit', function(code) {
             if (code) {
-                finish(`WebToPDF exit code ${code}`);
+                finish(`${WEB_TO_PDF} exit code ${code}`);
             } else {
                 submitFilesToOutpost(addon_name, fileNames, finish);
             }
@@ -452,7 +479,7 @@ function submitFilesToOutpost(addon_name, fileNames, callback) {
 function browseMessage() {
     openMessage(argvSlice(4), function browse(page) {
         startProcess('start', [page], {shell: true, detached: true, stdio: 'ignore'});
-        process.exit(0); // mission accomplished
+        flushAndExit(0); // mission accomplished
     });
 }
 
@@ -505,7 +532,7 @@ function openForm(args, tryLater, afterOpen) {
             afterOpen(location);
         } else if (res.statusCode == HTTP_OK && args.length == 0) {
             log('HTTP response ' + res.statusCode + ' ' + res.statusMessage + EOL + data);
-            process.exit(0); // dry run accomplished
+            flushAndExit(0); // dry run accomplished
         } else {
             // Could be an old server, version <= 2.18,
             // or something went wrong on the server side.
@@ -671,7 +698,7 @@ function serve() {
     app.post(StopServer, function(req, res, next) {
         res.end(); // with no body
         log(StopServer);
-        process.exit(0);
+        flushAndExit(0);
     });
     app.get('/manual', function(req, res, next) {
         onGetManual(res);
@@ -778,7 +805,7 @@ function serve() {
                             fs.unlink(PortFileName, log);
                         }
                         server.close();
-                        process.exit(0);
+                        flushAndExit(0);
                     });
                 } else {
                     fs.readFile(PortFileName, {encoding: ENCODING}, function(err, data) {
@@ -787,7 +814,7 @@ function serve() {
                             clearInterval(checkSilent);
                             deleteMySaveFiles();
                             server.close();
-                            process.exit(0);
+                            flushAndExit(0);
                         }
                     });
                 }
@@ -1740,7 +1767,15 @@ function log(data) {
 
 function logAndAbort(err) {
     log(err);
-    process.exit(1);
+    flushAndExit(1);
+}
+
+function flushAndExit(exitCode) {
+    realStdout.write('', function(err) {
+        realStderr.write('', function(err) {
+            process.exit(exitCode);
+        });
+    });
 }
 
 function encodeHTML(text) {
