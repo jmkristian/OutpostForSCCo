@@ -336,9 +336,21 @@ function argvSlice(start) {
 }
 
 function convertPages(page, copyNames) {
+    var fileNames = [];
+    var fail = function fail(err) {
+        log(err);
+        // Clean up any temporary files:
+        for (var f = 0; f < fileNames.length; ++f) {
+            try {
+                fs.unlinkSync(fileNames[f]);
+            } catch(err) {
+                log(err);
+            }
+        }
+        setTimeout( // Wait for log output to flush.
+            function() {process.exit(1);}, 2 * seconds);
+    }
     try {
-        var exitCode = 0;
-        var copies = copyNames.length;
         var args = ['bin/Chromium', page];
         for (var c = 0; c < copyNames.length; ++c) {
             var tempFile = makeTemp.fileSync({
@@ -346,6 +358,7 @@ function convertPages(page, copyNames) {
                 prefix: 'T', postfix: '.pdf',
                 keep: true, discardDescriptor: true
             });
+            fileNames.push(tempFile.name);
             args.push(tempFile.name);
             args.push(copyNames[c] || '');
         }
@@ -356,24 +369,22 @@ function convertPages(page, copyNames) {
             });
         child.stdout.pipe(process.stdout);
         child.stderr.pipe(process.stdout);
+        child.on('error', fail);
         child.on('exit', function(code) {
-            log('WebToPDF exit code ' + code);
-            if (code) exitCode = code;
-            if (--copies <= 0) {
-                setTimeout( // Wait for log output to flush to disk.
-                    function() {process.exit(exitCode);},
-                    exitCode ? (2 * seconds) : 10);
+            if (code) {
+                fail(`WebToPDF exit code ${code}`);
+            } else {
+                try {
+                    sendFormsToOutpost(fileNames);
+                    setTimeout( // Wait for log output to flush.
+                        function() {process.exit(0);}, 1 * seconds);
+                } catch(err) {
+                    fail(err);
+                }
             }
         });
-        child.on('error', function(err) {
-            log('WebToPDF spawn error');
-            log(err);
-            exitCode = 1;
-        });
     } catch(err) {
-        log(err);
-        setTimeout( // Wait for log output to flush to disk.
-            function() {process.exit(1);}, 2 * seconds);
+        fail(err);
     }
 }
 
@@ -402,6 +413,12 @@ function convertMessage() {
     openMessage(args, function convert(page) {
         convertPages(page, copyNames);
     });
+}
+
+function sendFormsToOutpost(fileNames) {
+    for (var f = 0; f < fileNames.length; ++f) {
+        log(`send ${fileNames[f]} to Outpost`);
+    }
 }
 
 function browseMessage() {

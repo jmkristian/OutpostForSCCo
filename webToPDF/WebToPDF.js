@@ -49,7 +49,6 @@ function log(data) {
         for (let a = 4; a < argv.length; ++a) {
             const fileName = argv[a];
             const copyName = argv[++a];
-            log(fileName + (copyName ? ` ${copyName} copy` : ''));
             options.path = path.resolve(fileName);
             options.footerTemplate = `<table style="${tableStyle}">` +
                 '<tr><td style="text-align:left;padding-left:0;">' +
@@ -63,7 +62,7 @@ function log(data) {
         await browser.close();
     } catch(err) {
         log(err);
-        setTimeout( // Wait for log output to flush to disk.
+        setTimeout( // Wait for log output to flush.
             function() {process.exit(1);}, 1000);
     }
 })();
