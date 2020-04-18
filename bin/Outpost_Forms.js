@@ -65,6 +65,7 @@ const morgan = require('morgan');
 const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
+const tmp = require('tmp');
 
 const HTTP_OK = 200;
 const SEE_OTHER = 303;
@@ -72,6 +73,7 @@ const FORBIDDEN = 403;
 const NOT_FOUND = 404;
 
 const CHARSET = 'utf-8'; // for HTTP
+const CONVERTED_FOLDER = 'converted';
 const ENCODING = CHARSET; // for files
 const EOL = '\r\n';
 const htmlEntities = new AllHtmlEntities();
@@ -193,14 +195,15 @@ function install() {
     log('install addons ' + JSON.stringify(addonNames));
     installConfigFiles(myDirectory, addonNames);
     installIncludes(myDirectory, addonNames);
-    fs.stat(LOG_FOLDER, function(err, stats) {
+    installFolder(SAVE_FOLDER);
+    installFolder(LOG_FOLDER);
+    installFolder(CONVERTED_FOLDER);
+}
+
+function installFolder(name) {
+    fs.stat(name, function(err, stats) {
         if (err || !stats) {
-            fs.mkdir(LOG_FOLDER, function(err){});
-        }
-    });
-    fs.stat(SAVE_FOLDER, function(err, stats) {
-        if (err || !stats) {
-            fs.mkdir(SAVE_FOLDER, function(err){});
+            fs.mkdir(name, function(err){});
         }
     });
 }
@@ -338,11 +341,17 @@ function convertPages(page, copyNames) {
         var copies = copyNames.length;
         for (var c = 0; c < copyNames.length; ++c) {
             var args = ['bin/Chromium', page];
-            args.push(page.substring(page.lastIndexOf('/') + 1) + '.pdf')
+            var fileName = tmp.fileSync({
+                dir: path.resolve(CONVERTED_FOLDER),
+                prefix: 'T', postfix: '.pdf',
+                keep: true, discardDescriptor: true
+            }).name;
+            args.push(fileName);
             var copyName = copyNames[c];
             if (copyName) {
                 args.push(copyName);
             }
+            log('bin/WebToPDF ' + args.join(' '))
             const child = child_process.spawn(
                 'bin/WebToPDF.exe', args, {
                     stdio: ['ignore', 'pipe', 'pipe']
@@ -351,7 +360,7 @@ function convertPages(page, copyNames) {
             child.stderr.pipe(process.stdout);
             child.on('exit', function(code) {
                 log('WebToPDF exit code ' + code);
-                if (code != 0) exitCode = code;
+                if (code) exitCode = code;
                 if (--copies <= 0) {
                     setTimeout( // Wait for log output to flush to disk.
                         function() {process.exit(exitCode);},

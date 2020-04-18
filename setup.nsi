@@ -309,6 +309,7 @@ Function ${un}DeleteMyFiles
   ${Delete} bin\launch-v.cmd
   ${Delete} "${PROGRAM_PATH}"
   ${RMDir} "$INSTDIR\addons"
+  ${RMDir} "$INSTDIR\converted"
   ${RMDir} "$INSTDIR\pack-it-forms"
   Pop $R1
   Pop $R0
@@ -413,7 +414,6 @@ Section "Install"
   File bin\message.html
   File bin\server.ini
   ${IfNot} ${IsWinXP}
-     File WebToPDF\WebToPDF.cmd
      File WebToPDF\WebToPDF.exe
      File /r WebToPDF\Chromium
   ${EndIf}
