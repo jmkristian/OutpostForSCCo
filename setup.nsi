@@ -414,7 +414,7 @@ Section "Install"
   File bin\server.ini
   ${IfNot} ${IsWinXP}
      File webToPDF\WebToPDF.exe
-#     File /r webToPDF\Chromium
+     File /r webToPDF\Chromium
      File bin\cmd-convert.ini
   ${EndIf}
   SetOutPath "$INSTDIR"
