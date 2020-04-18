@@ -65,7 +65,7 @@ const morgan = require('morgan');
 const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
-const tmp = require('tmp');
+const makeTemp = require('tmp');
 
 const HTTP_OK = 200;
 const SEE_OTHER = 303;
@@ -341,7 +341,7 @@ function convertPages(page, copyNames) {
         var copies = copyNames.length;
         for (var c = 0; c < copyNames.length; ++c) {
             var args = ['bin/Chromium', page];
-            var fileName = tmp.fileSync({
+            var fileName = makeTemp.fileSync({
                 dir: path.resolve(CONVERTED_FOLDER),
                 prefix: 'T', postfix: '.pdf',
                 keep: true, discardDescriptor: true
