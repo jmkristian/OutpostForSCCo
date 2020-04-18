@@ -384,15 +384,20 @@ function convertMessage() {
     var allArgs = argvSlice(4);
     var args = [];
     var copyNames = '';
+    var message_status = 'sent';
     for (var a = 0; a < allArgs.length; ++a) {
         var arg = allArgs[a];
         if (arg == '--COPY_NAMES') {
             copyNames = allArgs[++a];
             if (copyNames == '{{COPY_NAMES}}') copyNames = '';
         } else {
+            if (arg == '--MSG_DATETIME_OP_RCVD' && allArgs[a+1]) {
+                message_status = 'unread';
+            }
             args.push(arg);
         }
     }
+    args.push('--message_status'); args.push(message_status);
     copyNames = copyNames.split('\\n');
     for (var c = 0; c < copyNames.length; ++c) {
         copyNames[c] = copyNames[c].replace(/\\\\/g, '\\');
