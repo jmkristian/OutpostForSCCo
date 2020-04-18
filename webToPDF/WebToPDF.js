@@ -49,13 +49,13 @@ function log(data) {
         for (let a = 4; a < argv.length; ++a) {
             const fileName = argv[a];
             const copyName = argv[++a];
-            log(`${copyName} copy > ${fileName}`);
+            log(fileName + (copyName ? ` ${copyName} copy` : ''));
             options.path = path.resolve(fileName);
             options.footerTemplate = `<table style="${tableStyle}">` +
                 '<tr><td style="text-align:left;padding-left:0;">' +
                 (copyName ? `<b>${copyName}</b> copy` : '') +
                 '</td><td style="text-align:right;padding-right:0;">' +
-                'Page <span class="pageNumber"></span>/<span class="totalPages"></span>' +
+                'Page <span class="pageNumber"></span> of <span class="totalPages"></span>' +
                 '</td></tr>' +
                 '</table>',
             await page.pdf(options);
@@ -63,6 +63,7 @@ function log(data) {
         await browser.close();
     } catch(err) {
         log(err);
-        process.exit(1);
+        setTimeout( // Wait for log output to flush to disk.
+            function() {process.exit(1);}, 1000);
     }
 })();
