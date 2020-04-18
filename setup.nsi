@@ -466,9 +466,15 @@ Section "Install"
     StrCpy $WSCRIPT_EXE "$WINDIR\System\wscript.exe"
   ${EndIf}
   SimpleFC::addApplication "${DisplayName}" "${PROGRAM_PATH}" 1 2 "" 1
-  ${If} ${FileExists} "$INSTDIR\bin\cmd-convert.ini"
-    ${AppendFile} "$INSTDIR\addons\${addon_name}.ini" "$INSTDIR\bin\cmd-convert.ini"
-    ${Delete} "$INSTDIR\bin\cmd-convert.ini"
+  ${If} ${FileExists} "bin\cmd-convert.ini"
+    ClearErrors
+    ${Execute} 'bin\WebToPDF.exe bin\Chromium'
+    ${If} ${Errors}
+      ${DetailLog} `WebToPDF failed`
+    ${Else}
+      ${AppendFile} "addons\${addon_name}.ini" "bin\cmd-convert.ini"
+      ${Delete} "bin\cmd-convert.ini"
+    ${EndIf}
   ${EndIf}
   ClearErrors
   ${Execute} '"${PROGRAM_PATH}" install "$WSCRIPT_EXE" $OUTPOST_DATA'
