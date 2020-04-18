@@ -339,40 +339,37 @@ function convertPages(page, copyNames) {
     try {
         var exitCode = 0;
         var copies = copyNames.length;
+        var args = ['bin/Chromium', page];
         for (var c = 0; c < copyNames.length; ++c) {
-            var args = ['bin/Chromium', page];
-            var fileName = makeTemp.fileSync({
-                dir: path.resolve(CONVERTED_FOLDER),
+            var tempFile = makeTemp.fileSync({
+                dir: CONVERTED_FOLDER,
                 prefix: 'T', postfix: '.pdf',
                 keep: true, discardDescriptor: true
-            }).name;
-            args.push(fileName);
-            var copyName = copyNames[c];
-            if (copyName) {
-                args.push(copyName);
-            }
-            log('bin/WebToPDF ' + args.join(' '))
-            const child = child_process.spawn(
-                'bin/WebToPDF.exe', args, {
-                    stdio: ['ignore', 'pipe', 'pipe']
-                });
-            child.stdout.pipe(process.stdout);
-            child.stderr.pipe(process.stdout);
-            child.on('exit', function(code) {
-                log('WebToPDF exit code ' + code);
-                if (code) exitCode = code;
-                if (--copies <= 0) {
-                    setTimeout( // Wait for log output to flush to disk.
-                        function() {process.exit(exitCode);},
-                        exitCode ? (2 * seconds) : 10);
-                }
             });
-            child.on('error', function(err) {
-                log('WebToPDF spawn error');
-                log(err);
-                exitCode = 1;
-            });
+            args.push(tempFile.name);
+            args.push(copyNames[c] || '');
         }
+        log('bin/WebToPDF.exe ' + args.join(' '))
+        const child = child_process.spawn(
+            'bin/WebToPDF.exe', args, {
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+        child.stdout.pipe(process.stdout);
+        child.stderr.pipe(process.stdout);
+        child.on('exit', function(code) {
+            log('WebToPDF exit code ' + code);
+            if (code) exitCode = code;
+            if (--copies <= 0) {
+                setTimeout( // Wait for log output to flush to disk.
+                    function() {process.exit(exitCode);},
+                    exitCode ? (2 * seconds) : 10);
+            }
+        });
+        child.on('error', function(err) {
+            log('WebToPDF spawn error');
+            log(err);
+            exitCode = 1;
+        });
     } catch(err) {
         log(err);
         setTimeout( // Wait for log output to flush to disk.
