@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
 const argv = process.argv;
@@ -54,6 +55,9 @@ function log(data) {
                 await page.waitForSelector('#loading', {hidden: true});
             } catch(err) {
                 log(err);
+                for (let f = 2; f < files.length; f += 2) {
+                    fs.unlink(files[f], log);
+                }
                 files = files.slice(0, 1); // just one file, no copyName
             }
             for (let f = 0; f < files.length; ++f) {

@@ -454,31 +454,39 @@ function convertPageToFiles(addon_name, page, copyNames) {
 
 function submitFilesToOutpost(addon_name, fileNames, callback) {
     try {
-        var toDo = fileNames.length;
-        var afterSubmit = function(fileName) {
-            return function afterSubmit(err) {
-                if (err) {
-                    log(err);
-                    fs.unlink(fileName, log);
-                }
-                if (--toDo <= 0) {
-                    callback(); // success
-                }
+        var f = -1;
+        const next = function nextFile(err) {
+            if (err) {
+                log(err);
+                fs.unlink(fileNames[f], log);
+            }
+            if (++f < fileNames.length) {
+                submitFileToOutpost(addon_name, fileNames[f], next);
+            } else {
+                callback();
             }
         }
-        for (var f = 0; f < fileNames.length; ++f) {
-            var fileName = path.resolve(fileNames[f]);
-            var andThen = afterSubmit(fileName);
-            try {
+        next();
+    } catch(err) {
+        callback(err);
+    }
+}
+
+function submitFileToOutpost(addon_name, fileName, callback) {
+    try {
+        fs.stat(fileName, function(err, stat) {
+            if (err) {
+                callback(err);
+            } else if (!(stat && stat.size > 0)) {
+                callback(`${fileName} is empty`);
+            } else {
                 // Outpost requires parameters to appear in a specific order.
                 // So don't stringify them from a single object.
                 var body = querystring.stringify({adn: addon_name})
-                    + '&' + querystring.stringify({prt: fileName});
-                submitToOpdirect({}, body, andThen);
-            } catch(err) {
-                andThen(err);
+                    + '&' + querystring.stringify({prt: path.resolve(fileName)});
+                submitToOpdirect({}, body, callback);
             }
-        }
+        });
     } catch(err) {
         callback(err);
     }
