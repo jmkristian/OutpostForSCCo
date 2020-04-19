@@ -393,10 +393,11 @@ function convertMessageToFiles() {
         }
     }
     args.push('--message_status'); args.push(message_status);
-    copyNames = copyNames.split('\\n');
-    for (var c = 0; c < copyNames.length; ++c) {
-        copyNames[c] = copyNames[c].replace(/\\\\/g, '\\');
-    }
+    copyNames = copyNames.replace(/\\./g, function(found) {
+        const c = found.substring(1, 2);
+        return (c == 'n') ? '\n' : c;
+    });
+    copyNames = copyNames.split('\n');
     openMessage(args, function convertToFiles(page) {
         convertPageToFiles(addon_name, page, copyNames);
     });
