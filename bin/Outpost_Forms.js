@@ -212,7 +212,6 @@ function installFolder(name) {
 
 function installConfigFiles(myDirectory, addonNames) {
     var cmdConvert = '';
-    const cmdConvertFile = path.join('bin', 'cmd-convert.ini');
     try {
         // Dry run WEB_TO_PDF:
         const child = child_process.spawn(
@@ -224,12 +223,14 @@ function installConfigFiles(myDirectory, addonNames) {
             if (code) {
                 log(`${WEB_TO_PDF} exit code ${code}`);
             } else {
+                const cmdConvertFile = path.join('bin', 'cmd-convert.ini');
                 fs.readFile(cmdConvertFile, ENCODING, function(err, data) {
                     if (err) {
                         log(err);
                     } else {
                         // Success! Add cmdConvert to the addon.ini files.
                         cmdConvert = data;
+                        fs.unlink(cmdConvertFile, log);
                     }
                 });
             }
@@ -237,7 +238,6 @@ function installConfigFiles(myDirectory, addonNames) {
     } catch(err) {
         log(err);
     }
-    fs.unlink(cmdConvertFile, log);
     var launch = process.argv[3] + ' ' + path.join(myDirectory, 'bin', 'launch.vbs');
     expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch}, 'UserGuide.html');
     addonNames.forEach(function(addon_name) {
@@ -1773,7 +1773,7 @@ function logAndAbort(err) {
 function flushAndExit(exitCode) {
     realStdout.write('', function(err) {
         realStderr.write('', function(err) {
-            process.exit(exitCode);
+            setTimeout(function() {process.exit(exitCode);}, 1 * seconds);
         });
     });
 }
