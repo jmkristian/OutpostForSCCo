@@ -51,14 +51,19 @@ function log(data) {
                 files.push(argv[a]);
             }
             try {
-                await page.waitForSelector('#loading');
-                await page.waitForSelector('#loading', {hidden: true});
+                await Promise.race([
+                    page.waitForSelector('#loading')
+                        .then(selected => page.waitForSelector('#loading', {hidden: true})),
+                    page.waitForSelector('#something-went-wrong')
+                        .then(selected => {throw new Error('Something went wrong.');})
+                ])
             } catch(err) {
                 log(err);
+                // Create just one file, with no copyName.
                 for (let f = 2; f < files.length; f += 2) {
                     fs.unlink(files[f], log);
                 }
-                files = files.slice(0, 1); // just one file, no copyName
+                files = files.slice(0, 1);
             }
             for (let f = 0; f < files.length; ++f) {
                 const fileName = files[f];

@@ -94,7 +94,7 @@ const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join(LOG_FOLDER, 'server-port.txt');
 const PROBLEM_HEADER = '<html><head><title>Problem</title></head><body>'
-      + EOL + '<h3><img src="/icon-warning.png" alt="warning"'
+      + EOL + '<h3 id="something-went-wrong"><img src="/icon-warning.png" alt="warning"'
       + ' style="width:24pt;height:24pt;vertical-align:middle;margin-right:1em;">'
       + 'Something went wrong.</h3>';
 const realStdout = process.stdout;
@@ -455,14 +455,10 @@ function convertPageToFiles(addon_name, page, copyNames) {
 
 function submitFilesToOutpost(addon_name, fileNames, callback) {
     try {
-        var f = -1;
-        const next = function nextFile(err) {
-            if (err) {
-                log(err);
-                fs.unlink(fileNames[f], log);
-            }
-            if (++f < fileNames.length) {
-                submitFileToOutpost(addon_name, fileNames[f], next);
+        var f = 0;
+        const next = function nextFile() {
+            if (f < fileNames.length) {
+                submitFileToOutpost(addon_name, fileNames[f++], next);
             } else {
                 callback();
             }
@@ -473,23 +469,29 @@ function submitFilesToOutpost(addon_name, fileNames, callback) {
     }
 }
 
-function submitFileToOutpost(addon_name, fileName, callback) {
+function submitFileToOutpost(addon_name, fileName, next) {
     try {
         fs.stat(fileName, function(err, stat) {
             if (err) {
-                callback(err);
-            } else if (!(stat && stat.size > 0)) {
-                callback(`${fileName} is empty`);
+                log(err);
+                next();
+            } else if (stat && stat.size <= 0) {
+                log(`${fileName} is empty`);
+                fs.unlink(fileName, log);
+                next();
             } else {
                 // Outpost requires parameters to appear in a specific order.
                 // So don't stringify them from a single object.
                 var body = querystring.stringify({adn: addon_name})
                     + '&' + querystring.stringify({prt: path.resolve(fileName)});
-                submitToOpdirect({}, body, callback);
+                submitToOpdirect({}, body, function(err) {
+                    fs.unlink(fileName, log);
+                    next();
+                });
             }
         });
     } catch(err) {
-        callback(err);
+        log(err);
     }
 }
 
