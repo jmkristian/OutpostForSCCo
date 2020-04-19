@@ -45,11 +45,20 @@ function log(data) {
         const page = await browser.newPage();
         if (argv.length >= 4) {
             await page.goto(argv[3]);
-            await page.waitForSelector('#loading');
-            await page.waitForSelector('#loading', {hidden: true});
+            var files = [];
             for (let a = 4; a < argv.length; ++a) {
-                const fileName = argv[a];
-                const copyName = argv[++a];
+                files.push(argv[a]);
+            }
+            try {
+                await page.waitForSelector('#loading');
+                await page.waitForSelector('#loading', {hidden: true});
+            } catch(err) {
+                log(err);
+                files = files.slice(0, 1); // just one file, no copyName
+            }
+            for (let f = 0; f < files.length; ++f) {
+                const fileName = files[f];
+                const copyName = files[++f];
                 options.path = path.resolve(fileName);
                 options.footerTemplate = `<table style="${tableStyle}">` +
                     '<tr><td style="text-align:left;padding-left:0;">' +
