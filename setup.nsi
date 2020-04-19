@@ -293,6 +293,7 @@ Function ${un}DeleteMyFiles
   Push $R0
   Push $R1
   # It doesn't really matter whether these are deleted:
+  ${RMDir} "$INSTDIR\bin\Chromium" # Allow some time for ${PROGRAM_PATH} to exit.
   ${Delete} README.*
   ${Delete} UserGuide.*
   ${Delete} launch.vbs
