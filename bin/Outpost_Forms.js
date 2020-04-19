@@ -195,11 +195,14 @@ function install() {
     const myDirectory = process.cwd();
     const addonNames = getAddonNames();
     log('install addons ' + JSON.stringify(addonNames));
-    installConfigFiles(myDirectory, addonNames);
-    installIncludes(myDirectory, addonNames);
-    installFolder(SAVE_FOLDER);
-    installFolder(LOG_FOLDER);
-    installFolder(CONVERTED_FOLDER);
+    installCmdConvert(function(err, cmdConvert) {
+        log(err);
+        installConfigFiles(myDirectory, addonNames, cmdConvert);
+        installIncludes(myDirectory, addonNames);
+        installFolder(SAVE_FOLDER);
+        installFolder(LOG_FOLDER);
+        installFolder(CONVERTED_FOLDER);
+    });
 }
 
 function installFolder(name) {
@@ -210,8 +213,7 @@ function installFolder(name) {
     });
 }
 
-function installConfigFiles(myDirectory, addonNames) {
-    var cmdConvert = '';
+function installCmdConvert(callback) {
     try {
         // Dry run WEB_TO_PDF:
         const child = child_process.spawn(
@@ -221,28 +223,34 @@ function installConfigFiles(myDirectory, addonNames) {
         child.on('error', log);
         child.on('exit', function(code) {
             if (code) {
-                log(`${WEB_TO_PDF} exit code ${code}`);
+                callback(`${WEB_TO_PDF} exit code ${code}`);
             } else {
                 const cmdConvertFile = path.join('bin', 'cmd-convert.ini');
                 fs.readFile(cmdConvertFile, ENCODING, function(err, data) {
                     if (err) {
-                        log(err);
+                        callback(err);
                     } else {
-                        // Success! Add cmdConvert to the addon.ini files.
-                        cmdConvert = data;
+                        // Success! Add cmd-convert to the addon.ini files.
                         fs.unlink(cmdConvertFile, log);
+                        callback(null, data);
                     }
                 });
             }
         });
     } catch(err) {
-        log(err);
+        callback(err);
     }
+}
+
+function installConfigFiles(myDirectory, addonNames, cmdConvert) {
     var launch = process.argv[3] + ' ' + path.join(myDirectory, 'bin', 'launch.vbs');
     expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch}, 'UserGuide.html');
     addonNames.forEach(function(addon_name) {
-        expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch, cmdConvert: cmdConvert},
-                              path.join('addons', addon_name + '.ini'));
+        var addonIni = path.join('addons', addon_name + '.ini');
+        if (cmdConvert) {
+            fs.appendFileSync(addonIni, cmdConvert, {encoding: ENCODING});
+        }
+        expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch}, addonIni);
     });
 }
 

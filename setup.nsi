@@ -415,7 +415,7 @@ Section "Install"
   ${IfNot} ${IsWinXP}
      File webToPDF\WebToPDF.exe
      File /r webToPDF\Chromium
-     File bin\cmd-convert.ini
+     File built\cmd-convert.ini
   ${EndIf}
   SetOutPath "$INSTDIR"
   File built\browse.cmd
