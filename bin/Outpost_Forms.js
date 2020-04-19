@@ -876,9 +876,9 @@ function showForm(form, res) {
     } catch(err) {
         throw "I don't know about a form named "
             + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
-            + " Perhaps the message came from a newer version of this "
+            + " Perhaps the message came from a newer version of the "
             + form.environment.addon_name + " add-on, "
-            + 'so it might help if you install the latest version.'
+            + 'so it might help to install the latest version.'
             + '\n\n' + err;
     }
     html = expandDataIncludes(html, form);
