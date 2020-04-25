@@ -3,10 +3,13 @@
 cd `dirname "$0"` || exit $?
 export VersionMajor=2
 export VersionMinor=21b
-rm -r built logs
+rm -rf built logs
 mkdir built
+if [ `node --version` != "v4.9.1" ]; then
+    nvm use 4.9.1 32 || exit $? # https://github.com/coreybutler/nvm-windows
+fi
 if [ ! -e node_modules ]; then
-    npm install # https://nodejs.org
+    npm install || exit $? # https://docs.npmjs.com/cli/install
 fi
 node_modules/.bin/pkg.cmd -t node4-win-x86 bin/Outpost_Forms.js || exit $?
 mv Outpost_Forms.exe built/ || exit $?
