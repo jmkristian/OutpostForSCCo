@@ -157,7 +157,7 @@ if (process.argv.length > 2) {
         }
     } catch(err) {
         log(err);
-        process.exit(1);
+        process.exitCode = 1;
     }
 }
 
@@ -333,8 +333,7 @@ function openMessage() {
     function tryLater(err) {
         log(err);
         if (retries >= 6) {
-            log(retries + ' retries failed ' + JSON.stringify(args));
-            logAndAbort('Goodbye.');
+            throw (retries + ' retries failed ' + JSON.stringify(args));
         } else {
             ++retries;
             log('retries = ' + retries);
@@ -367,10 +366,10 @@ function openForm(args, tryLater) {
             var location = res.headers.location;
             log('opened form ' + location + EOL + data);
             startProcess('start', [location], {shell: true, detached: true, stdio: 'ignore'});
-            process.exit(0); // mission accomplished
+            process.exitCode = 0; // mission accomplished
         } else if (res.statusCode == HTTP_OK && args.length == 0) {
             log('HTTP response ' + res.statusCode + ' ' + res.statusMessage + EOL + data);
-            process.exit(0); // dry run accomplished
+            process.exitCode = 0; // dry run accomplished
         } else {
             // Could be an old server, version <= 2.18,
             // or something went wrong on the server side.
@@ -536,7 +535,7 @@ function serve() {
     app.post(StopServer, function(req, res, next) {
         res.end(); // with no body
         log(StopServer);
-        process.exit(0);
+        setTimeout(process.exit, 10);
     });
     app.get('/manual', function(req, res, next) {
         onGetManual(res);
@@ -1556,11 +1555,11 @@ function expandVariablesInFile(variables, fromFile, intoFile) {
         fs.mkdirSync(path.dirname(intoFile)); // fail fast
     }
     fs.readFile(fromFile, ENCODING, function(err, data) {
-        if (err) logAndAbort(err);
+        if (err) throw err;
         var newData = expandVariables(data, variables);
         if (newData != data || intoFile != fromFile) {
             fs.writeFile(intoFile, newData, {encoding: ENCODING}, function(err) {
-                if (err) logAndAbort(err);
+                if (err) throw err;
                 log(JSON.stringify(variables) + ' in ' + intoFile);
             });
         }
@@ -1591,11 +1590,6 @@ function log(data) {
         var message = (typeof data == 'object') ? errorToMessage(data) : ('' + data);
         console.log('[' + new Date().toISOString() + '] ' + message);
     }
-}
-
-function logAndAbort(err) {
-    log(err);
-    process.exit(1);
 }
 
 function encodeHTML(text) {
