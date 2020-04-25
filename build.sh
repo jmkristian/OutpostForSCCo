@@ -7,10 +7,9 @@ rm -r built logs
 mkdir built
 if [ ! -e node_modules ]; then
     npm install # https://nodejs.org
-    npm install --global pkg@4.2.6 # https://github.com/zeit/pkg
 fi
-pkg.cmd -t node4-win-x86 bin/Outpost_Forms.js || exit $?
-mv Outpost_Forms.exe built/
+node_modules/.bin/pkg.cmd -t node4-win-x86 bin/Outpost_Forms.js || exit $?
+mv Outpost_Forms.exe built/ || exit $?
 rm -f pack-it-forms/resources/integration/integration.js
 
 for REPO in jmkristian/pack-it-forms "$@"; do
