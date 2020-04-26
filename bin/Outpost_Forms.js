@@ -661,9 +661,8 @@ function serve() {
     app.use(bodyParser.urlencoded({extended: false}));
     app.post(OpenOutpostMessage, function(req, res, next) {
         const args = req.body; // an array, thanks to bodyParser.json
-        var result = '';
         if (!args || !args.length) { // a dry run
-            res.end(result, CHARSET);
+            res.end();
         } else {
             formId = '' + nextFormId++;
             try {
@@ -973,7 +972,7 @@ function onGetMessage(formId, req, res) {
         const form = findForm(formId);
         if (form) {
             res.set({'Content-Type': TEXT_PLAIN});
-            res.end('#Subject: ' + form.environment.subject + EOL + form.message);
+            res.end('#Subject: ' + form.environment.subject + EOL + form.message, CHARSET);
         } else if (formId < nextFormId) {
             throw new Error('message ' + formId + ' was discarded, since it was closed.');
         } else {
@@ -987,25 +986,21 @@ function onGetMessage(formId, req, res) {
 
 /** Handle an HTTP GET /form-id request. */
 function onGetForm(formId, req, res) {
-    noCache(res);
-    res.set({'Content-Type': TEXT_PLAIN});
-    const form = findForm(formId);
-    if (formId <= 0) {
-        res.status(400).end('Form numbers start with 1.', CHARSET);
-    } else if (!form) {
-        log('/form-' + formId + ' is not open');
-        if (formId < nextFormId) {
-            res.status(NOT_FOUND)
-                .end('/form-' + formId + ' was discarded, since it was submitted or closed.',
-                     CHARSET);
+    try {
+        noCache(res);
+        res.set({'Content-Type': TEXT_HTML});
+        const form = findForm(formId);
+        if (formId <= 0) {
+            throw 'Form numbers start with 1.';
+        } else if (!form) {
+            log('/form-' + formId + ' is not open');
+            if (formId < nextFormId) {
+                throw '/form-' + formId + ' was discarded, since it was submitted or closed.';
+            } else {
+                throw '/form-' + formId + ' has not been opened.';
+            }
         } else {
-            res.status(NOT_FOUND)
-                .end('/form-' + formId + ' has not been opened.', CHARSET);
-        }
-    } else {
-        log('/form-' + formId + ' viewed');
-        try {
-            res.set({'Content-Type': TEXT_HTML});
+            log('/form-' + formId + ' viewed');
             updateSettings();
             loadForm(formId, form, req);
             if (form.environment.message_status == 'manual-created') {
@@ -1013,9 +1008,9 @@ function onGetForm(formId, req, res) {
             } else {
                 showForm(form, res);
             }
-        } catch(err) {
-            res.end(errorToHTML(err, form), CHARSET);
         }
+    } catch(err) {
+        res.end(errorToHTML(err, form), CHARSET);
     }
 }
 
