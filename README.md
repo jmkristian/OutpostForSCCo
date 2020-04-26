@@ -45,5 +45,5 @@ Pass the name of your private repository to ./build.sh on the command line.
 
 The installer source code is setup.nsi, and
 the source for most of the installed code is bin/Outpost\_Forms.js.
-The installer configures Outpost to execute launch.vbs or (on Windows XP) launch.cmd.
+The installer configures Outpost to execute launch.vbs.
 For debugging, you might change the configuration to execute launch-v.cmd instead.
