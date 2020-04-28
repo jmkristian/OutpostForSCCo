@@ -385,20 +385,31 @@ function convertMessageToFiles() {
     var args = [];
     var copyNames = '';
     var addon_name = null;
-    var message_status = 'sent';
+    var message_status = null;
+    var msgDateTimeOpRcvd = null;
     for (var a = 0; a < allArgs.length; ++a) {
         var arg = allArgs[a];
         if (arg == '--COPY_NAMES') {
             copyNames = allArgs[++a];
             if (copyNames == '{{COPY_NAMES}}') copyNames = '';
+        } else if (arg == '--message_status') {
+            message_status = allArgs[++a];
+            if (message_status == '{{MSG_STATE}}') message_status = '';
         } else {
             if (arg == '--addon_name') {
                 addon_name = allArgs[a+1];
-            } else if (arg == '--MSG_DATETIME_OP_RCVD' && allArgs[a+1]) {
-                message_status = 'unread';
+            } else if (arg == '--MSG_DATETIME_OP_RCVD') {
+                msgDateTimeOpRcvd = allArgs[a+1];
             }
             args.push(arg);
         }
+    }
+    if (message_status) {
+        message_status = message_status.toLowerCase();
+    } else if (msgDateTimeOpRcvd) {
+        message_status = 'unread';
+    } else {
+        message_status = 'sent';
     }
     args.push('--message_status'); args.push(message_status);
     copyNames = copyNames.replace(/\\./g, function(found) {
