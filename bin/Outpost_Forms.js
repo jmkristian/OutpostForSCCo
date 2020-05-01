@@ -66,6 +66,156 @@ const morgan = require('morgan');
 const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
+const fsp = { // Like fs, except functions return Promises.
+
+    appendFile: function(name, data, options) {
+        return new Promise(function appendFile(resolve, reject) {
+            try {
+                fs.appendFile(name, data, options, function(err) {
+                    if (err) reject(err);
+                    else resolve(true);
+                });
+            } catch(err) {
+                reject(err);
+            }
+        });
+    },
+
+    checkFolder: function(name) {
+        return fsp.stat(name).then(
+            function(stats) {
+                return false; // not created
+            },
+            function(err) {
+                return fsp.createFolder(name);
+            });
+    },
+
+    createFolder: function(name) {
+        return new Promise(function createFolder(resolve, reject) {
+            try {
+                fs.mkdir(name, function(err) {
+                    if (err) reject(err);
+                    else resolve(true); // created
+                });
+            } catch(err) {
+                reject(err);
+            }
+        });
+    },
+
+    readdir: function(name) { // @return Promise<array of String>
+        return new Promise(function readdir(resolve, reject) {
+            try {
+                fs.readdir(name, function(err, files) {
+                    if (err) reject(err);
+                    else resolve(files);
+                });
+            } catch(err) {
+                reject(err);
+            }
+        });
+    },
+
+    readFile: function(name, options) { // @return Promise<String or Buffer>
+        return new Promise(function readFile(resolve, reject) {
+            try {
+                fs.readFile(name, options, function(err, data) {
+                    if (err) reject(err);
+                    else resolve(data);
+                });
+            } catch(err) {
+                reject(err);
+            }
+        });
+    },
+
+    stat: function stat(name) {
+        return new Promise(function stat(resolve, reject) {
+            try {
+                fs.stat(name, function(err, stats) {
+                    if (err) reject(err);
+                    else if (stats) resolve(stats);
+                    else reject(`No Stats from ${name}`);
+                });
+            } catch(err) {
+                reject(err);
+            }
+        });
+    },
+
+    unlink: function(name) { // @return Promise<String or Buffer>
+        return new Promise(function unlink(resolve, reject) {
+            try {
+                fs.unlink(name, function(err) {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            } catch(err) {
+                reject(err);
+            }
+        });
+    },
+
+    writeFile: function(name, data, options) {
+        return new Promise(function writeFile(resolve, reject) {
+            try {
+                fs.writeFile(name, data, options, function(err) {
+                    if (err) reject(err);
+                    else resolve(true);
+                });
+            } catch(err) {
+                reject(err);
+            }
+        });
+    }
+};
+
+function promiseExecFile(program, args) {
+    return new Promise(function execFile(resolve, reject) {
+        try {
+            child_process.execFile(
+                program, args,
+                function(err, stdout, stderr) {
+                    try {
+                        if (err) reject(err);
+                        else resolve(stdout.toString(ENCODING) + stderr.toString(ENCODING));
+                    } catch(err) {
+                        reject(err);
+                    }
+                });
+        } catch(err) {
+            reject(err);
+        }
+    });
+}
+
+function promiseSpawn(exe, args, options) {
+    return new Promise(function spawnChild(resolve, reject) {
+        try {
+            const child = child_process.spawn(exe, args, options);
+            child.stdout.pipe(process.stdout);
+            child.stderr.pipe(process.stderr);
+            child.on('error', reject);
+            child.on('exit', function(code) {
+                if (code) reject(`${exe} exit code ${code}`);
+                else resolve(child);
+            });
+        } catch(err) {
+            reject(err);
+        }
+    });
+}
+
+function promiseTimeout(msec) {
+    return new Promise(function timeout(resolve, reject) {
+        try {
+            setTimeout(resolve, msec);
+        } catch(err) {
+            reject(err);
+        }
+    });
+}
 
 const HTTP_OK = 200;
 const SEE_OTHER = 303;
@@ -120,40 +270,44 @@ var settings = DEFAULT_SETTINGS;
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
     const verb = process.argv[2];
-    if (!(verb == 'serve' || verb == 'subject')) {
-        logToFile(verb);
-    }
-    try {
+    ((['build', 'serve', 'subject', 'uninstall'].indexOf(verb) >= 0)
+     ? Promise.resolve()
+     : fsp.checkFolder(
+         LOG_FOLDER
+     ).then(function() {
+         if (verb == 'convert') {
+             // Unlike most verbs, this one is passed directly from Outpost.
+             // Don't expect Outpost to set the current working directory consistently.
+             // Instead, the directory is passed on the command line:
+             process.chdir(process.argv[4]);
+         }
+         logToFile(verb);
+     })
+    ).then(function() {
         switch(verb) {
         case 'build':
             // Customize various files for a given add-on.
             // This happens before creating an installer.
-            build(process.argv[3], process.argv[4], process.argv[5], process.argv[6]);
-            break;
+            return build();
         case 'install':
             // Edit various files depending on how this program was installed.
-            install();
-            break;
+            return install();
         case 'uninstall':
             // Remove this add-on from Outpost's configuration.
-            uninstall();
-            break;
+            return uninstall();
         case 'convert':
-            convertMessageToFiles();
-            break;
+            return convertMessageToFiles();
         case 'open':
         case 'dry-run':
             // Make sure a server is running, and then send process.argv[4..] to it.
-            browseMessage();
-            break;
+            return browseMessage();
         case 'serve':
             // Serve HTTP requests until a few minutes after there are no forms open.
             serve();
             break;
         case 'stop':
             // Stop any running servers.
-            stopServers(function() {});
-            break;
+            return stopServers();
         case 'subject':
             // Output the subject of the message in a given file.
             outputSubjects(process.argv);
@@ -161,137 +315,124 @@ if (process.argv.length > 2) {
         default:
             throw 'unknown verb "' + verb + '"';
         }
-    } catch(err) {
+    }).catch(function(err) {
         log(err);
         process.exitCode = 1;
-    }
+    });
 }
 
-function build(addonVersion, addonName, programPath, displayName) {
-    expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
-                          path.join('bin', 'addon.ini'),
-                          path.join('built', 'addons', addonName + '.ini'));
-    expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
-                          path.join('bin', 'cmd-convert.ini'),
-                          path.join('built', 'cmd-convert.ini'));
-    expandVariablesInFile({addon_name: addonName},
-                          path.join('bin', 'Aoclient.ini'),
-                          path.join('built', 'addons', addonName, 'Aoclient.ini'));
-    expandVariablesInFile({addon_name: addonName},
-                          path.join('bin', 'manual.html'),
-                          path.join('built', 'manual.html'));
-    ['browse.cmd', 'launch-v.cmd', 'launch.vbs', 'UserGuide.html'].forEach(function(fileName) {
-        expandVariablesInFile({PROGRAM_PATH: programPath, DisplayName: displayName},
-                              fileName, path.join('built', fileName));
-    });
+function build() {
+    const addonVersion = process.argv[3];
+    const addonName = process.argv[4];
+    const programPath = process.argv[5];
+    const displayName = process.argv[6];
+    return Promise.all([
+        expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
+                              path.join('bin', 'addon.ini'),
+                              path.join('built', 'addons', addonName + '.ini')),
+        expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
+                              path.join('bin', 'cmd-convert.ini'),
+                              path.join('built', 'cmd-convert.ini')),
+        expandVariablesInFile({addon_name: addonName},
+                              path.join('bin', 'Aoclient.ini'),
+                              path.join('built', 'addons', addonName, 'Aoclient.ini')),
+        expandVariablesInFile({addon_name: addonName},
+                              path.join('bin', 'manual.html'),
+                              path.join('built', 'manual.html'))
+    ].concat(
+        ['browse.cmd', 'launch-v.cmd', 'launch.vbs', 'UserGuide.html'].map(function(fileName) {
+            return expandVariablesInFile({PROGRAM_PATH: programPath, DisplayName: displayName},
+                                         fileName, path.join('built', fileName));
+        })
+    ));
 }
 
 function install() {
     // This method must be idempotent, in part because Avira antivirus
     // might execute it repeatedly while scrutinizing the .exe for viruses.
     const myDirectory = process.cwd();
-    const addonNames = getAddonNames();
-    log('install addons ' + JSON.stringify(addonNames));
-    installCmdConvert(function(err, cmdConvert) {
-        if (err) {
-            process.exitCode = 1;
-        } else {
-            installConfigFiles(myDirectory, addonNames, cmdConvert);
-            installIncludes(myDirectory, addonNames);
-            installFolder(SAVE_FOLDER);
-            installFolder(LOG_FOLDER);
-            installFolder(CONVERTED_FOLDER);
-        }
+    return getAddonNames().then(function(addonNames) {
+        log('install addons ' + JSON.stringify(addonNames));
+        return Promise.all([
+            installCmdConvert().then(function(cmdConvert) {
+                return installConfigFiles(myDirectory, addonNames, cmdConvert);
+            }),
+            installIncludes(myDirectory, addonNames),
+            fsp.checkFolder(SAVE_FOLDER),
+            fsp.checkFolder(LOG_FOLDER),
+            fsp.checkFolder(CONVERTED_FOLDER)
+        ]);
     });
 }
 
-function installFolder(name) {
-    fs.stat(name, function(err, stats) {
-        if (err || !stats) {
-            fs.mkdir(name, log);
-        }
-    });
-}
-
-function installCmdConvert(callback) {
-    try {
-        const cmdConvertFile = path.join('bin', 'cmd-convert.ini');
-        fs.stat(cmdConvertFile, function(err, stats) {
-            if (err || !stats) {
-                log(err || `no stats from ${cmdConvertFile}`);
-                // We're running on Windows XP, presumably.
-                callback(null, null);
-            } else {
-                // Dry run WEB_TO_PDF:
-                const child = child_process.spawn(
-                    WEB_TO_PDF, ['bin'], {stdio: ['ignore', 'pipe', 'pipe']});
-                child.stdout.pipe(process.stdout);
-                child.stderr.pipe(process.stdout);
-                child.on('error', log);
-                child.on('exit', function(code) {
-                    if (code) {
-                        callback(`${WEB_TO_PDF} exit code ${code}`);
-                    } else {
-                        fs.readFile(cmdConvertFile, ENCODING, function(err, data) {
-                            if (err) {
-                                callback(err);
-                            } else {
-                                // Success! Add cmd-convert to the addon.ini files.
-                                fs.unlink(cmdConvertFile, log);
-                                callback(null, data);
-                            }
-                        });
-                    }
-                });
-            }
+function installCmdConvert() {
+    const cmdConvertFile = path.join('bin', 'cmd-convert.ini');
+    return fsp.stat(
+        cmdConvertFile
+    ).then(function(stats) {
+        // Dry run WEB_TO_PDF:
+        return promiseSpawn(
+            WEB_TO_PDF, ['bin'], {stdio: ['ignore', 'pipe', 'pipe']}
+        ).then(function() {
+            return fsp.readFile(cmdConvertFile, ENCODING)
+        }).then(function(data) {
+            // Success! Add cmd-convert to the addon.ini files.
+            fs.unlink(cmdConvertFile, log);
+            return data;
         });
-    } catch(err) {
-        callback(err);
-    }
+    }, function statFailed(err) {
+        // cmdConvertFile doesn't exist.
+        // We're running on Windows XP, presumably.
+        log(err);
+    });
 }
 
 function installConfigFiles(myDirectory, addonNames, cmdConvert) {
-    var launch = process.argv[3] + ' ' + path.join(myDirectory, 'bin', 'launch.vbs');
-    expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch}, 'UserGuide.html');
-    addonNames.forEach(function(addon_name) {
-        var addonIni = path.join('addons', addon_name + '.ini');
-        if (cmdConvert) {
-            fs.appendFileSync(addonIni, cmdConvert, {encoding: ENCODING});
-        }
-        expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch}, addonIni);
-    });
+    const launch = process.argv[3] + ' ' + path.join(myDirectory, 'bin', 'launch.vbs');
+    return Promise.all([
+        expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch}, 'UserGuide.html')
+    ].concat(
+        addonNames.map(function(addon_name) {
+            const addonIni = path.join('addons', addon_name + '.ini');
+            return (
+                cmdConvert
+                    ? fsp.appendFile(addonIni, cmdConvert, {encoding: ENCODING})
+                    : Promise.resolve()
+            ).then(function() {
+                return expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch}, addonIni);
+            });
+        })
+    ));
 }
 
-/* Make sure Outpost's Launch.ini or Launch.local file includes addons/*.launch. */
+/* Make sure Outpost's Launch.ini or Launch.local files include addons/*.launch. */
 function installIncludes(myDirectory, addonNames) {
-    const oldInclude = new RegExp('^INCLUDE[ \\t]+' + enquoteRegex(myDirectory) + '[\\\\/]', 'i');
-    var myIncludes = addonNames.map(function(addonName) {
-        return 'INCLUDE ' + path.resolve(myDirectory, 'addons', addonName + '.launch');
-    });
-    // Each of the process arguments names a directory that contains Outpost configuration data.
-    for (var a = 4; a < process.argv.length; a++) {
-        var outpostLaunch = path.resolve(process.argv[a], 'Launch.local');
-        var launchIni = path.resolve(process.argv[a], 'Launch.ini');
-        if (fs.readFileSync(launchIni, ENCODING).split(/[\r\n]+/).some(function(line) {
-            return oldInclude.test(line);
-        })) {
-            log('already included into ' + launchIni);
-            removeIncludes(addonNames, outpostLaunch);
-            continue;
-        }
-        // Upsert myIncludes into outpostLaunch:
-        if (!fs.existsSync(outpostLaunch)) {
-            // Work around a bug: Outpost might ignore the first line of Launch.local.
-            var data = EOL + myIncludes.join(EOL) + EOL;
-            fs.writeFile(outpostLaunch, data, {encoding: ENCODING}, function(err) {
-                log(err ? err : 'included into ' + outpostLaunch);
+    function includeInto(outpostFolder) {
+        const launchIni = path.resolve(outpostFolder, 'Launch.ini');
+        return fsp.readFile(
+            launchIni, ENCODING
+        ).then(function(data) {
+            const oldInclude = new RegExp('^INCLUDE[ \\t]+' + enquoteRegex(myDirectory) + '[\\\\/]', 'i');
+            const myIncludes = addonNames.map(function(addonName) {
+                return 'INCLUDE ' + path.resolve(myDirectory, 'addons', addonName + '.launch');
             });
-        } else {
-            fs.readFile(outpostLaunch, ENCODING, function(err, data) {
-                if (err) {
-                    log(err); // tolerable
-                } else {
-                    var oldLines = data.split(/[\r\n]+/);
+            const launchLocal = path.resolve(outpostFolder, 'Launch.local');
+            if (data.split(/[\r\n]+/).some(function(line) {
+                return oldInclude.test(line);
+            })) {
+                log('already included into ' + launchIni);
+                return removeIncludes(addonNames, launchLocal);
+            }
+            var oldData = null;
+            // Upsert myIncludes into launchLocal:
+            return fsp.stat(
+                launchLocal
+            ).then(function() {
+                return fsp.readFile(
+                    launchLocal, ENCODING
+                ).then(function(data) {
+                    oldData = data;
+                    var oldLines = oldData.split(/[\r\n]+/);
                     var newLines = [];
                     var included = false;
                     oldLines.forEach(function(oldLine) {
@@ -307,69 +448,84 @@ function installIncludes(myDirectory, addonNames) {
                     if (!included) {
                         newLines = newLines.concat(myIncludes); // append myIncludes
                     }
-                    // Work around a bug: Outpost might ignore the first line of Launch.local.
-                    var newData = EOL + newLines.join(EOL) + EOL;
-                    if (newData == data) {
-                        log('already included into ' + outpostLaunch);
-                    } else {
-                        fs.writeFile(outpostLaunch, newData, {encoding: ENCODING}, function(err) {
-                            log(err ? err : ('included into ' + outpostLaunch));
-                        }); 
-                    }
+                    return newLines;
+                });
+            }, function statFailed(err) {
+                // launchLocal doesn't exist.
+                return myIncludes;
+            }).then(function(newLines) {
+                // Work around a bug: Outpost might ignore the first line of Launch.local.
+                const newData = EOL + newLines.join(EOL) + EOL;
+                if (newData == oldData) {
+                    log('already included into ' + launchLocal);
+                    return Promise.resolve(true);
                 }
+                return fsp.writeFile(
+                    launchLocal, newData, {encoding: ENCODING}
+                ).then(function() {
+                    log(`included into ${launchLocal}`);
+                });
             });
-        }
-    }
+        }).catch(log);
+    };
+    // Each of the arguments names a folder that contains Outpost configuration data.
+    return Promise.all(argvSlice(4).map(includeInto));
 }
 
 function uninstall() {
-    stopServers(function() {
-        const addonNames = getAddonNames();
-        log('addons ' + JSON.stringify(addonNames));
-        for (a = 3; a < process.argv.length; a++) {
-            removeIncludes(addonNames, path.resolve(process.argv[a], 'Launch.local'));
-        }
+    return getAddonNames().then(function(addonNames) {
+        log('uninstall addons ' + JSON.stringify(addonNames));
+        return Promise.all([
+            stopServers()
+        ].concat(
+            argvSlice(3).map(function(outpostFolder) {
+                removeIncludes(addonNames, path.resolve(outpostFolder, 'Launch.local'));
+            })
+        ));
     });
 }
 
-function removeIncludes(addonNames, outpostLaunch) {
-    if (fs.existsSync(outpostLaunch)) {
-        // Remove INCLUDEs from outpostLaunch:
-        fs.readFile(outpostLaunch, ENCODING, function(err, data) {
-            if (err) {
-                log(err);
-            } else {
-                var newData = data;
-                addonNames.forEach(function(addonName) {
-                    var myLaunch = enquoteRegex(path.resolve(process.cwd(), 'addons', addonName + '.launch'));
-                    var myInclude1 = new RegExp('^INCLUDE[ \\t]+' + myLaunch + '[\r\n]*', 'i');
-                    var myInclude = new RegExp('[\r\n]+INCLUDE[ \\t]+' + myLaunch + '[\r\n]+', 'gi');
-                    newData = newData.replace(myInclude1, '').replace(myInclude, EOL);
-                });
-                if (newData != data) {
-                    fs.writeFile(outpostLaunch, newData, {encoding: ENCODING}, function(err) {
-                        log(err ? err : ('removed ' + JSON.stringify(addonNames) + ' from ' + outpostLaunch));
-                    });
-                }
+function removeIncludes(addonNames, launchLocal) {
+    // Remove INCLUDEs from launchLocal:
+    return fsp.readFile(
+        launchLocal, ENCODING
+    ).then(function(data) {
+        var newData = data;
+        addonNames.forEach(function(addonName) {
+            var myLaunch = enquoteRegex(path.resolve(process.cwd(), 'addons', addonName + '.launch'));
+            var myInclude1 = new RegExp('^INCLUDE[ \\t]+' + myLaunch + '[\r\n]*', 'i');
+            var myInclude = new RegExp('[\r\n]+INCLUDE[ \\t]+' + myLaunch + '[\r\n]+', 'gi');
+            newData = newData.replace(myInclude1, '').replace(myInclude, EOL);
+        });
+        if (newData != data) {
+            return fsp.writeFile(
+                launchLocal, newData, {encoding: ENCODING}
+            ).then(function() {
+                log('removed ' + JSON.stringify(addonNames) + ` from ${launchLocal}`);
+            });
+        }
+    }).catch(log);
+}
+
+/** @return a Promise of a list of names, such that for each name
+    there exists a <name>.launch file in the given directory.
+*/
+function getAddonNames(directoryName) {
+    return fsp.readdir(
+        directoryName || 'addons', {encoding: ENCODING}
+    ).then(function(fileNames) {
+        var addonNames = [];
+        fileNames.forEach(function(fileName) {
+            var found = /^(.*)\.launch$/.exec(fileName);
+            if (found && found[1]) {
+                addonNames.push(found[1]);
             }
         });
-    }
-}
-
-/** Return a list of names, such that for each name there exists a <name>.launch file in the given directory. */
-function getAddonNames(directoryName) {
-    var addonNames = [];
-    const fileNames = fs.readdirSync(directoryName || 'addons', {encoding: ENCODING});
-    fileNames.forEach(function(fileName) {
-        var found = /^(.*)\.launch$/.exec(fileName);
-        if (found && found[1]) {
-            addonNames.push(found[1]);
-        }
+        addonNames.sort(function (x, y) {
+            return x.toLowerCase().localeCompare(y.toLowerCase());
+        });
+        return addonNames;
     });
-    addonNames.sort(function (x, y) {
-        return x.toLowerCase().localeCompare(y.toLowerCase());
-    });
-    return addonNames;
 }
 
 function argvSlice(start) {
@@ -381,7 +537,7 @@ function argvSlice(start) {
 }
 
 function convertMessageToFiles() {
-    var allArgs = argvSlice(4);
+    var allArgs = argvSlice(5);
     var args = [];
     var copyNames = '';
     var addon_name = null;
@@ -417,25 +573,19 @@ function convertMessageToFiles() {
         return (c == 'n') ? '\n' : c;
     });
     copyNames = copyNames.split('\n');
-    openMessage(args, function(pageURL) {
-        convertPageToFiles(addon_name, pageURL, copyNames);
-    });
+    openMessage(args).then(function convertPage(pageURL) {
+        if (pageURL) {
+            return convertPageToFiles(addon_name, pageURL, copyNames);
+        } else {
+            throw 'page URL = ' + JSON.stringify(pageURL);
+        }
+    }).catch(log);
 }
 
-function convertPageToFiles(addon_name, page, copyNames) {
+function convertPageToFiles(addon_name, pageURL, copyNames) {
     const fileNames = [];
-    const finish = function finish(err) {
-        if (err) {
-            log(err);
-            process.exitCode = 1;
-            // Delete all the files:
-            for (var f = 0; f < fileNames.length; ++f) {
-                fs.unlink(fileNames[f], log);
-            }
-        }
-    };
-    try {
-        var args = ['bin', page];
+    return Promise.resolve().then(function() {
+        var args = ['bin', pageURL];
         for (var c = 0; c < copyNames.length; ++c) {
             var tempFile = makeTemp.fileSync({
                 dir: CONVERTED_FOLDER,
@@ -447,126 +597,160 @@ function convertPageToFiles(addon_name, page, copyNames) {
             args.push(copyNames[c] || '');
         }
         log(`${WEB_TO_PDF} "` + args.join('" "') + '"')
-        const child = child_process.spawn(
-            WEB_TO_PDF, args, {stdio: ['ignore', 'pipe', 'pipe']});
-        child.stdout.pipe(process.stdout);
-        child.stderr.pipe(process.stdout);
-        child.on('error', finish);
-        child.on('exit', function(code) {
-            if (code) {
-                finish(`${WEB_TO_PDF} exit code ${code}`);
-            } else {
-                submitFilesToOutpost(addon_name, fileNames, finish);
-            }
-        });
-    } catch(err) {
-        finish(err);
-    }
-}
-
-function submitFilesToOutpost(addon_name, fileNames, callback) {
-    try {
-        var f = 0;
-        const next = function nextFile() {
-            if (f < fileNames.length) {
-                submitFileToOutpost(addon_name, fileNames[f++], next);
-            } else {
-                callback();
-            }
+        return promiseSpawn(WEB_TO_PDF, args, {stdio: ['ignore', 'pipe', 'pipe']});
+    }).then(function(child) {
+        return submitFilesToOutpost(addon_name, fileNames);
+    }, function spawnFailed(err) {
+        // Delete all the files:
+        for (var f = 0; f < fileNames.length; ++f) {
+            fs.unlink(fileNames[f], log);
         }
-        next();
-    } catch(err) {
-        callback(err);
-    }
-}
-
-function submitFileToOutpost(addon_name, fileName, next) {
-    try {
-        fs.stat(fileName, function(err, stat) {
-            if (err) {
-                log(err);
-                next();
-            } else if (stat && stat.size <= 0) {
-                log(`${fileName} is empty`);
-                fs.unlink(fileName, log);
-                next();
-            } else {
-                // Outpost requires parameters to appear in a specific order.
-                // So don't stringify them from a single object.
-                var body = querystring.stringify({adn: addon_name})
-                    + '&' + querystring.stringify({prt: path.resolve(fileName)});
-                submitToOpdirect({}, body, function(err) {
-                    fs.unlink(fileName, log);
-                    next();
-                });
-            }
-        });
-    } catch(err) {
-        log(err);
-    }
-}
-
-function browseMessage() {
-    openMessage(argvSlice(4), function browse(pageURL) {
-        startProcess('start', [pageURL], {shell: true, detached: true, stdio: 'ignore'});
+        throw err;
     });
 }
 
-function openMessage(args, afterOpen) {
+function submitFilesToOutpost(addon_name, fileNames) {
+    var failed = 0;
+    function submitFile(chain, fileName) {
+        return chain.then(function() {
+            return fsp.stat(fileName);
+        }).then(function(stats) {
+            if (stats.size <= 0) {
+                throw `${fileName} is empty`;
+            }
+            // Outpost requires parameters to appear in a specific order.
+            // So don't stringify them from a single object.
+            const reqBody = querystring.stringify({adn: addon_name})
+                  + '&' + querystring.stringify({prt: path.resolve(fileName)});
+            return submitToOpdirect({}, reqBody);
+        }).then(
+            respondFromOpdirect
+            // TODO: should we expect a different response here?
+        ).then(function(fromOutpost) {
+            if (fromOutpost) {
+                throw 'from Outpost ' + JSON.stringify(fromOutpost);
+            }
+        }).catch(function(err) {
+            ++failed;
+            log(err);
+            fs.unlink(fileName, log);
+        });
+    }
+    return fileNames.reduce(
+        submitFile, Promise.resolve()
+    ).then(function() {
+        if (failed) {
+            throw `${failed} files were not delivered to Outpost.`;
+        }
+    });
+}
+
+function browseMessage() {
+    const args = argvSlice(4);
+    return openMessage(args).then(function displayPage(pageURL) {
+        if (pageURL) {
+            startProcess('start', [pageURL], {shell: true, detached: true, stdio: 'ignore'});
+        }
+    });
+}
+
+function openMessage(args) {
     const programPath = process.argv[3];
     var retries = 0;
     function tryNow() {
-        try {
-            openForm(args, tryLater, afterOpen);
-        } catch(err) {
-            tryLater(err);
-        }
-    }
-    function tryLater(err) {
-        log(err);
-        if (retries >= 6) {
-            throw (retries + ' retries failed ' + JSON.stringify(args));
-        } else {
-            ++retries;
-            log('retries = ' + retries);
-            if (retries == 1 || retries == 4) {
-                startProcess(programPath, ['serve'], {detached: true, stdio: 'ignore'});
+        return openForm(
+            args
+        ).catch(function tryLater(err) {
+            log(err);
+            if (retries >= 6) {
+                throw (retries + ' retries failed ' + JSON.stringify(args));
+            } else {
+                ++retries;
+                log('retries = ' + retries);
+                if (retries == 1 || retries == 4) {
+                    startProcess(programPath, ['serve'], {detached: true, stdio: 'ignore'});
+                }
+                return promiseTimeout(retries * seconds).then(tryNow);
             }
-            setTimeout(tryNow, retries * seconds);
-        }
+        });
     }
-    tryNow();
+    return tryNow();
 }
 
-function openForm(args, tryLater, afterOpen) {
-    if (!fs.existsSync(PortFileName)) {
-        // There's definitely no server running. Start one now:
+function openForm(args) {
+    return fsp.stat(
+        PortFileName
+    ).catch(function(err) {
+        // There's definitely no server running.
         throw PortFileName + " doesn't exist";
-    }
-    var options = {host: LOCALHOST,
-                   port: parseInt(fs.readFileSync(PortFileName, ENCODING), 10),
-                   method: 'POST',
-                   path: OpenOutpostMessage,
-                   headers: {'Content-Type': JSON_TYPE + '; charset=' + CHARSET}};
-    var postData = JSON.stringify(args);
-    log('http://' + options.host + ':' + options.port
-        + ' ' + options.method + ' ' + OpenOutpostMessage + ' ' + postData);
-    request(options, function(err, data, res) {
-        if (err) {
-            tryLater(err);
-        } else if (res.statusCode == SEE_OTHER) {
+    }).then(function(stats) {
+        return fsp.readFile(PortFileName, ENCODING);
+    }).then(function(port) {
+        var options = {host: LOCALHOST,
+                       port: parseInt(port, 10),
+                       method: 'POST',
+                       path: OpenOutpostMessage,
+                       headers: {'Content-Type': JSON_TYPE + '; charset=' + CHARSET}};
+        var postData = JSON.stringify(args);
+        log('http://' + options.host + ':' + options.port
+            + ' ' + options.method + ' ' + options.path + ' ' + postData);
+        return httpPromise(httpExchange(options), postData);
+    }).then(function(exchange) {
+        const res = exchange.res;
+        const data = exchange.resBody;
+        if (res.statusCode == SEE_OTHER) {
             var location = res.headers.location;
             log('opened form ' + location + EOL + data);
-            afterOpen(location);
+            return location;
         } else if (res.statusCode == HTTP_OK && args.length == 0) {
             log('HTTP response ' + res.statusCode + ' ' + res.statusMessage + EOL + data);
-            process.exitCode = 0; // dry run accomplished
-         } else {
+            return null; // dry run accomplished
+        } else {
             // Could be an old server, version <= 2.18,
             // or something went wrong on the server side.
-            tryLater('HTTP response ' + res.statusCode + ' ' + res.statusMessage + EOL + data);
+            throw('HTTP response ' + res.statusCode + ' ' + res.statusMessage + EOL + data);
         }
-    }).end(postData, CHARSET);
+    });
+}
+
+function httpExchange(options) {
+    const exchange = {};
+    function onError(event) {
+        return function(err) {
+            (exchange.callback || log)(err || event);
+        }
+    }
+    const req = http.request(options, function(res) {
+        exchange.res = res;
+        res.on('aborted', onError('res.aborted'));
+        res.on('error', onError('res.error'));
+        res.on('timeout', onError('res.timeout'));
+        res.pipe(concat_stream(function(buffer) {
+            if (exchange.callback) {
+                exchange.callback(null, buffer.toString(CHARSET));
+            }
+        }));
+    });
+    req.on('aborted', onError('req.aborted'));
+    req.on('error', onError('req.error'));
+    req.on('timeout', onError('req.timeout'));
+    exchange.req = req;
+    return exchange;
+}
+
+function httpPromise(exchange, reqBody) {
+    return new Promise(function(resolve, reject) {
+        try {
+            exchange.callback = function httpCallback(err, data) {
+                exchange.resBody = data;
+                if (err) reject(err);
+                else resolve(exchange);
+            };
+            exchange.req.end(reqBody, CHARSET);
+        } catch(err) {
+            reject(err);
+        }
+    });
 }
 
 function startProcess(program, args, options) {
@@ -585,11 +769,12 @@ function startProcess(program, args, options) {
     }
 }
 
-function stopServers(next) {
-    try {
+function stopServers() {
+    return fsp.readdir(
+        LOG_FOLDER, {encoding: ENCODING}
+    ).then(function(fileNames) {
         // Find the port numbers of all servers (including stopped servers):
         var ports = [];
-        const fileNames = fs.readdirSync(LOG_FOLDER, {encoding: ENCODING});
         fileNames.forEach(function(fileName) {
             var found = /^server-(\d*)\.log$/.exec(fileName);
             if (found && found[1]) {
@@ -600,57 +785,19 @@ function stopServers(next) {
                 ports.push(found[1]);
             }
         });
-        try {
-            fs.unlink(PortFileName, log);
-        } catch(err) {
-            log(err); // harmless
-        }
-        var forked = ports.length;
-        ports.forEach(function(port) {
-            const join = function join(err) {
-                log(err || ('stopped server on port ' + port));
-                if (--forked == 0) {
-                    next();
-                }
-            };
-            try {
-                log('stopping server on port ' + port);
-                request({host: LOCALHOST,
-                         port: parseInt(port, 10),
-                         method: 'POST',
-                         path: StopServer},
-                        join).end();
-            } catch(err) {
-                join(err);
-            }
-        });
-    } catch(err) {
-        log(err);
-        next();
-    }
-}
-
-function request(options, callback) {
-    const onError = function(event) {
-        return function(err) {
-            (callback || log)(err || event);
-        }
-    }
-    var req = http.request(options, function(res) {
-        res.on('aborted', onError('res.aborted'));
-        res.on('error', onError('res.error'));
-        res.on('timeout', onError('res.timeout'));
-        res.pipe(concat_stream(function(buffer) {
-            var data = buffer.toString(CHARSET);
-            if (callback) {
-                callback(null, data, res);
-            }
+        fsp.unlink(PortFileName).catch(function(err){});
+        return Promise.all(ports.map(function(port) {
+            log('stopping server on port ' + port);
+            return httpPromise(
+                httpExchange({
+                    host: LOCALHOST,
+                    port: parseInt(port, 10),
+                    method: 'POST',
+                    path: StopServer
+                }) // no request data
+            ).catch(log); // ignore response
         }));
-    });
-    req.on('aborted', onError('req.aborted'));
-    req.on('error', onError('req.error'));
-    req.on('timeout', onError('req.timeout'));
-    return req;
+    }).catch(log);
 }
 
 var openForms = {'0': {quietTime: 0}}; // all the forms that are currently open
@@ -658,6 +805,20 @@ var openForms = {'0': {quietTime: 0}}; // all the forms that are currently open
 var nextFormId = 1; // Forms are assigned sequence numbers when they're opened.
 
 function serve() {
+    var server = null;
+    function exitSoon(err) {
+        log(err);
+        const exitCode = err ? 1 : 0;
+        process.exitCode = exitCode;
+        if (server) {
+            try {
+                server.close();
+            } catch(err) {
+                log(err);
+            }
+        }
+        setTimeout(function() {process.exit(exitCode);}, 2 * seconds).unref();
+    };
     const app = express();
     app.set('etag', false); // convenient for troubleshooting
     app.set('trust proxy', ['loopback']); // to find the IP address of a client
@@ -784,9 +945,8 @@ function serve() {
         }
     }}));
 
-    const server = app.listen(0);
-    const address = server.address();
-    myServerPort = address.port;
+    server = app.listen(0);
+    myServerPort = server.address().port;
     if (!fs.existsSync(LOG_FOLDER)) {
         fs.mkdirSync(LOG_FOLDER);
     }
@@ -831,7 +991,6 @@ function serve() {
                         if (!err && data && (data.trim() == (myServerPort + ''))) {
                             fs.unlink(PortFileName, log);
                         }
-                        server.close();
                         exitSoon();
                     });
                 } else {
@@ -840,7 +999,6 @@ function serve() {
                             log(PortFileName + ' ' + (err ? err : data));
                             clearInterval(checkSilent);
                             deleteMySaveFiles();
-                            server.close();
                             exitSoon();
                         }
                     });
@@ -851,13 +1009,6 @@ function serve() {
         }
     }, checkInterval);
     deleteOldFiles(SAVE_FOLDER, /^[^\.].*$/, 60 * seconds);
-}
-
-function exitSoon(err) {
-    log(err);
-    const exitCode = err ? 1 : 0;
-    process.exitCode = exitCode;
-    setTimeout(function() {process.exit(exitCode);}, 2 * seconds).unref();
 }
 
 function onOpen(formId, args) {
@@ -959,27 +1110,32 @@ function parseArgs(args) {
 }
 
 function getMessage(environment) {
-    var message = null;
-    if (environment.message) {
-        message = environment.message;
-    } else if (environment.MSG_FILENAME) {
-        const msgFileName = path.resolve(PackItMsgs, environment.MSG_FILENAME);
-        message = fs.readFileSync(msgFileName, {encoding: ENCODING});
-        fs.unlink(msgFileName, function(err) {
-            log(err ? err : ("Deleted " + msgFileName));
-        });
-    }
-    if (message) {
-        // Outpost sometimes appends junk to the end of message.
-        // One observed case was "You have new messages."
-        message = message.replace(/[\r\n]+[ \t]*!\/ADDON![\s\S]*$/, EOL + '!/ADDON!' + EOL);
-    }
-    return message;
+    return Promise.resolve(
+        environment.message
+    ).then(function(message) {
+        if (message) {
+            return message;
+        } else if (environment.MSG_FILENAME) {
+            const msgFileName = path.resolve(PackItMsgs, environment.MSG_FILENAME);
+            return fsp.readFile(
+                msgFileName, {encoding: ENCODING}
+            ).then(function(message) {
+                fs.unlink(msgFileName, function(err) {
+                    log(err ? err : ("Deleted " + msgFileName));
+                });
+                // Outpost sometimes appends junk to the end of message.
+                // One observed case was "You have new messages."
+                return message && message.replace(
+                    /[\r\n]+[ \t]*!\/ADDON![\s\S]*$/,
+                    EOL + '!/ADDON!' + EOL);
+            });
+        } // else don't return anything.
+    });
 }
 
 function onGetMessage(formId, req, res) {
-    noCache(res);
     try {
+        noCache(res);
         const form = findForm(formId);
         if (form) {
             res.set({'Content-Type': TEXT_PLAIN});
@@ -1013,40 +1169,50 @@ function onGetForm(formId, req, res) {
         } else {
             log('/form-' + formId + ' viewed');
             updateSettings();
-            loadForm(formId, form, req);
-            if (form.environment.message_status == 'manual-created') {
-                showManualMessage(formId, form, res);
-            } else {
-                showForm(form, res);
-            }
+            loadForm(
+                formId, form
+            ).then(function() {
+                if (form.environment.message_status == 'manual-created') {
+                    return getManualMessage(formId, form);
+                } else {
+                    return getForm(form, res);
+                }
+            }).then(function(data) {
+                res.end(data, CHARSET);
+            }).catch(function(err) {
+                res.end(errorToHTML(err, form), CHARSET);
+            });
         }
     } catch(err) {
         res.end(errorToHTML(err, form), CHARSET);
     }
 }
 
-function loadForm(formId, form, req) {
+function loadForm(formId, form) {
     if (!form.environment) {
         form.environment = parseArgs(form.args);
         form.environment.emailURL = '/email-' + formId;
         form.environment.submitURL = '/submit-' + formId;
-    }
-    if (form.message == null) {
-        form.message = getMessage(form.environment);
-        if (form.message) {
-            if (!form.environment.ADDON_MSG_TYPE) {
-                form.environment.ADDON_MSG_TYPE = parseMessage(form.message).formType;
-            }
-        }
     }
     if (form.environment.mode == 'readonly') {
         form.environment.pingURL = '/ping-' + formId;
     } else {
         form.environment.saveURL = '/save-' + formId;
     }
+    if (form.message != null) {
+        return Promise.resolve();
+    }
+    return getMessage(
+        form.environment
+    ).then(function(message) {
+        form.message = message;
+        if (message && !form.environment.ADDON_MSG_TYPE) {
+            form.environment.ADDON_MSG_TYPE = parseMessage(message).formType;
+        }
+    });
 }
 
-function showForm(form, res) {
+function getForm(form, res) {
     log(form.environment);
     if (!form.environment.addon_name) {
         throw new Error('addon_name is ' + form.environment.addon_name + '\n');
@@ -1063,38 +1229,47 @@ function showForm(form, res) {
             formType = receiverFileName;
         }
     }
-    try {
-        var html = fs.readFileSync(path.join(PackItForms, formType), ENCODING);
-    } catch(err) {
+    return fsp.readFile(
+        path.join(PackItForms, formType), ENCODING
+    ).then(function(data) {
+        const template = data.replace(
+            /<\s*script\b[^>]*\bsrc\s*=\s*"resources\/integration\/integration.js"/,
+            '<script type="text/javascript">'
+                + '\n      var integrationEnvironment = ' + JSON.stringify(form.environment)
+                + ';\n      var integrationMessage = ' + JSON.stringify(form.message)
+                + ';\n    </script>\n    $&');
+        // It would be more elegant to inject data into integration.js,
+        // but sadly that file is cached by the Chrome browser.
+        // So changes would be ignored by the browser, for example
+        // the change to message_status after emailing a message.
+        return expandDataIncludes(template, form);
+    }, function readFileFailed(err) {
         throw "I don't know about a form named "
             + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
             + " Perhaps the message came from a newer version of the "
             + form.environment.addon_name + " add-on, "
             + 'so it might help to install the latest version.'
             + '\n\n' + err;
-    }
-    html = expandDataIncludes(html, form);
-    if (form.environment.emailing) {
-        form.environment.message_status = 'sent';
-        delete form.environment.emailing;
-    }
-    res.end(html, CHARSET);
+    }).then(function(html) {
+        if (form.environment.emailing) {
+            form.environment.message_status = 'sent';
+            delete form.environment.emailing;
+        }
+        return html;
+    });
 }
 
-function showManualMessage(formId, form, res) {
+function getManualMessage(formId, form) {
     const template = path.join('bin', 'message.html');
-    fs.readFile(template, {encoding: ENCODING}, function(err, data) {
-        try {
-            if (err) throw err;
-            res.end(expandVariables(data,
-                                    {SUBJECT: encodeHTML(form.environment.subject),
-                                     MESSAGE: encodeHTML(form.message),
-                                     MESSAGE_URL: '/message-' + formId
-                                     + '/' + encodeURIComponent(form.environment.subject)}),
-                    CHARSET);
-        } catch(err) {
-            res.end(errorToHTML(err, form.environment), CHARSET);
-        }
+    return fsp.readFile(
+        template, {encoding: ENCODING}
+    ).then(function(data) {
+        return expandVariables(data, {
+            SUBJECT: encodeHTML(form.environment.subject),
+            MESSAGE: encodeHTML(form.message),
+            MESSAGE_URL: '/message-' + formId
+                + '/' + encodeURIComponent(form.environment.subject)
+        });
     });
 }
 
@@ -1112,48 +1287,53 @@ function merge(a, b) {
 }
 
 function updateSettings() {
-    fs.stat(SETTINGS_FILE, function(err, stats) {
-        if (err || !(stats && stats.mtime)) {
-            settings = DEFAULT_SETTINGS;
-        } else {
-            const fileTime = stats.mtime.getTime();
-            if (fileTime != settingsUpdatedTime) {
-                fs.readFile(SETTINGS_FILE, {encoding: ENCODING}, function(err, data) {
-                    try {
-                        if (err) throw err;
-                        settingsUpdatedTime = fileTime;
-                        var fileSettings = {};
-                        var section = null;
-                        data.split(/[\r\n]+/).forEach(function(line) {
-	                    if (INI.comment.test(line)) {
-	                        return;
-	                    } else if (INI.section.test(line)) {
-	                        var match = line.match(INI.section);
-	                        section = match[1];
-                                if (fileSettings[section] == null) {
-	                            fileSettings[section] = {};
-                                }
-	                    } else if (INI.property.test(line)) {
-	                        var match = line.match(INI.property);
-	                        if (section) {
-		                    fileSettings[section][match[1]] = match[2];
-	                        } else {
-		                    fileSettings[match[1]] = match[2];
-	                        }
-	                    };
-                        });
-                        if ((typeof fileSettings.Opdirect.port) == 'string') {
-                            fileSettings.Opdirect.port = parseInt(fileSettings.Opdirect.port);
-                        }
-                        settings = merge(DEFAULT_SETTINGS, fileSettings);
-                        log('settings = ' + JSON.stringify(settings));
-                    } catch(err) {
-                        log(err);
-                    }
-                });
-            }
+    return fsp.stat(
+        SETTINGS_FILE
+    ).then(function(stats) {
+        if (!stats.mtime) {
+            return DEFAULT_SETTINGS;
         }
-    });
+        const fileTime = stats.mtime.getTime();
+        if (fileTime == settingsUpdatedTime) {
+            return settings; // no change
+        }
+        return fsp.readFile(
+            SETTINGS_FILE, {encoding: ENCODING}
+        ).then(function(data) {
+            settingsUpdatedTime = fileTime;
+            var fileSettings = {};
+            var section = null;
+            data.split(/[\r\n]+/).forEach(function(line) {
+                if (INI.comment.test(line)) {
+                    return;
+                } else if (INI.section.test(line)) {
+                    var match = line.match(INI.section);
+                    section = match[1];
+                    if (fileSettings[section] == null) {
+                        fileSettings[section] = {};
+                    }
+                } else if (INI.property.test(line)) {
+                    var match = line.match(INI.property);
+                    if (section) {
+                        fileSettings[section][match[1]] = match[2];
+                    } else {
+                        fileSettings[match[1]] = match[2];
+                    }
+                };
+            });
+            if ((typeof fileSettings.Opdirect.port) == 'string') {
+                fileSettings.Opdirect.port = parseInt(fileSettings.Opdirect.port);
+            }
+            newSettings = merge(DEFAULT_SETTINGS, fileSettings);
+            log('settings = ' + JSON.stringify(newSettings));
+            return newSettings;
+        });
+    }, function statFailed(err) {
+        log(err);
+        return DEFAULT_SETTINGS;
+    }).then(function(newSettings) {
+        settings = newSettings;
+    }).catch(log);
 }
 
 /* Expand data-include-html elements, for example:
@@ -1164,46 +1344,57 @@ function updateSettings() {
     }
   </div>
 */
-function expandDataIncludes(data, form) {
-    var oldData = data.replace(
-        /<\s*script\b[^>]*\bsrc\s*=\s*"resources\/integration\/integration.js"/,
-        '<script type="text/javascript">'
-            + '\n      var integrationEnvironment = ' + JSON.stringify(form.environment)
-            + ';\n      var integrationMessage = ' + JSON.stringify(form.message)
-            + ';\n    </script>\n    $&');
-    // It would be more elegant to inject data into integration.js,
-    // but sadly that file is cached by the Chrome browser.
-    // So changes would be ignored by the browser, for example
-    // the change to message_status after emailing a message.
-    while(true) {
-        var newData = expandDataInclude(oldData, form);
-        if (newData == oldData) {
-            return oldData;
-        }
-        oldData = newData; // and try it again, in case there are nested includes.
-    }
-}
-
-function expandDataInclude(data, form) {
+function expandDataIncludes(template, form) {
     const target = /<\s*div\s+data-include-html\s*=\s*"[^"]*"\s*>[^<]*<\/\s*div\s*>/gi;
-    return data.replace(target, function(found) {
-        const matches = found.match(/"([^"]*)"\s*>([^<]*)/);
+    const includes = [];
+    var found;
+    while(found = target.exec(template)) {
+        includes.push(found);
+    }
+    if (includes.length <= 0) {
+        // There's nothing here to expand.
+        return Promise.resolve(template);
+    }
+    const readers = includes.map(function(found) {
+        const matches = found[0].match(/"([^"]*)"\s*>([^<]*)/);
         const name = matches[1];
         const formDefaults = htmlEntities.decode(matches[2].trim());
         log('data-include-html ' + name + ' ' + formDefaults);
         // Read a file from pack-it-forms:
         const fileName = path.join(PackItForms, 'resources', 'html', name + '.html')
-        var result = fs.readFileSync(fileName, ENCODING);
-        // Remove the enclosing <div></div>:
-        result = result.replace(/^\s*<\s*div\s*>\s*/i, '');
-        result = result.replace(/<\/\s*div\s*>\s*$/i, '');
-        if (formDefaults) {
-            result += `<script type="text/javascript">
+        return fsp.readFile(
+            fileName, ENCODING
+        ).then(function(data) {
+            // Remove the enclosing <div></div>:
+            var result = data
+                .replace(/^\s*<\s*div\s*>\s*/i, '')
+                .replace(/<\/\s*div\s*>\s*$/i, '');
+            if (formDefaults) {
+                result += `<script type="text/javascript">
   add_form_default_values(${formDefaults});
 </script>
 `;
-        }
-        return result;
+            }
+            return { // one replacement
+                first: found.index,
+                newData: result,
+                next: found.index + found[0].length
+            };
+        });
+    });
+    return Promise.all(
+        readers
+    ).then(function(replacements) {
+        var next = 0;
+        var chunks = [];
+        replacements.forEach(function(replacement) {
+            chunks.push(template.substring(next, replacement.first));
+            chunks.push(replacement.newData);
+            next = replacement.next;
+        });
+        chunks.push(template.substring(next));
+        // Try it again, in case there are nested includes:
+        return expandDataIncludes(chunks.join(''), form);
     });
 }
 
@@ -1246,43 +1437,7 @@ function onEmail(formId, message, res) {
 
 function onSubmit(formId, q, res, fromOutpostURL) {
     const form = findForm(formId);
-    const callback = function callback(err) {
-        try {
-            if (!err) {
-                log('/form-' + formId + ' submitted');
-                form.environment.mode = 'readonly';
-                res.redirect('/form-' + formId);
-                // Don't closeForm, so the operator can view it.
-                // But do delete its save file (if any):
-                const fileName = saveFileName(formId);
-                fs.unlink(fileName, function(err) {
-                    if (!err) log("Deleted " + fileName);
-                });
-            } else if ((typeof err) != 'object') {
-                throw err;
-            } else {
-                res.set({'Content-Type': TEXT_HTML});
-                form.fromOutpost = err;
-                log('/form-' + formId + ' from Outpost ' + JSON.stringify(err));
-                var page = PROBLEM_HEADER + EOL
-                    + 'When the message was submitted, Outpost responded:<br/><br/>' + EOL
-                    + '<iframe src="' + fromOutpostURL + '" style="width:95%;"></iframe><br/><br/>' + EOL;
-                if (err.message) {
-                    page += encodeHTML(err.message)
-                        .replace(/[\r\n]+/g, '<br/>' + EOL) + '<br/>' + EOL;
-                }
-                if (logFileName) {
-                    page += encodeHTML('log file ' + logFileName) + '<br/>' + EOL;
-                }
-                page += '</body></html>';
-                res.end(page, CHARSET);
-            }
-        } catch(err) {
-            res.set({'Content-Type': TEXT_HTML});
-            res.end(errorToHTML(err, form.environment), CHARSET);
-        }
-    };
-    try {
+    return Promise.resolve().then(function() {
         const message = q.formtext;
         const parsed = parseMessage(message);
         const fields = parsed.fields;
@@ -1291,22 +1446,52 @@ function onSubmit(formId, q, res, fromOutpostURL) {
         if (form.environment.message_status == 'manual') {
             form.environment.message_status = 'manual-created';
             form.message = message;
-            res.redirect('/form-' + formId);
-        } else {
-            // Outpost requires Windows-style line breaks:
-            form.message = message.replace(/([^\r])\n/g, '$1' + EOL);
-            const submission = {
-                formId: formId,
-                form: form,
-                addonName: form.environment.addon_name,
-                subject: form.environment.subject,
-                urgent: (['IMMEDIATE', 'I'].indexOf(handling) >= 0)
-            };
-            submitToOpdirect(submission, messageForOpdirect(submission), callback);
+            return null;
         }
-    } catch(err) {
-        callback(err);
-    }
+        // Outpost requires Windows-style line breaks:
+        form.message = message.replace(/([^\r])\n/g, '$1' + EOL);
+        const submission = {
+            formId: formId,
+            form: form,
+            addonName: form.environment.addon_name,
+            subject: form.environment.subject,
+            urgent: (['IMMEDIATE', 'I'].indexOf(handling) >= 0)
+        };
+        return submitToOpdirect(submission, messageForOpdirect(submission));
+    }).then(
+        respondFromOpdirect
+    ).then(function(fromOutpost) {
+        if (fromOutpost) {
+            res.set({'Content-Type': TEXT_HTML});
+            form.fromOutpost = fromOupost;
+            log(`/form-${formId} from Outpost ` + JSON.stringify(fromOutpost));
+            var page = PROBLEM_HEADER + EOL
+                + 'When the message was submitted, Outpost responded:<br/><br/>' + EOL
+                + '<iframe src="' + fromOutpostURL + '" style="width:95%;"></iframe><br/><br/>' + EOL;
+            if (fromOutpost.message) {
+                page += encodeHTML(fromOutpost.message)
+                    .replace(/[\r\n]+/g, '<br/>' + EOL) + '<br/>' + EOL;
+            }
+            if (logFileName) {
+                page += encodeHTML('log file ' + logFileName) + '<br/>' + EOL;
+            }
+            page += '</body></html>';
+            res.end(page, CHARSET);
+        } else {
+            log('/form-' + formId + ' submitted');
+            form.environment.mode = 'readonly';
+            // Don't closeForm, so the operator can view it.
+            // But do delete its save file (if any):
+            const fileName = saveFileName(formId);
+            fsp.unlink(fileName).then(function() {
+                log("Deleted " + fileName);
+            });
+            res.redirect('/form-' + formId);
+        }
+    }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err, form.environment), CHARSET);
+    });
 }
 
 function messageForOpdirect(submission) {
@@ -1327,58 +1512,45 @@ function messageForOpdirect(submission) {
     return body;
 }
 
-function submitToOpdirect(submission, body, callback) {
+/** Evaluate the response from submitting a message to Opdirect.
+    @return null if and only if the response looks successful.
+*/
+function respondFromOpdirect(exchange) {
+    const res = exchange.res;
+    const data = exchange.resBody || '';
+    if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
+        log(context + `from Outpost ${res.statusCode} ${data}`);
+        // It's an old version of Outpost. Maybe Aoclient will work:
+        return submitToAoclient(submission);
+    } else if (res.statusCode < HTTP_OK || res.statusCode >= 300) {
+        return {message: 'HTTP status ' + res.statusCode + ' ' + res.statusMessage,
+                headers: copyHeaders(res.headers),
+                body: data};
+    }
+    var returnCode = 0;
+    // Look for <meta name="OpDirectReturnCode" content="403"> in the body:
+    var matches = data.match(/<\s*meta\s+[^>]*\bname\s*=\s*"OpDirectReturnCode"[^>]*/i);
+    if (matches) {
+        matches = matches[0].match(/\s+content\s*=\s*"\s*([^"]*)\s*"/i);
+        if (matches) {
+            returnCode = parseInt(matches[1]);
+        }
+    }
+    if (returnCode < HTTP_OK || returnCode >= 300) {
+        return {message: 'OpDirectReturnCode ' + returnCode,
+                headers: copyHeaders(res.headers),
+                body: data};
+    } else {
+        return null;
+    }
+}
+
+/** @return a Promise, which will be an httpPromise if all goes well,
+    or rejected if something goes wrong.
+*/
+function submitToOpdirect(submission, body) {
     const context = submission.formId ? ('/form-' + submission.formId + ' ') : '';;
-    try {
-        const options = settings.Opdirect;
-        // Send an HTTP request.
-        const server = request(
-            options,
-            function(err, data, res) {
-                try {
-                    if (data == null) data = '';
-                    log(context + 'from Opdirect {' + err + '} ' + data);
-                    if (err) {
-                        if (err == 'req.timeout' || err == 'res.timeout') {
-                            err = "Outpost didn't respond within " + SUBMIT_TIMEOUT_SEC + ' seconds.'
-                                + EOL + JSON.stringify(options);
-                        } else if ((err + '').indexOf(' ECONNREFUSED ') >= 0) {
-                            err = "Opdirect isn't running, it appears." + EOL + err
-                                + EOL + JSON.stringify(options);
-                        }
-                        callback(err);
-                    } else if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
-                        // It's an old version of Outpost. Maybe Aoclient will work:
-                        submitToAoclient(submission, callback);
-                    } else if (res.statusCode < HTTP_OK || res.statusCode >= 300) {
-                        callback({message: 'HTTP status ' + res.statusCode + ' ' + res.statusMessage,
-                                  headers: copyHeaders(res.headers),
-                                  body: data});
-                    } else {
-                        var returnCode = 0;
-                        // Look for <meta name="OpDirectReturnCode" content="403"> in the body:
-                        var matches = data.match(/<\s*meta\s+[^>]*\bname\s*=\s*"OpDirectReturnCode"[^>]*/i);
-                        if (matches) {
-                            matches = matches[0].match(/\s+content\s*=\s*"\s*([^"]*)\s*"/i);
-                            if (matches) {
-                                returnCode = parseInt(matches[1]);
-                            }
-                        }
-                        if (returnCode < HTTP_OK || returnCode >= 300) {
-                            callback({message: 'OpDirectReturnCode ' + returnCode,
-                                      headers: copyHeaders(res.headers),
-                                      body: data});
-                        } else {
-                            callback(); // success
-                        }
-                    }
-                } catch(err) {
-                    callback(err);
-                }
-            });
-        server.setHeader('Content-Type', 'application/x-www-form-urlencoded');
-        server.setTimeout(SUBMIT_TIMEOUT_SEC * seconds);
-        log(context + 'submitting ' + JSON.stringify(options) + ' ' + body);
+    return Promise.resolve().then(function() {
         // URL encode the 'E' in '#EOF', to prevent Outpost from treating this as a PacFORM message:
         body = body.replace(/%23EOF/gi, function(match) {
             // Case insensitive:
@@ -1391,67 +1563,54 @@ function submitToOpdirect(submission, body, callback) {
         // finds there is no parameter named formtext and fails.
         // A new server recognizes &4VAO= as the end-of-message marker.
         // Either server ignores the HTTP Content-Length header; it just scans for the marker.
-        server.end(body);
-    } catch(err) {
-        if (!submission.form) {
-            callback(err);
+        const options = settings.Opdirect;
+        // Send an HTTP request.
+        log(context + 'to Outpost ' + JSON.stringify(options) + ' ' + body);
+        const exchange = httpExchange(options);
+        exchange.req.setHeader('Content-Type', 'application/x-www-form-urlencoded');
+        exchange.req.setTimeout(SUBMIT_TIMEOUT_SEC * seconds);
+        return httpPromise(exchange, body);
+    }).catch(function(err) {
+        if (err == 'req.timeout' || err == 'res.timeout') {
+            throw "Outpost didn't respond within " + SUBMIT_TIMEOUT_SEC + ' seconds.';
+        } else if ((err + '').indexOf(' ECONNREFUSED ') >= 0) {
+            throw "Opdirect isn't running, it appears." + EOL + err;
         } else {
-            // Maybe Aoclient will work:
-            try {
-                log(err);
-                submitToAoclient(submission, callback);
-            } catch(err) {
-                callback(err);
-            }
+            throw err;
         }
-    }
+    });
 }
 
-function submitToAoclient(submission, callback) {
+function submitToAoclient(submission) {
     const msgFileName = path.resolve(PackItMsgs, 'form-' + submission.formId + '.txt');
     // Remove the first line of the Outpost message header:
-   const message = submission.form.message.replace(/^\s*![^\r\n]*[\r\n]+/, '')
-   // Outpost will insert !submission.addonName!.
-    fs.writeFile(msgFileName, message, {encoding: ENCODING}, function(err) {
-        try {
-            if (err) throw err;
-            try {
-                fs.unlinkSync(OpdFAIL);
-            } catch(err) {
-                // ignored
-            }
-            var options = ['-a', submission.addonName,
-                           '-f', msgFileName,
-                           '-s', submission.subject];
-            if (submission.urgent) {
-                options.push('-u');
-            }
-            const program = path.join ('addons', submission.addonName, 'Aoclient.exe');
-            log('/form-' + submission.formId + ' submitting ' + program + ' ' + options.join(' '));
-            child_process.execFile(
-                program, options,
-                function(err, stdout, stderr) {
-                    try {
-                        if (err) throw err;
-                        if (fs.existsSync(OpdFAIL)) {
-                            throw (OpdFAIL + ': ' + fs.readFileSync(OpdFAIL, ENCODING) + '\n\n'
-                                   + stdout.toString(ENCODING)
-                                   + stderr.toString(ENCODING));
-                        }
-                        callback();
-                        try {
-                            fs.unlinkSync(msgFileName);
-                        } catch(err) {
-                            if (err) log(err);
-                            else log("Deleted " + msgFileName);
-                        }
-                    } catch(err) {
-                        callback(err);
-                    }
-                });
-        } catch(err) {
-            callback(err);
+    const message = submission.form.message.replace(/^\s*![^\r\n]*[\r\n]+/, '')
+    // Outpost will insert !submission.addonName!.
+    return fsp.writeFile(
+        msgFileName, message, {encoding: ENCODING}
+    ).then(function() {
+        return fsp.unlink(OpdFAIL).catch(function(){});
+    }).then(function() {
+        var options = ['-a', submission.addonName,
+                       '-f', msgFileName,
+                       '-s', submission.subject];
+        if (submission.urgent) {
+            options.push('-u');
         }
+        const program = path.join ('addons', submission.addonName, 'Aoclient.exe');
+        log('/form-' + submission.formId + ' to ' + program + ' ' + options.join(' '));
+        return promiseExecFile(program, options);
+    }).then(function(output) {
+        return fsp.readFile(
+            OpdFAIL, ENCODING
+        ).then(function(data) {
+            throw `${OpdFAIL} : ${data}\n\n${output}`;
+        }, function readFileFailed(err) {
+            fsp.unlink(msgFileName).then(function() {
+                log("Deleted " + msgFileName);
+            });
+            return null; // success
+        });
     });
 }
 
@@ -1460,28 +1619,24 @@ function onGetManual(res) {
     keepAlive(0);
     res.set({'Content-Type': TEXT_HTML});
     const template = path.join('bin', 'manual.html');
-    fs.readFile(template, {encoding: ENCODING}, function(err, data) {
-        if (err) {
-            res.send(errorToHTML(err, template));
-        } else {
-            try {
-                var forms = getAddonForms();
-                var form_options = forms
-                    .filter(function(form) {return !!(form.a && form.t);})
-                    .map(function(form) {
-                        return EOL
-                            + '<option value="'
-                            + encodeHTML(form.a + ' ' + form.t)
-                            + '">'
-                            + encodeHTML(form.fn ? form.fn.replace(/_/g, ' ') : form.t)
-                            + '</option>';
-                    });
-                res.send(expandVariables(data, {form_options: form_options.join('')}));
-            } catch(err) {
-                res.send(errorToHTML(err, forms));
-            }
-        }
-        res.end();
+    return fsp.readFile(
+        template, {encoding: ENCODING}
+    ).then(function(data) {
+        return getAddonForms().then(function(forms) {
+            var form_options = forms
+                .filter(function(form) {return !!(form.a && form.t);})
+                .map(function(form) {
+                    return EOL
+                        + '<option value="'
+                        + encodeHTML(form.a + ' ' + form.t)
+                        + '">'
+                        + encodeHTML(form.fn ? form.fn.replace(/_/g, ' ') : form.t)
+                        + '</option>';
+                });
+            res.send(expandVariables(data, {form_options: form_options.join('')}));
+        });
+    }).catch(function(err) {
+        res.send(errorToHTML(err, template));
     });
 }
 
@@ -1613,9 +1768,11 @@ function copyHeaders(from) {
 
 function getAddonForms() {
     var addonForms = [];
-    getAddonNames().forEach(function(addonName) {
-        fs.readFileSync(path.join('addons', addonName + '.launch'), {encoding: ENCODING})
-            .split(/[\r\n]+/).forEach(function(line) {
+    function nextAddon(chain, addonName) {
+        return chain.then(function() {
+            return fsp.readFile(path.join('addons', addonName + '.launch'), {encoding: ENCODING});
+        }).then(function(data) {
+            data.split(/[\r\n]+/).forEach(function(line) {
                 if (line.startsWith('ADDON ')) {
                     var addonForm = {};
                     var name = null;
@@ -1642,8 +1799,12 @@ function getAddonForms() {
                     addonForms.push(addonForm);
                 }
             });
+            return addonForms;
+        });
+    }
+    return getAddonNames().then(function(addonNames) {
+        return addonNames.reduce(nextAddon, Promise.resolve(addonForms));
     });
-    return addonForms;
 }
 
 function errorToHTML(err, state) {
@@ -1699,9 +1860,6 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
 }
 
 function logToFile(fileNameSuffix) {
-    if (!fs.existsSync('logs')) {
-        fs.mkdirSync('logs');
-    }
     const windowsEOL = new stream.Transform({
         // Transform line endings from Unix style to Windows style.
         transform: function(chunk, encoding, output) {
@@ -1729,7 +1887,7 @@ function logToFile(fileNameSuffix) {
                  today.setUTCSeconds(0);
                  today.setUTCMilliseconds(0);
                  const prefix = today.toISOString().substring(0, 10) + '-';
-                 const nextFileName = path.join('logs', prefix + fileNameSuffix +'.log');
+                 const nextFileName = path.join(LOG_FOLDER, prefix + fileNameSuffix +'.log');
                  if (nextFileName == fileName) {
                      // Oops, we jumped the gun. Wait a second longer:
                      nextDay = +today + seconds;
@@ -1742,7 +1900,7 @@ function logToFile(fileNameSuffix) {
                      fileStream = nextFileStream;
                      fileName = nextFileName;
                      logFileName = path.resolve(fileName);
-                     deleteOldFiles('logs', /\.log$/, 7 * 24 * hours);
+                     deleteOldFiles(LOG_FOLDER, /\.log$/, 7 * 24 * hours);
                  }
              }
              return fileStream.write(chunk, encoding, next);
@@ -1754,15 +1912,16 @@ function logToFile(fileNameSuffix) {
 
 function expandVariablesInFile(variables, fromFile, intoFile) {
     if (!intoFile) intoFile = fromFile;
-    if (!fs.existsSync(path.dirname(intoFile))) {
-        fs.mkdirSync(path.dirname(intoFile)); // fail fast
-    }
-    fs.readFile(fromFile, ENCODING, function(err, data) {
-        if (err) throw err;
+    return fsp.checkFolder(
+        path.dirname(intoFile)
+    ).then(function() {
+        return fsp.readFile(fromFile, ENCODING);
+    }).then(function(data) {
         var newData = expandVariables(data, variables);
         if (newData != data || intoFile != fromFile) {
-            fs.writeFile(intoFile, newData, {encoding: ENCODING}, function(err) {
-                if (err) throw err;
+            return fsp.writeFile(
+                intoFile, newData, {encoding: ENCODING}
+            ).then(function() {
                 log(JSON.stringify(variables) + ' in ' + intoFile);
             });
         }
