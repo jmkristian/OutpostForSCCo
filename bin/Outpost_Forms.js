@@ -270,19 +270,9 @@ var settings = DEFAULT_SETTINGS;
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
     const verb = process.argv[2];
-    ((['build', 'serve', 'subject', 'uninstall'].indexOf(verb) >= 0)
+    ((['build', 'convert', 'serve', 'subject', 'uninstall'].indexOf(verb) >= 0)
      ? Promise.resolve()
-     : fsp.checkFolder(
-         LOG_FOLDER
-     ).then(function() {
-         if (verb == 'convert') {
-             // Unlike most verbs, this one is passed directly from Outpost.
-             // Don't expect Outpost to set the current working directory consistently.
-             // Instead, the directory is passed on the command line:
-             process.chdir(process.argv[4]);
-         }
-         logToFile(verb);
-     })
+     : fsp.checkFolder(LOG_FOLDER).then(function() {logToFile(verb);})
     ).then(function() {
         switch(verb) {
         case 'build':
@@ -537,6 +527,7 @@ function argvSlice(start) {
 }
 
 function convertMessageToFiles() {
+    process.chdir(process.argv[4]);
     var allArgs = argvSlice(5);
     var args = [];
     var copyNames = '';
@@ -573,13 +564,13 @@ function convertMessageToFiles() {
         return (c == 'n') ? '\n' : c;
     });
     copyNames = copyNames.split('\n');
-    openMessage(args).then(function convertPage(pageURL) {
+    return openMessage(args).then(function convertPage(pageURL) {
         if (pageURL) {
             return convertPageToFiles(addon_name, pageURL, copyNames);
         } else {
             throw 'page URL = ' + JSON.stringify(pageURL);
         }
-    }).catch(log);
+    });
 }
 
 function convertPageToFiles(addon_name, pageURL, copyNames) {
