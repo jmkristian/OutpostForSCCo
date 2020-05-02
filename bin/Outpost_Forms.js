@@ -207,6 +207,19 @@ function promiseSpawn(exe, args, options) {
     });
 }
 
+function promiseTempFile(options) {
+    return new Promise(function tempFile(resolve, reject) {
+        try {
+            makeTemp.file(options, function(err, name, fd) {
+                if (err) reject(err);
+                else resolve({name: name, fd: fd});
+            });
+        } catch(err) {
+            reject(err);
+        }
+    });
+}
+
 function promiseTimeout(msec) {
     return new Promise(function timeout(resolve, reject) {
         try {
@@ -575,18 +588,23 @@ function convertMessageToFiles() {
 
 function convertPageToFiles(addon_name, pageURL, copyNames) {
     const fileNames = [];
-    return Promise.resolve().then(function() {
-        var args = ['bin', pageURL];
-        for (var c = 0; c < copyNames.length; ++c) {
-            var tempFile = makeTemp.fileSync({
-                dir: CONVERTED_FOLDER,
-                prefix: 'T', postfix: '.pdf',
-                keep: true, discardDescriptor: true
+    var args = ['bin', pageURL];
+    return copyNames.reduce(
+        function(chain, copyName) {
+            return chain.then(function() {
+                return promiseTempFile({
+                    dir: CONVERTED_FOLDER,
+                    prefix: 'T', postfix: '.pdf',
+                    keep: true, discardDescriptor: true
+                });
+            }).then(function(tempFile) {
+                fileNames.push(tempFile.name);
+                args.push(tempFile.name);
+                args.push(copyName || '');
             });
-            fileNames.push(tempFile.name);
-            args.push(tempFile.name);
-            args.push(copyNames[c] || '');
-        }
+        },
+        Promise.resolve()
+    ).then(function() {
         log(`${WEB_TO_PDF} "` + args.join('" "') + '"')
         return promiseSpawn(WEB_TO_PDF, args, {stdio: ['ignore', 'pipe', 'pipe']});
     }).then(function(child) {
