@@ -130,7 +130,7 @@ const fsp = { // Like fs, except functions return Promises.
         });
     },
 
-    stat: function stat(name) {
+    stat: function(name) {
         return new Promise(function stat(resolve, reject) {
             try {
                 fs.stat(name, function(err, stats) {
@@ -846,10 +846,11 @@ function serve() {
             res.end();
         } else {
             formId = '' + nextFormId++;
-            try {
-                onOpen(formId, args);
+            onOpen(
+                formId, args
+            ).then(function() {
                 res.redirect(SEE_OTHER, 'http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId);
-            } catch(err) {
+            }, function openFailed(err) {
                 log(err);
                 req.socket.end(); // abort the HTTP connection
                 // The client will log "Error: socket hang up" into logs/*-open.log,
@@ -857,15 +858,13 @@ function serve() {
                 // log something more informative, but client versions <= 2.18
                 // can't be induced to do that.
                 res.writeHead(421, {});
-            }
+            });
         }
     });
     app.get('/form-:formId', function(req, res, next) {
-        keepAlive(req.params.formId);
         onGetForm(req.params.formId, req, res);
     });
     app.get('/message-:formId/:subject', function(req, res, next) {
-        keepAlive(req.params.formId);
         onGetMessage(req.params.formId, req, res);
     });
     app.post('/save-:formId', function(req, res, next) {
@@ -873,11 +872,9 @@ function serve() {
         res.end();
     });
     app.post('/email-:formId', function(req, res, next) {
-        keepAlive(req.params.formId);
         onEmail(req.params.formId, req.body.formtext, res);
     });
     app.post('/submit-:formId', function(req, res, next) {
-        keepAlive(req.params.formId);
         onSubmit(req.params.formId, req.body, res,
                  `http://${req.get('host')}/fromOutpost-${req.params.formId}`);
     });
@@ -901,23 +898,26 @@ function serve() {
         onGetManual(res);
     });
     app.post('/manual-create', function(req, res, next) {
-        try {
-            const formId = '' + nextFormId++;
+        const formId = '' + nextFormId++;
+        Promise.resolve().then(function() {
             const form = req.body.form;
             const space = form.indexOf(' ');
-            onOpen(formId, ['--message_status', 'manual',
-                            '--addon_name', form.substring(0, space),
-                            '--ADDON_MSG_TYPE', form.substring(space + 1),
-                            '--operator_call_sign', req.body.operator_call_sign || '',
-                            '--operator_name', req.body.operator_name || '']);
+            return onOpen(formId, [
+                '--message_status', 'manual',
+                '--addon_name', form.substring(0, space),
+                '--ADDON_MSG_TYPE', form.substring(space + 1),
+                '--operator_call_sign', req.body.operator_call_sign || '',
+                '--operator_name', req.body.operator_name || '']);
+        }).then(function() {
             res.redirect('/form-' + formId);
-        } catch(err) {
+        }, function openFailed(err) {
             res.set({'Content-Type': TEXT_HTML});
             res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
-        }
+        });
     });
     app.post('/manual-view', function(req, res, next) {
-        try {
+        const formId = '' + nextFormId++;
+        Promise.resolve().then(function() {
             var args = ['--message_status', 'unread', '--mode', 'readonly'];
             for (var name in req.body) {
                 args.push('--' + name);
@@ -927,13 +927,13 @@ function serve() {
                 args.push('--MSG_DATETIME_OP_RCVD')
                 args.push(req.body.OpDate + " " + req.body.OpTime)
             }
-            const formId = '' + nextFormId++;
-            onOpen(formId, args);
+            return onOpen(formId, args);
+        }).then(function() {
             res.redirect('/form-' + formId);
-        } catch(err) {
+        }, function openFailed(err) {
             res.set({'Content-Type': TEXT_HTML});
             res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
-        }
+        });
     });
     app.get('/pdf/\*.pdf', express.static('.', {setHeaders: function(res, path, stat) {
         res.set('Content-Type', 'application/pdf');
@@ -961,7 +961,9 @@ function serve() {
     }
     logToFile('server-' + myServerPort);
     log('Listening for HTTP requests on port ' + myServerPort + '...');
-    fs.writeFileSync(PortFileName, myServerPort + '', {encoding: ENCODING}); // advertise my port
+    fsp.writeFile( // advertise my port
+        PortFileName, myServerPort + '', {encoding: ENCODING}
+    ).catch(log);
     const deleteMySaveFiles = function deleteMySaveFiles() {
         deleteOldFiles(SAVE_FOLDER, new RegExp('^form-' + myServerPort + '-\\d*.json$'), -seconds);
     };
@@ -1023,47 +1025,54 @@ function serve() {
 function onOpen(formId, args) {
     // This code should be kept dead simple, since
     // it can't show a problem to the operator.
-    for (var a = 0; a+1 < args.length; ++a) {
-        if (args[a] == '--addon_name') {
-            var addon_name = args[a+1];
-            if (!fs.statSync(path.join('addons', addon_name + '.ini'))) {
-                throw new Error('This is not a server for ' + addon_name + '.');
+    return Promise.resolve().then(function() {
+        for (var a = 0; a+1 < args.length; ++a) {
+            if (args[a] == '--addon_name') {
+                var addon_name = args[a+1];
+                return fsp.stat(
+                    path.join('addons', addon_name + '.ini')
+                ).catch(function(err) {
+                    throw new Error('This is not a server for ' + addon_name + '.');
+                });
             }
-            break;
         }
-    }
-    openForms[formId] = {
-        args: args,
-        quietTime: 0
-    };
-    log('/form-' + formId + ' opened');
+    }).then(function() {
+        openForms[formId] = {
+            args: args,
+            quietTime: 0
+        };
+        log('/form-' + formId + ' opened');
+    });
 }
 
+/** @return Promise<form> */
 function keepAlive(formId) {
-    form = findForm(formId);
-    if (form) {
-        form.quietTime = 0;
-    } else if (formId == "0") {
-        openForms[formId] = {quietTime: 0};
-    }
+    return findForm(formId).then(function(form) {
+        if (form) {
+            form.quietTime = 0;
+        } else if (formId == "0") {
+            openForms[formId] = {quietTime: 0};
+        }
+        return form;
+    });
 }
 
+/** @return Promise<form> */
 function findForm(formId) {
-    var form = openForms[formId];
-    if (form == null) {
-        try {
-            const fileName = saveFileName(formId);
-            form = JSON.parse(fs.readFileSync(fileName, ENCODING));
+    return Promise.resolve().then(function(form) {
+        var form = openForms[formId]
+        if (form != null) return form;
+        const fileName = saveFileName(formId);
+        return fsp.readFile(fileName, ENCODING).then(function(data) {
+            form = JSON.parse(data);
             if (form) {
                 form.quietTime = 0;
                 openForms[formId] = form;
                 log('Read ' + fileName);
             }
-        } catch(err) {
-            log(err);
-        }
-    }
-    return form;
+            return form;
+        });
+    }).catch(log);
 }
 
 function closeForm(formId) {
@@ -1143,9 +1152,10 @@ function getMessage(environment) {
 }
 
 function onGetMessage(formId, req, res) {
-    try {
+    var foundForm = null;
+    return keepAlive(formId).then(function(form) {
+        foundForm = form;
         noCache(res);
-        const form = findForm(formId);
         if (form) {
             res.set({'Content-Type': TEXT_PLAIN});
             res.end('#Subject: ' + form.environment.subject + EOL + form.message, CHARSET);
@@ -1154,18 +1164,19 @@ function onGetMessage(formId, req, res) {
         } else {
             throw new Error('message ' + formId + ' has not been opened.');
         }
-    } catch(err) {
+    }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
-        res.end(errorToHTML(err, form), CHARSET);
-    }
+        res.end(errorToHTML(err, foundForm), CHARSET);
+    });
 }
 
 /** Handle an HTTP GET /form-id request. */
 function onGetForm(formId, req, res) {
-    try {
+    var foundForm = null;
+    return keepAlive(formId).then(function(form) {
+        foundForm = form;
         noCache(res);
         res.set({'Content-Type': TEXT_HTML});
-        const form = findForm(formId);
         if (formId <= 0) {
             throw 'Form numbers start with 1.';
         } else if (!form) {
@@ -1178,7 +1189,7 @@ function onGetForm(formId, req, res) {
         } else {
             log('/form-' + formId + ' viewed');
             updateSettings();
-            loadForm(
+            return loadForm(
                 formId, form
             ).then(function() {
                 if (form.environment.message_status == 'manual-created') {
@@ -1188,13 +1199,11 @@ function onGetForm(formId, req, res) {
                 }
             }).then(function(data) {
                 res.end(data, CHARSET);
-            }).catch(function(err) {
-                res.end(errorToHTML(err, form), CHARSET);
             });
         }
-    } catch(err) {
-        res.end(errorToHTML(err, form), CHARSET);
-    }
+    }).catch(function(err) {
+        res.end(errorToHTML(err, foundForm), CHARSET);
+    });
 }
 
 function loadForm(formId, form) {
@@ -1414,39 +1423,47 @@ function noCache(res) {
 }
 
 function onSaveMessage(formId, req) {
-    const form = findForm(formId);
-    if (form) {
-        var charset = CHARSET;
-        const contentType = req.headers['content-type'];
-        if (contentType) {
-            const found = /; *charset=([^ ;]+)/i.exec(contentType);
-            if (found) {
-                charset = found[1];
+    return findForm(formId).then(function(form) {
+        if (form) {
+            var charset = CHARSET;
+            const contentType = req.headers['content-type'];
+            if (contentType) {
+                const found = /; *charset=([^ ;]+)/i.exec(contentType);
+                if (found) {
+                    charset = found[1];
+                }
             }
+            req.pipe(concat_stream(function(buffer) {
+                var message = buffer.toString(charset);
+                log('/save-' + formId + ' ' + message.length);
+                keepAlive(formId);
+                form.message = message;
+            }));
+        } else {
+            log('form ' + formId + ' not saved');
         }
-        req.pipe(concat_stream(function(buffer) {
-            var message = buffer.toString(charset);
-            log('/save-' + formId + ' ' + message.length);
-            keepAlive(formId);
-            form.message = message;
-        }));
-    } else {
-        log('form ' + formId + ' not saved');
-    }
+    });
 }
 
 function onEmail(formId, message, res) {
-    const form = findForm(formId);
-    form.message = message;
-    form.environment.emailing = true;
-    form.environment.subject = subjectFromMessage(parseMessage(message));
-    form.environment.mode = 'readonly';
-    res.redirect('/form-' + formId);
+    var foundForm = null;
+    return keepAlive(formId).then(function(form) {
+        foundForm = form;
+        form.message = message;
+        form.environment.emailing = true;
+        form.environment.subject = subjectFromMessage(parseMessage(message));
+        form.environment.mode = 'readonly';
+        res.redirect('/form-' + formId);
+    }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err, foundForm), CHARSET);
+    });
 }
 
 function onSubmit(formId, q, res, fromOutpostURL) {
-    const form = findForm(formId);
-    return Promise.resolve().then(function() {
+    var foundForm = null;
+    return keepAlive(formId).then(function(form) {
+        foundForm = form;
         const message = q.formtext;
         const parsed = parseMessage(message);
         const fields = parsed.fields;
@@ -1472,7 +1489,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
     ).then(function(fromOutpost) {
         if (fromOutpost) {
             res.set({'Content-Type': TEXT_HTML});
-            form.fromOutpost = fromOupost;
+            foundForm.fromOutpost = fromOutpost;
             log(`/form-${formId} from Outpost ` + JSON.stringify(fromOutpost));
             var page = PROBLEM_HEADER + EOL
                 + 'When the message was submitted, Outpost responded:<br/><br/>' + EOL
@@ -1488,7 +1505,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
             res.end(page, CHARSET);
         } else {
             log('/form-' + formId + ' submitted');
-            form.environment.mode = 'readonly';
+            foundForm.environment.mode = 'readonly';
             // Don't closeForm, so the operator can view it.
             // But do delete its save file (if any):
             const fileName = saveFileName(formId);
@@ -1499,7 +1516,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
         }
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
-        res.end(errorToHTML(err, form.environment), CHARSET);
+        res.end(errorToHTML(err, foundForm && foundForm.environment), CHARSET);
     });
 }
 
@@ -1525,6 +1542,7 @@ function messageForOpdirect(submission) {
     @return null if and only if the response looks successful.
 */
 function respondFromOpdirect(exchange) {
+    if (exchange == null) return null;
     const res = exchange.res;
     const data = exchange.resBody || '';
     if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
@@ -1558,7 +1576,7 @@ function respondFromOpdirect(exchange) {
     or rejected if something goes wrong.
 */
 function submitToOpdirect(submission, body) {
-    const context = submission.formId ? ('/form-' + submission.formId + ' ') : '';;
+    const context = submission.formId ? ('/form-' + submission.formId + ' ') : '';
     return Promise.resolve().then(function() {
         // URL encode the 'E' in '#EOF', to prevent Outpost from treating this as a PacFORM message:
         body = body.replace(/%23EOF/gi, function(match) {
@@ -1644,7 +1662,7 @@ function onGetManual(res) {
                 });
             res.send(expandVariables(data, {form_options: form_options.join('')}));
         });
-    }).catch(function(err) {
+    }, function(err) {
         res.send(errorToHTML(err, template));
     });
 }
@@ -1834,38 +1852,26 @@ function errorToHTML(err, state) {
 }
 
 function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
-    try {
+    return fsp.readdir(directoryName).then(function(fileNames) {
         const deadline = (new Date).getTime() - ageLimitMs;
-        fs.readdir(directoryName, function(err, fileNames) {
-            if (err) {
-                log(err);
-            } else {
-                fileNames.forEach(function(fileName) {
-                    if (fileNamePattern.test(fileName)) {
-                        var fullName = path.join(directoryName, fileName);
-                        fs.stat(fullName, (function(fullName) {
-                            // fullName is constant in this function, not a var in deleteOldFiles.
-                            return function(err, stats) {
-                                // This is the callback from fs.stat.
-                                if (err) {
-                                    log(err);
-                                } else if (stats.isFile()) {
-                                    var fileTime = stats.mtime.getTime();
-                                    if (fileTime < deadline) {
-                                        fs.unlink(fullName, function(err) {
-                                            log(err ? err : ("Deleted " + fullName));
-                                        });
-                                    }
-                                }
-                            };
-                        })(fullName));
+        return Promise.all(
+            fileNames.filter(function(fileName) {
+                return fileNamePattern.test(fileName);
+            }).map(function(fileName) {
+                const fullName = path.join(directoryName, fileName);
+                return fsp.stat(fullName).then(function(stats) {
+                    if (stats.isFile()) {
+                        const fileTime = stats.mtime.getTime();
+                        if (fileTime < deadline) {
+                            fsp.unlink(fullName).then(function() {
+                                log("Deleted " + fullName);
+                            }, log);
+                        }
                     }
                 });
-            }
-        });
-    } catch(err) {
-        log(err);
-    }
+            })
+        );
+    }).catch(log);
 }
 
 function logToFile(fileNameSuffix) {
