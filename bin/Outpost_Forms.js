@@ -236,7 +236,6 @@ const FORBIDDEN = 403;
 const NOT_FOUND = 404;
 
 const CHARSET = 'utf-8'; // for HTTP
-const CONVERTED_FOLDER = 'converted';
 const ENCODING = CHARSET; // for files
 const EOL = '\r\n';
 const htmlEntities = new AllHtmlEntities();
@@ -362,8 +361,7 @@ function install() {
             }),
             installIncludes(myDirectory, addonNames),
             fsp.checkFolder(SAVE_FOLDER),
-            fsp.checkFolder(LOG_FOLDER),
-            fsp.checkFolder(CONVERTED_FOLDER)
+            fsp.checkFolder(LOG_FOLDER)
         ]);
     });
 }
@@ -543,7 +541,8 @@ function convertMessageToFiles() {
     process.chdir(process.argv[4]);
     var allArgs = argvSlice(5);
     var args = [];
-    var copyNames = '';
+    var spoolDir = null;
+    var copyNames = null;
     var addon_name = null;
     var message_status = null;
     var msgDateTimeOpRcvd = null;
@@ -552,6 +551,8 @@ function convertMessageToFiles() {
         if (arg == '--COPY_NAMES') {
             copyNames = allArgs[++a];
             if (copyNames == '{{COPY_NAMES}}') copyNames = '';
+        } else if (arg == '--SPOOL_DIR') {
+            spoolDir = allArgs[++a];
         } else if (arg == '--message_status') {
             message_status = allArgs[++a];
             if (message_status == '{{MSG_STATE}}') message_status = '';
@@ -572,28 +573,33 @@ function convertMessageToFiles() {
         message_status = 'sent';
     }
     args.push('--message_status'); args.push(message_status);
-    copyNames = copyNames.replace(/\\./g, function(found) {
-        const c = found.substring(1, 2);
-        return (c == 'n') ? '\n' : c;
-    });
-    copyNames = copyNames.split('\n');
-    return openMessage(args).then(function convertPage(pageURL) {
+    return Promise.resolve().then(function() {
+        if (spoolDir == null) throw new Error('no SPOOL_DIR in arguments.');
+        if (copyNames == null) throw new Error('no COPY_NAMES in arguments.');
+        copyNames = copyNames.replace(/\\./g, function(found) {
+            const c = found.substring(1, 2);
+            return (c == 'n') ? '\n' : c;
+        });
+        copyNames = copyNames.split('\n');
+    }).then(function() {
+        return openMessage(args);
+    }).then(function convertPage(pageURL) {
         if (pageURL) {
-            return convertPageToFiles(addon_name, pageURL, copyNames);
+            return convertPageToFiles(addon_name, pageURL, spoolDir, copyNames);
         } else {
             throw 'page URL = ' + JSON.stringify(pageURL);
         }
     });
 }
 
-function convertPageToFiles(addon_name, pageURL, copyNames) {
+function convertPageToFiles(addon_name, pageURL, spoolDir, copyNames) {
     const fileNames = [];
     var args = ['bin', pageURL];
     return copyNames.reduce(
         function(chain, copyName) {
             return chain.then(function() {
                 return promiseTempFile({
-                    dir: CONVERTED_FOLDER,
+                    dir: spoolDir,
                     prefix: 'T', postfix: '.pdf',
                     keep: true, discardDescriptor: true
                 });
@@ -607,50 +613,6 @@ function convertPageToFiles(addon_name, pageURL, copyNames) {
     ).then(function() {
         log(`${WEB_TO_PDF} "` + args.join('" "') + '"')
         return promiseSpawn(WEB_TO_PDF, args, {stdio: ['ignore', 'pipe', 'pipe']});
-    }).then(function(child) {
-        return submitFilesToOutpost(addon_name, fileNames);
-    }, function spawnFailed(err) {
-        // Delete all the files:
-        for (var f = 0; f < fileNames.length; ++f) {
-            fs.unlink(fileNames[f], log);
-        }
-        throw err;
-    });
-}
-
-function submitFilesToOutpost(addon_name, fileNames) {
-    var failed = 0;
-    function submitFile(chain, fileName) {
-        return chain.then(function() {
-            return fsp.stat(fileName);
-        }).then(function(stats) {
-            if (stats.size <= 0) {
-                throw `${fileName} is empty`;
-            }
-            // Outpost requires parameters to appear in a specific order.
-            // So don't stringify them from a single object.
-            const reqBody = querystring.stringify({adn: addon_name})
-                  + '&' + querystring.stringify({prt: path.resolve(fileName)});
-            return submitToOpdirect({}, reqBody);
-        }).then(
-            respondFromOpdirect
-            // TODO: should we expect a different response here?
-        ).then(function(fromOutpost) {
-            if (fromOutpost) {
-                throw 'from Outpost ' + JSON.stringify(fromOutpost);
-            }
-        }).catch(function(err) {
-            ++failed;
-            log(err);
-            fs.unlink(fileName, log);
-        });
-    }
-    return fileNames.reduce(
-        submitFile, Promise.resolve()
-    ).then(function() {
-        if (failed) {
-            throw `${failed} files were not delivered to Outpost.`;
-        }
     });
 }
 

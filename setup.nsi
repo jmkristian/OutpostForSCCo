@@ -275,6 +275,7 @@ Function ${un}DeleteMyFiles
   ${Delete} launch-v.cmd
   ${Delete} version.txt
   ${RMDir} "$INSTDIR\bin"
+  ${RMDir} "$INSTDIR\converted"
   ${RMDir} "$INSTDIR\notes"
   ${RMDir} "$INSTDIR\pdf"
   ClearErrors
@@ -284,7 +285,6 @@ Function ${un}DeleteMyFiles
   ${Delete} bin\launch-v.cmd
   ${Delete} "${PROGRAM_PATH}"
   ${RMDir} "$INSTDIR\addons"
-  ${RMDir} "$INSTDIR\converted"
   ${RMDir} "$INSTDIR\pack-it-forms"
   Pop $R1
   Pop $R0
