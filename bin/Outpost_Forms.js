@@ -296,6 +296,7 @@ const PROBLEM_HEADER = '<html><head><title>Problem</title></head><body>'
       + 'Something went wrong.</h3>';
 const SAVE_FOLDER = 'saved';
 const SEQUENCE_MARK = '^'; // must be OK in a file name, and come after '.' in lexical order
+const SEQUENCE_REGEX = /\^/g; // matches all occurrences of SEQUENCE_MARK
 const SETTINGS_FILE = path.join('bin', 'server.ini');
 const StopServer = '/stopSCCoPIFO';
 const SUBMIT_TIMEOUT_SEC = 30;
@@ -591,7 +592,7 @@ function convertMessageToFiles() {
     }
     const spoolFilePrefix = subjectFromMessage(parseMessage(
         fs.readFileSync(path.resolve(PackItMsgs, environment.MSG_FILENAME), ENCODING)
-    )).replace(/[<>:"/\\|?*]/g, '~').replace(SEQUENCE_MARK, '~');
+    )).replace(/[<>:"/\\|?*]/g, '~').replace(SEQUENCE_REGEX, '~');
 
     const spoolDir = environment.SPOOL_DIR;
     if (spoolDir == null) throw new Error('no SPOOL_DIR in arguments.');
