@@ -91,6 +91,29 @@ const fsp = { // Like fs, except functions return Promises.
             });
     },
 
+    copyFile: function(source, target) {
+        return new Promise(function copyFile(resolve, reject) {
+            var settled = false;
+            function settle(err) {
+                if (!settled) {
+                    settled = true;
+                    if (err) reject(err);
+                    else resolve();
+                }
+            }
+            try {
+                const from = fs.createReadStream(source);
+                from.on('error', settle);
+                const into = fs.createWriteStream(target);
+                into.on('error', settle);
+                into.on('close', function() {settle();});
+                from.pipe(into);
+            } catch(err) {
+                settle(err);
+            }
+        });
+    },
+
     createFolder: function(name) {
         return new Promise(function createFolder(resolve, reject) {
             try {
@@ -123,6 +146,19 @@ const fsp = { // Like fs, except functions return Promises.
                 fs.readFile(name, options, function(err, data) {
                     if (err) reject(err);
                     else resolve(data);
+                });
+            } catch(err) {
+                reject(err);
+            }
+        });
+    },
+
+    rename: function(oldPath, newPath) {
+        return new Promise(function rename(resolve, reject) {
+            try {
+                fs.rename(oldPath, newPath, function(err) {
+                    if (err) reject(err);
+                    else resolve();
                 });
             } catch(err) {
                 reject(err);
@@ -259,6 +295,7 @@ const PROBLEM_HEADER = '<html><head><title>Problem</title></head><body>'
       + ' style="width:24pt;height:24pt;vertical-align:middle;margin-right:1em;">'
       + 'Something went wrong.</h3>';
 const SAVE_FOLDER = 'saved';
+const SEQUENCE_MARK = '^'; // must be OK in a file name, and come after '.' in lexical order
 const SETTINGS_FILE = path.join('bin', 'server.ini');
 const StopServer = '/stopSCCoPIFO';
 const SUBMIT_TIMEOUT_SEC = 30;
@@ -539,67 +576,50 @@ function argvSlice(start) {
 
 function convertMessageToFiles() {
     process.chdir(process.argv[4]);
-    var allArgs = argvSlice(5);
-    var args = [];
-    var spoolDir = null;
-    var copyNames = null;
-    var addon_name = null;
-    var message_status = null;
-    var msgDateTimeOpRcvd = null;
-    for (var a = 0; a < allArgs.length; ++a) {
-        var arg = allArgs[a];
-        if (arg == '--COPY_NAMES') {
-            copyNames = allArgs[++a];
-            if (copyNames == '{{COPY_NAMES}}') copyNames = '';
-        } else if (arg == '--SPOOL_DIR') {
-            spoolDir = allArgs[++a];
-        } else if (arg == '--message_status') {
-            message_status = allArgs[++a];
-            if (message_status == '{{MSG_STATE}}') message_status = '';
+    var args = argvSlice(5);
+    const environment = parseArgs(args);
+    var message_status = environment.message_status;
+    if (!message_status) {
+        if (environment.MSG_STATE) {
+            message_status = environment.MSG_STATE.toLowerCase();
+        } else if (environment.MSG_DATETIME_OP_RCVD) {
+            message_status = 'unread';
         } else {
-            if (arg == '--addon_name') {
-                addon_name = allArgs[a+1];
-            } else if (arg == '--MSG_DATETIME_OP_RCVD') {
-                msgDateTimeOpRcvd = allArgs[a+1];
-            }
-            args.push(arg);
+            message_status = 'sent';
         }
+        args.push('--message_status'); args.push(message_status);
     }
-    if (message_status) {
-        message_status = message_status.toLowerCase();
-    } else if (msgDateTimeOpRcvd) {
-        message_status = 'unread';
-    } else {
-        message_status = 'sent';
-    }
-    args.push('--message_status'); args.push(message_status);
-    return Promise.resolve().then(function() {
-        if (spoolDir == null) throw new Error('no SPOOL_DIR in arguments.');
-        if (copyNames == null) throw new Error('no COPY_NAMES in arguments.');
-        copyNames = copyNames.replace(/\\./g, function(found) {
-            const c = found.substring(1, 2);
-            return (c == 'n') ? '\n' : c;
-        });
-        copyNames = copyNames.split('\n');
-    }).then(function() {
-        return openMessage(args);
-    }).then(function convertPage(pageURL) {
-        if (pageURL) {
-            return convertPageToFiles(addon_name, pageURL, spoolDir, copyNames);
-        } else {
+    const spoolFilePrefix = subjectFromMessage(parseMessage(
+        fs.readFileSync(path.resolve(PackItMsgs, environment.MSG_FILENAME), ENCODING)
+    )).replace(/[<>:"/\\|?*]/g, '~').replace(SEQUENCE_MARK, '~');
+
+    const spoolDir = environment.SPOOL_DIR;
+    if (spoolDir == null) throw new Error('no SPOOL_DIR in arguments.');
+    var copyNames = environment.COPY_NAMES;
+    if (copyNames == null) throw new Error('no COPY_NAMES in arguments.');
+    copyNames = copyNames.replace(/\\./g, function(found) {
+        const c = found.substring(1, 2);
+        return (c == 'n') ? '\n' : c;
+    });
+    copyNames = copyNames.split('\n');
+    return openMessage(args).then(function convertPage(pageURL) {
+        if (!pageURL) {
             throw 'page URL = ' + JSON.stringify(pageURL);
         }
+        return convertPageToFiles(environment.addon_name, pageURL, copyNames);
+    }).then(function(tempFileNames) {
+        return spoolFiles(tempFileNames, spoolDir, spoolFilePrefix);
     });
 }
 
-function convertPageToFiles(addon_name, pageURL, spoolDir, copyNames) {
+function convertPageToFiles(addon_name, pageURL, copyNames) {
     const fileNames = [];
     var args = ['bin', pageURL];
     return copyNames.reduce(
         function(chain, copyName) {
             return chain.then(function() {
                 return promiseTempFile({
-                    dir: spoolDir,
+                    dir: LOG_FOLDER,
                     prefix: 'T', postfix: '.pdf',
                     keep: true, discardDescriptor: true
                 });
@@ -613,6 +633,70 @@ function convertPageToFiles(addon_name, pageURL, spoolDir, copyNames) {
     ).then(function() {
         log(`${WEB_TO_PDF} "` + args.join('" "') + '"')
         return promiseSpawn(WEB_TO_PDF, args, {stdio: ['ignore', 'pipe', 'pipe']});
+    }).then(function() {
+        return fileNames;
+    });
+}
+
+function spoolFiles(tempFileNames, spoolDir, spoolFilePrefix) {
+    // Make sure files in spoolDir are processed in the right order,
+    // by giving them names that sort lexically.
+    return fsp.readdir(spoolDir).then(function(spoolFileNames) {
+        var nextNumber = spoolFileNames.reduce(function(found, spoolFile) {
+            const base = spoolFile.substring( // ignore the file type
+                0, spoolFile.length - path.extname(spoolFile).length
+            ).toLowerCase(); // ignore the file name case
+            if (base.startsWith(spoolFilePrefix.toLowerCase())) {
+                const seq = base.substring(spoolFilePrefix.length);
+                return Math.max(found, decodeSeq(seq) + 1);
+            }
+            return found;
+        }, 0);
+        return tempFileNames.reduce(function(chain, tempFile, index) {
+            return chain.then(function() {
+                const seq = nextNumber + index;
+                const spoolFile = spoolFilePrefix + encodeSeq(seq) + path.extname(tempFile);
+                return moveFile(tempFile, path.resolve(spoolDir, spoolFile));
+            });
+        }, Promise.resolve());
+    });
+}
+
+/** Encode a non-negative integer, so that encoded numbers sort lexically in numeric order. */
+function encodeSeq(number) {
+    if (!number) {
+        return '';
+    }
+    var result = SEQUENCE_MARK;
+    var n = number;
+    for (; n >= 10; n -= 10) {
+        result += '9';
+    }
+    result += `${n}`;
+    return result;
+}
+
+/** Decode a result of encodeSeq. */
+function decodeSeq(str) {
+    if (!str.startsWith(SEQUENCE_MARK)) {
+        return 0;
+    }
+    return ((str.length - 2) * 10) + parseInt(str.substring(str.length - 1), 10);
+}
+
+function moveFile(source, destination) {
+    return fsp.stat(destination).then(function(stats) {
+        throw new Error(`${destination} already exists`);
+    }, function statFailed(err) {
+        log(`move ${source} to ${destination}`);
+        return fsp.rename(source, destination).catch(function(err) {
+            if (err.code != 'EXDEV') {
+                throw err;
+            }
+            return fsp.copyFile(source, destination).then(function() {
+                fsp.unlink(source).catch(log);
+            });
+        });
     });
 }
 
@@ -1077,9 +1161,11 @@ function parseArgs(args) {
             environment[option.substring(2)] = args[++i];
         }
     }
-    if (environment.MSG_INDEX == '{{MSG_INDEX}}') {
-        delete environment.MSG_INDEX;
-    }
+    ['COPY_NAMES', 'MSG_INDEX', 'MSG_STATE', 'SPOOL_DIR'].forEach(function(name) {
+        if (environment[name] == '{{' + name + '}}') {
+            delete environment[name];
+        }
+    });
     if (['draft', 'ready'].indexOf(environment.message_status) >= 0
         && !environment.MSG_INDEX) {
         // This probably came from an old version of Outpost.
