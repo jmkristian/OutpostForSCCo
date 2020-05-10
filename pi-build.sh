@@ -1,6 +1,6 @@
 #!/bin/bash
 VersionMajor=2
-VersionMinor=21b
+VersionMinor=21c
 cd `dirname "$0"` || exit $?
 if [ ! -e node_modules ]; then
     npm install || exit $? # https://docs.npmjs.com/cli/install
