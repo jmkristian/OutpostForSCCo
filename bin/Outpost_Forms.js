@@ -381,7 +381,8 @@ function build() {
                               path.join('bin', 'manual.html'),
                               path.join('built', 'manual.html'))
     ].concat(
-        ['browse.cmd', 'launch-v.cmd', 'launch.vbs', 'UserGuide.html'].map(function(fileName) {
+        ['browse.cmd', 'launch-v.cmd', 'launch.vbs', 'pi-browse.sh', 'UserGuide.html'
+        ].map(function(fileName) {
             return expandVariablesInFile({PROGRAM_PATH: programPath, DisplayName: displayName},
                                          fileName, path.join('built', fileName));
         })
@@ -421,9 +422,7 @@ function installCmdConvert() {
             return data;
         });
     }, function statFailed(err) {
-        // cmdConvertFile doesn't exist.
-        // We're running on Windows XP, presumably.
-        log(err);
+        log('not found: ' + cmdConvertFile);
     });
 }
 

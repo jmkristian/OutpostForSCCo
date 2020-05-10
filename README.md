@@ -8,7 +8,9 @@ to Outpost, and a web browser to display and edit forms.
 For installation and usage instructions, see the UserGuide.html file in each [release](https://github.com/jmkristian/OutpostForSCCo/releases).
 
 Source code is stored in this repository.
-To build it, you'll need
+
+### Build for Windows
+You'll need
 [Git](https://git-scm.com/downloads),
 [nvm for Windows](https://github.com/coreybutler/nvm-windows),
 [NSIS](http://nsis.sourceforge.net) version 3 or later
@@ -53,3 +55,7 @@ The installer source code is setup.nsi, and
 the source for most of the installed code is bin/Outpost\_Forms.js.
 The installer configures Outpost to execute launch.vbs.
 For debugging, you might change the configuration to execute launch-v.cmd instead.
+
+### Build for Raspberry Pi
+You'll need [Git](https://git-scm.com/downloads) and node.js.
+Clone this repository and then run ./pi-build.sh in your clone.
