@@ -48,6 +48,7 @@ for ADDON in SCCoPIFO SF_ACS_forms "$@"; do
     echo "$VersionMajor"."$VersionMinor" > version.txt
     chmod +x browse.sh bin/$ADDON.js             || exit $?
     cd ..
+    rm -f    $ADDON.tar.gz                       || exit $?
     tar -czf $ADDON.tar.gz $ADDON                || exit $?
     cd ..
 done
