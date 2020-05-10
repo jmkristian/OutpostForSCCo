@@ -24,6 +24,7 @@ node bin/Outpost_Forms.js build "$VersionMajor"."$VersionMinor"\
 mv built/addons built/SCCoPIFR/                 || exit $?
 mv built/pi-browse.sh built/SCCoPIFR/browse.sh  || exit $?
 mv built/UserGuide.html built/SCCoPIFR/         || exit $?
+mv built/manual.html built/SCCoPIFR/bin         || exit $?
 cp -p bin/Outpost_Forms.js built/SCCoPIFR/bin/SCCoPIFR.js    || exit $?
 cp -pr package.json node_modules built/SCCoPIFR/bin/         || exit $?
 cp -pr pack-it-forms built/SCCoPIFR/         || exit $?
