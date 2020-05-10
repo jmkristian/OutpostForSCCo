@@ -28,7 +28,7 @@ That old version of Node.js builds code that runs on Windows XP; newer versions 
 Clone this repository and then use bash to run webToPDF/build.sh and then ./build.sh in your clone.
 
 Most improvements to the web user interface will be done in
-[pack-it-forms](https://github.com/jmkristian/pack-it-forms/blob/SCCo.2/README.md)
+[pack-it-forms](https://github.com/jmkristian/pack-it-forms/blob/SF-ACS/README.md)
 (not this repository). You can experiment by replacing the pack-it-forms sub-folder
 with a clone of the pack-it-forms repository.
 When you're done experimenting, release pack-it-forms and then use the new released version here.
