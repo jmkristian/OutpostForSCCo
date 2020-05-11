@@ -11,7 +11,6 @@ fi
 if [ ! -e "pack-it-forms" ]; then
     git clone https://github.com/jmkristian/pack-it-forms.git || exit $?
     (cd "pack-it-forms" && git checkout SF-ACS)
-    rm -rf "pack-it-forms"/.git*
 fi
 for ADDON in SCCoPIFO SF_ACS_forms "$@"; do
     rm -rf   built/$ADDON/*
@@ -32,7 +31,7 @@ for ADDON in SCCoPIFO SF_ACS_forms "$@"; do
 
     cd built/$ADDON                              || exit $?
     find . -type f -name "*~" | xargs rm
-    rm -rf .git
+    rm -rf .git pack-it-forms/.git
     mv pack-it-forms/pdf .                       || exit $?
     rm pdf/LOS-ALTOS-*.pdf
     rm pack-it-forms/form-los-altos-*.html
