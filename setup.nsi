@@ -386,7 +386,6 @@ Section "Install"
   File built\launch-v.cmd
   File built\manual.html
   File bin\message.html
-  File bin\Outpost_Forms.js
   File bin\server.ini
   File bin\subject.cmd
   ${IfNot} ${IsWinXP}
