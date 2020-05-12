@@ -616,11 +616,20 @@ function parseMessage(message) {
             switch(line.charAt(0)) {
             case '!':
                 if (line == '!/ADDON!') return false; // ignore subsequent lines
+                if (!result.addonName) result.addonName = line.match(/^!([^!]*)/)[1];
                 break;
             case '#':
                 var foundType = /^#\s*(T|FORMFILENAME):(.*)/.exec(line);
                 if (foundType) {
                     result.formType = foundType[2].trim();
+                }
+                var found = /^#\s*(T|FORMFILENAME):(.*)/.exec(line);
+                if (found) {
+                    result.formType = found[2].trim();
+                }
+                var found = /^#\s*(V|VERSION):(.*)/.exec(line);
+                if (found) {
+                    result.addonVersion = found[2].trim();
                 }
                 break;
             default:
@@ -1093,6 +1102,12 @@ function loadForm(formId, form) {
             const parsed = parseMessage(message);
             if (!form.environment.ADDON_MSG_TYPE) {
                 form.environment.ADDON_MSG_TYPE = parsed.formType;
+            }
+            if (!form.environment.addon_name) {
+                form.environment.addon_name = parsed.addonName;
+            }
+            if (!form.environment.addon_version) {
+                form.environment.addon_version = parsed.addonVersion;
             }
             if (!form.environment.subject) {
                 form.environment.subject = subjectFromMessage(parsed);
