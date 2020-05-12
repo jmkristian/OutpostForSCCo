@@ -102,6 +102,7 @@ const fsp = etc.fsp;
 const getAddonNames = server.getAddonNames;
 const log = etc.log;
 const LOG_FOLDER = etc.LOG_FOLDER;
+const openMessage = commands.openMessage;
 const PackItMsgs = server.PackItMsgs;
 const parseArgs = server.parseArgs;
 const parseMessage = server.parseMessage;
