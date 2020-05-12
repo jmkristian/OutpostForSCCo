@@ -56,6 +56,8 @@ const footerFontSize = '7pt';
                         options.footerTemplate = `<table style="${tableStyle}">` +
                             '<tr><td style="text-align:left;padding-left:0;">' +
                             (copyName ? `<b>${copyName}</b> copy` : '') +
+                            '</td><td style="text-align:center;">' +
+                            '<span class="title"></span>' +
                             '</td><td style="text-align:right;padding-right:0;">' +
                             'Page <span class="pageNumber"></span> of <span class="totalPages"></span>' +
                             '</td></tr>' +

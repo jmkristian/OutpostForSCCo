@@ -1273,8 +1273,14 @@ function loadForm(formId, form) {
         form.environment
     ).then(function(message) {
         form.message = message;
-        if (message && !form.environment.ADDON_MSG_TYPE) {
-            form.environment.ADDON_MSG_TYPE = parseMessage(message).formType;
+        if (message) {
+            const parsed = parseMessage(message);
+            if (!form.environment.ADDON_MSG_TYPE) {
+                form.environment.ADDON_MSG_TYPE = parsed.formType;
+            }
+            if (!form.environment.subject) {
+                form.environment.subject = subjectFromMessage(parsed);
+            }
         }
     });
 }
