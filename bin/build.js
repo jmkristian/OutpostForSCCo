@@ -34,7 +34,7 @@ function build() {
         expandVariablesInFile({addon_name: addonName},
                               path.join('bin', 'Aoclient.ini'),
                               path.join('built', 'addons', addonName, 'Aoclient.ini')),
-        expandVariablesInFile({addon_name: addonName},
+        expandVariablesInFile({addon_name: addonName, DisplayName: displayName},
                               path.join('bin', 'manual.html'),
                               path.join('built', 'manual.html'))
     ].concat(
