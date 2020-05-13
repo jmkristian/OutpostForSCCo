@@ -1,0 +1,41 @@
+<html><body>
+<p>This program handles forms used for emergency communication by ARES and RACES
+  in the San Francisco Bay area in California.
+  It uses a web browser to display and edit forms.
+  Data from a form can be transmitted in a text message,
+  which a recipient can convert back to the same form.</p>
+<h3 id="usage">Usage</h3>
+<p>Run the <code>browse.sh</code> script in this directory.
+  It will open a page in your browser, with buttons you can use to either
+  open a form and then create a message,
+  or view a received message as a form.
+  You can copy and paste messages to or from a BBS session or an email.
+  </p>
+<p>When filling out a form, required fields are outlined in red.
+  The red disappears when you enter a value in the correct format.
+  Hovering your cursor over a field may tell you about the required format.
+  Some fields have values like <code>{{date}}</code> or <code>{{time}}</code>,
+  which will be filled in automatically when you create a text message.</p>
+
+<p>When all required fields are filled in, the header bar will change color
+  and these buttons in the header will be enabled:
+  <ul>
+    <li>Create Message: convert the form to a text message, which you can copy-n-paste.</li>
+    <li>Submit via Email: create an email message, and fill it out with a text message you can send.
+      For best results, send the message in plain text format (not HTML or rich text).
+    </li>
+  </ul>
+  </p>
+
+<p>To give someone a copy of a form, you can print it or save it as a PDF file.
+  To create a PDF file, press Control+P and then choose 'Save as PDF' instead of a printer.
+  </p>
+<h3 id="incaseoftrouble">In Case of Trouble</h3>
+<p>If something's not right, please report it by posting to the Santa Clara County
+  <a href="https://www.scc-ares-races.org/data/packet/packet-technical-support.html#user">packet discussion group</a>.
+  Please say what operating system and version of browser you used.
+  To help isolate the problem, please attach the <code>version.txt</code> file from this directory,
+  all the files from the <code>logs</code> subdirectory,
+  and a screenshot of a browser page (if any).
+  </p>
+</body></html>

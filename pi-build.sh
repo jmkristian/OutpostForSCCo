@@ -22,11 +22,11 @@ for ADDON in SF_ACS_forms "$@"; do
         || exit $?
     mv built/addons built/$ADDON/                || exit $?
     mv built/pi-browse.sh built/$ADDON/browse.sh || exit $?
-    mv built/UserGuide.html built/$ADDON/        || exit $?
     mv built/manual.html built/$ADDON/bin        || exit $?
     cp -p bin/server.js built/$ADDON/bin/$ADDON.js     || exit $?
     cp -p bin/commands.js bin/etc.js built/$ADDON/bin/ || exit $?
     cp -pr package.json node_modules built/$ADDON/bin/ || exit $?
+    cp -p pi-UserGuide.html built/$ADDON/UserGuide.html || exit $?
     cp -pr pack-it-forms built/$ADDON/           || exit $?
     cp -p *.png built/$ADDON/pack-it-forms       || exit $?
 
