@@ -949,12 +949,17 @@ function serve() {
         Promise.resolve().then(function() {
             const form = req.body.form;
             const space = form.indexOf(' ');
-            return onOpen(formId, [
+            const args = [
                 '--message_status', 'manual',
                 '--addon_name', form.substring(0, space),
-                '--ADDON_MSG_TYPE', form.substring(space + 1),
-                '--operator_call_sign', req.body.operator_call_sign || '',
-                '--operator_name', req.body.operator_name || '']);
+                '--ADDON_MSG_TYPE', form.substring(space + 1)];
+            for (var name in req.body) {
+                if (name != 'form') {
+                    args.push(`--${name}`);
+                    args.push(req.body[name]);
+                }
+            }
+            return onOpen(formId, args);
         }).then(function() {
             res.redirect('/form-' + formId);
         }, function openFailed(err) {
@@ -967,7 +972,7 @@ function serve() {
         Promise.resolve().then(function() {
             var args = ['--message_status', 'unread', '--mode', 'readonly'];
             for (var name in req.body) {
-                args.push('--' + name);
+                args.push(`--${name}`);
                 args.push(req.body[name]);
             }
             if (req.body.OpDate && req.body.OpTime) {
