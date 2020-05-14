@@ -180,7 +180,7 @@ function serve() {
                 '--message_status', 'manual',
                 '--addon_name', form.substring(0, space),
                 '--ADDON_MSG_TYPE', form.substring(space + 1)];
-            for (name in req.body) {
+            for (var name in req.body) {
                 if (req.body.hasOwnProperty(name) && name != 'form') {
                     args.push(`--${name}`);
                     args.push(req.body[name]);
@@ -199,8 +199,10 @@ function serve() {
         Promise.resolve().then(function() {
             var args = ['--message_status', 'unread', '--mode', 'readonly'];
             for (var name in req.body) {
-                args.push('--' + name);
-                args.push(req.body[name]);
+                if (req.body.hasOwnProperty(name)) {
+                    args.push(`--${name}`);
+                    args.push(req.body[name]);
+                }
             }
             if (req.body.OpDate && req.body.OpTime) {
                 args.push('--MSG_DATETIME_OP_RCVD')
@@ -424,7 +426,7 @@ function onSaveMessage(formId, req) {
         }
     });
 }
-
+
 function onEmail(formId, message, res) {
     var foundForm = null;
     return keepAlive(formId).then(function(form) {
