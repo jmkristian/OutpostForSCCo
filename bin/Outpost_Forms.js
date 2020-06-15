@@ -1,5 +1,4 @@
-#!/usr/bin/node
- /* Copyright 2018, 2019 by John Kristian
+/* Copyright 2018, 2019 by John Kristian
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -381,8 +380,7 @@ function build() {
                               path.join('bin', 'manual.html'),
                               path.join('built', 'manual.html'))
     ].concat(
-        ['browse.cmd', 'launch-v.cmd', 'launch.vbs', 'pi-browse.sh', 'UserGuide.html'
-        ].map(function(fileName) {
+        ['browse.cmd', 'launch-v.cmd', 'launch.vbs', 'UserGuide.html'].map(function(fileName) {
             return expandVariablesInFile({PROGRAM_PATH: programPath, DisplayName: displayName},
                                          fileName, path.join('built', fileName));
         })
@@ -422,7 +420,9 @@ function installCmdConvert() {
             return data;
         });
     }, function statFailed(err) {
-        log('not found: ' + cmdConvertFile);
+        // cmdConvertFile doesn't exist.
+        // We're running on Windows XP, presumably.
+        log(err);
     });
 }
 
