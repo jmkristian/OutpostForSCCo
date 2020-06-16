@@ -607,7 +607,8 @@ function convertMessageToFiles() {
               .replace(/[<>:"/\\|?*]/g, '~')
               .replace(SEQUENCE_REGEX, '~');
         return openMessage(args).then(function(pageURL) {
-            return convertPageToFiles(environment.addon_name, pageURL, parsed.fields.MsgNo, copyNames);
+            const messageID = environment.MSG_NUMBER || parsed.fields.MsgNo;
+            return convertPageToFiles(environment.addon_name, pageURL, messageID, copyNames);
         }).then(function(tempFileNames) {
             return spoolFiles(tempFileNames, spoolDir, spoolFilePrefix);
         });
@@ -1173,9 +1174,19 @@ function parseArgs(args) {
     }
     ['COPY_NAMES', 'MSG_INDEX', 'MSG_STATE', 'SPOOL_DIR'].forEach(function(name) {
         if (environment[name] == '{{' + name + '}}') {
+            // The caller didn't provide a value for this variable.
             delete environment[name];
         }
     });
+    if (environment.MSG_NUMBER == '-1') { // a sentinel value
+        delete environment.MSG_NUMBER;
+    }
+    if (environment.MSG_LOCAL_ID == '-1') { // a sentinel value
+        delete environment.MSG_LOCAL_ID;
+    }
+    if (/^\?*$/.test(environment.MSG_DATETIME_HEADER)) { // a sentinel value
+        delete environment.MSG_DATETIME_HEADER;
+    }
     if (['draft', 'ready'].indexOf(environment.message_status) >= 0
         && !environment.MSG_INDEX) {
         // This probably came from an old version of Outpost.
