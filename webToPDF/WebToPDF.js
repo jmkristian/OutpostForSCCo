@@ -28,10 +28,11 @@ const footerFontSize = '7pt';
             const page = await browser.newPage();
             if (argv.length >= 4) {
                 const pageURL = argv[3];
+                const messageID = argv[4];
                 await page.goto(pageURL);
-                if (argv.length >= 5) {
+                if (argv.length >= 6) {
                     let files = [];
-                    for (let a = 4; a < argv.length; ++a) {
+                    for (let a = 5; a < argv.length; ++a) {
                         files.push(argv[a]);
                     }
                     try {
@@ -54,11 +55,11 @@ const footerFontSize = '7pt';
                         const copyName = files[++f];
                         options.path = path.resolve(fileName);
                         options.footerTemplate = `<table style="${tableStyle}">` +
-                            '<tr><td style="text-align:left;padding-left:0;">' +
+                            '<tr><td style="width:40%;text-align:left;padding-left:0;">' +
                             (copyName ? `<b>${copyName}</b> copy` : '') +
                             '</td><td style="text-align:center;">' +
-                            '<span class="title"></span>' +
-                            '</td><td style="text-align:right;padding-right:0;">' +
+                            messageID.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+                            '</td><td style="width:40%;text-align:right;padding-right:0;">' +
                             'Page <span class="pageNumber"></span> of <span class="totalPages"></span>' +
                             '</td></tr>' +
                             '</table>',

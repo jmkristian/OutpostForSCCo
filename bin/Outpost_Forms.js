@@ -590,10 +590,6 @@ function convertMessageToFiles() {
         }
         args.push('--message_status'); args.push(message_status);
     }
-    const spoolFilePrefix = subjectFromMessage(parseMessage(
-        fs.readFileSync(path.resolve(PackItMsgs, environment.MSG_FILENAME), ENCODING)
-    )).replace(/[<>:"/\\|?*]/g, '~').replace(SEQUENCE_REGEX, '~');
-
     const spoolDir = environment.SPOOL_DIR;
     if (spoolDir == null) throw new Error('no SPOOL_DIR in arguments.');
     var copyNames = environment.COPY_NAMES;
@@ -603,19 +599,27 @@ function convertMessageToFiles() {
         return (c == 'n') ? '\n' : c;
     });
     copyNames = copyNames.split('\n');
-    return openMessage(args).then(function convertPage(pageURL) {
-        if (!pageURL) {
-            throw 'page URL = ' + JSON.stringify(pageURL);
-        }
-        return convertPageToFiles(environment.addon_name, pageURL, copyNames);
-    }).then(function(tempFileNames) {
-        return spoolFiles(tempFileNames, spoolDir, spoolFilePrefix);
+    return fsp.readFile(
+        path.resolve(PackItMsgs, environment.MSG_FILENAME), ENCODING
+    ).then(function(message) {
+        const parsed = parseMessage(message);
+        const spoolFilePrefix = subjectFromMessage(parsed)
+              .replace(/[<>:"/\\|?*]/g, '~')
+              .replace(SEQUENCE_REGEX, '~');
+        return openMessage(args).then(function(pageURL) {
+            return convertPageToFiles(environment.addon_name, pageURL, parsed.fields.MsgNo, copyNames);
+        }).then(function(tempFileNames) {
+            return spoolFiles(tempFileNames, spoolDir, spoolFilePrefix);
+        });
     });
 }
 
-function convertPageToFiles(addon_name, pageURL, copyNames) {
+function convertPageToFiles(addon_name, pageURL, messageID, copyNames) {
+    if (!pageURL) {
+        throw 'page URL = ' + JSON.stringify(pageURL);
+    }
     const fileNames = [];
-    var args = ['bin', pageURL];
+    var args = ['bin', pageURL, messageID || ''];
     return copyNames.reduce(
         function(chain, copyName) {
             return chain.then(function() {
