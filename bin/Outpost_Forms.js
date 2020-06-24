@@ -336,7 +336,7 @@ if (process.argv.length > 2) {
             // Remove this add-on from Outpost's configuration.
             return uninstall();
         case 'convert':
-            return convertMessageToFiles();
+            return convert();
         case 'open':
         case 'dry-run':
             // Make sure a server is running, and then send process.argv[4..] to it.
@@ -575,8 +575,14 @@ function argvSlice(start) {
     return args;
 }
 
-function convertMessageToFiles() {
+function convert() {
     process.chdir(process.argv[4]);
+    fsp.checkFolder(LOG_FOLDER).then(function() {
+        return teeToFile('convert');
+    }).then(convertMessageToFiles);
+}
+
+function convertMessageToFiles() {
     var args = argvSlice(5);
     const environment = parseArgs(args);
     var message_status = environment.message_status;
@@ -1963,7 +1969,37 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
     }).catch(log);
 }
 
+/** Redirect standard output into log files. */
 function logToFile(fileNameSuffix) {
+    const file = logFilesWriter(fileNameSuffix);
+    process.stdout.write = process.stderr.write = file.write.bind(file);
+}
+
+/** Store a copy of standard output into log files. */
+function teeToFile(fileNameSuffix) {
+    const file = logFilesWriter(fileNameSuffix);
+    teeToWritable(process.stdout, file);
+    teeToWritable(process.stderr, file);
+}
+
+function teeToWritable(std, writable) {
+    const stdWrite = std.write.bind(std);
+    const tee = new stream.Writable({
+        decodeStrings: false, objectMode: true,
+        write: function(chunk, encoding, callback) {
+            writable.write(chunk, encoding, function(err) {
+                if (err) {
+                    stdWrite(toLogMessage(err) + EOL, ENCODING);
+                }
+            });
+            stdWrite(chunk, encoding, callback);
+        }
+    });
+    std.write = tee.write.bind(tee);
+}
+
+/** @return a Writable that stores output in date-stamped files with Windows style line endings. */
+function logFilesWriter(fileNameSuffix) {
     const windowsEOL = new stream.Transform({
         // Transform line endings from Unix style to Windows style.
         transform: function(chunk, encoding, output) {
@@ -2010,8 +2046,7 @@ function logToFile(fileNameSuffix) {
              return fileStream.write(chunk, encoding, next);
          }});
     windowsEOL.pipe(dailyFile);
-    const writer = windowsEOL.write.bind(windowsEOL);
-    process.stdout.write = process.stderr.write = writer;
+    return windowsEOL;
 }
 
 function expandVariablesInFile(variables, fromFile, intoFile) {
@@ -2053,9 +2088,13 @@ function errorToMessage(err) {
 
 function log(data) {
     if (data) {
-        var message = (typeof data == 'object') ? errorToMessage(data) : ('' + data);
-        console.log('[' + new Date().toISOString() + '] ' + message);
+        console.log(toLogMessage(data));
     }
+}
+
+function toLogMessage(data) {
+    const message = (typeof data == 'object') ? errorToMessage(data) : ('' + data);
+    return '[' + new Date().toISOString() + '] ' + message;
 }
 
 function encodeHTML(text) {
