@@ -1178,6 +1178,9 @@ function parseArgs(args) {
             delete environment[name];
         }
     });
+    if ((environment.MSG_STATE || '').toLowerCase() == 'undefined') {
+        delete environment.MSG_STATE;
+    }
     if (environment.MSG_NUMBER == '-1') { // a sentinel value
         delete environment.MSG_NUMBER;
     }
