@@ -55,11 +55,11 @@ const footerFontSize = '7pt';
                         const copyName = files[++f];
                         options.path = path.resolve(fileName);
                         options.footerTemplate = `<table style="${tableStyle}">` +
-                            '<tr><td style="width:40%;text-align:left;padding-left:0;">' +
-                            (copyName ? `<b>${copyName}</b> copy` : '') +
-                            '</td><td style="text-align:center;">' +
+                            '<tr><td style="width:25%;text-align:left;padding-left:0;">' +
                             messageID.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
-                            '</td><td style="width:40%;text-align:right;padding-right:0;">' +
+                            '</td><td style="text-align:center;">' +
+                            (copyName ? `<b>${copyName}</b>` : '') +
+                            '</td><td style="width:25%;text-align:right;padding-right:0;">' +
                             'Page <span class="pageNumber"></span> of <span class="totalPages"></span>' +
                             '</td></tr>' +
                             '</table>',
