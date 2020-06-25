@@ -589,6 +589,9 @@ function convertMessageToFiles() {
     if (!message_status) {
         if (environment.MSG_STATE) {
             message_status = environment.MSG_STATE.toLowerCase();
+            if (message_status == 'retrieved') {
+                message_status = 'unread';
+            }
         } else if (environment.MSG_DATETIME_OP_RCVD) {
             message_status = 'unread';
         } else {
