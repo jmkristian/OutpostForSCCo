@@ -588,12 +588,24 @@ function convertMessageToFiles() {
     var message_status = environment.message_status;
     if (!message_status) {
         if (environment.MSG_STATE) {
-            message_status = environment.MSG_STATE.toLowerCase();
-            if (message_status == 'retrieved') {
-                message_status = 'unread';
+            switch(environment.MSG_STATE.toLowerCase()) {
+            case 'received':
+            case 'retrieved':
+            case 'unread':
+            case 'read':
+                message_status = 'received';
+                break;
+            case 'sent':
+                message_status = 'sent';
+                break;
+            case 'new':
+                message_status = 'new';
+                break;
+            default:
+                message_status = 'draft';
             }
         } else if (environment.MSG_DATETIME_OP_RCVD) {
-            message_status = 'unread';
+            message_status = 'received';
         } else {
             message_status = 'sent';
         }
@@ -984,7 +996,7 @@ function serve() {
     app.post('/manual-view', function(req, res, next) {
         const formId = '' + nextFormId++;
         Promise.resolve().then(function() {
-            var args = ['--message_status', 'unread', '--mode', 'readonly'];
+            var args = ['--message_status', 'received', '--mode', 'readonly'];
             for (var name in req.body) {
                 args.push(`--${name}`);
                 args.push(req.body[name]);
@@ -1199,8 +1211,7 @@ function parseArgs(args) {
     if (/^\?*$/.test(environment.MSG_DATETIME_HEADER)) { // a sentinel value
         delete environment.MSG_DATETIME_HEADER;
     }
-    if (['draft', 'ready'].indexOf(environment.message_status) >= 0
-        && !environment.MSG_INDEX) {
+    if (environment.message_status == 'draft' && !environment.MSG_INDEX) {
         // This probably came from an old version of Outpost.
         // Without a MSG_INDEX, the operator can't revise the message:
         environment.mode = 'readonly';
@@ -1334,7 +1345,7 @@ function getForm(form, res) {
             + "I received " + JSON.stringify(formType)
             + " instead of the name of a form.\n";
     }
-    if (['read', 'unread'].indexOf(form.environment.message_status) >= 0) {
+    if (form.environment.message_status == 'received') {
         const receiverFileName = formType.replace(/\.([^.]*)$/, '.receiver.$1');
         if (fs.existsSync(path.join(PackItForms, receiverFileName))) {
             formType = receiverFileName;
