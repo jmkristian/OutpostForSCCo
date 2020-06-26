@@ -1,0 +1,11 @@
+{
+    "name": "WebToPDF",
+    "version": "2.0.0",
+    "description": "Create a PDF file that looks like a given web page.",
+    "license": "Apache-2.0",
+    "repository": "https://github.com/jmkristian/OutpostForSCCo",
+    "dependencies": {
+        "pkg": "~4.3.8",
+        "puppeteer-core": "~2.1.1"
+    }
+}

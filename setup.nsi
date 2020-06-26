@@ -267,6 +267,7 @@ Function ${un}DeleteMyFiles
   Push $R0
   Push $R1
   # It doesn't really matter whether these are deleted:
+  ${RMDir} "$INSTDIR\bin\Chromium-*" # Allow some time for ${PROGRAM_PATH} to exit.
   ${Delete} README.*
   ${Delete} UserGuide.*
   ${Delete} launch.vbs
@@ -274,6 +275,7 @@ Function ${un}DeleteMyFiles
   ${Delete} launch-v.cmd
   ${Delete} version.txt
   ${RMDir} "$INSTDIR\bin"
+  ${RMDir} "$INSTDIR\converted"
   ${RMDir} "$INSTDIR\notes"
   ${RMDir} "$INSTDIR\pdf"
   ClearErrors
@@ -384,12 +386,19 @@ Section "Install"
   File built\launch-v.cmd
   File built\manual.html
   File bin\message.html
+  File bin\Outpost_Forms.js
   File bin\server.ini
+  File bin\subject.cmd
+  ${IfNot} ${IsWinXP}
+     File /r webToPDF\Chromium-81.0.4044.92
+     File webToPDF\WebToPDF.exe
+     File webToPDF\WebToPDF.js
+     File built\cmd-convert.ini
+  ${EndIf}
   SetOutPath "$INSTDIR"
   File built\browse.cmd
   File built\UserGuide.html
   File /r built\addons
-  File /r /x "*~" /x *.txt /x *.ini /x *.html /x *.log /x notes bin
   File "/oname=${PROGRAM_PATH}" built\Outpost_Forms.exe
   Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"
@@ -421,7 +430,7 @@ Section "Install"
   WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMinor ${VersionMinor}
   WriteRegDWORD HKLM "${REG_SUBKEY}" NoModify 1
   WriteRegDWORD HKLM "${REG_SUBKEY}" NoRepair 1
-  WriteRegDWORD HKLM "${REG_SUBKEY}" EstimatedSize 15000
+  WriteRegDWORD HKLM "${REG_SUBKEY}" EstimatedSize 245000
 
   # Add the uninstaller to the Start menu:
   Call SetShellVarContextAppropriately

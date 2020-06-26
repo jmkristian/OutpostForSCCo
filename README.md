@@ -10,14 +10,20 @@ For installation and usage instructions, see the UserGuide.html file in each [re
 Source code is stored in this repository.
 To build it, you'll need
 [Git](https://git-scm.com/downloads),
-[Node.js](https://nodejs.org/en/download/)
-[version 4](https://nodejs.org/download/release/v4.9.1/) (yes that old),
+[nvm for Windows](https://github.com/coreybutler/nvm-windows),
 [NSIS](http://nsis.sourceforge.net) version 3 or later
 and a bash shell.
 The bash shell included with Git for Windows is sufficient.
-Don't use a more recent version of Node.js: it will build code that won't run on Windows XP.
 
-Clone this repository and then use bash to run ./build.sh in your clone.
+Using [nvm](https://github.com/coreybutler/nvm-windows),
+install the 32-bit variants of
+[Node.js](https://nodejs.org/en/download/)
+[version 4.9.1](https://nodejs.org/download/release/v4.9.1/) (yes that old)
+and version 10.18.1.
+Run "nvm install" from a Windows cmd or PowerShell prompt (not bash).
+That old version of Node.js builds code that runs on Windows XP; newer versions don't.
+
+Clone this repository and then use bash to run webToPDF/build.sh and then ./build.sh in your clone.
 
 Most improvements to the web user interface will be done in
 [pack-it-forms](https://github.com/jmkristian/pack-it-forms/blob/SCCo.2/README.md)
