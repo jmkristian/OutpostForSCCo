@@ -577,7 +577,7 @@ function argvSlice(start) {
 
 function convert() {
     process.chdir(process.argv[4]);
-    fsp.checkFolder(LOG_FOLDER).then(function() {
+    return fsp.checkFolder(LOG_FOLDER).then(function() {
         return teeToFile('convert');
     }).then(convertMessageToFiles);
 }
@@ -1993,20 +1993,28 @@ function logToFile(fileNameSuffix) {
 function teeToFile(fileNameSuffix) {
     const file = logFilesWriter(fileNameSuffix);
     teeToWritable(process.stdout, file);
-    teeToWritable(process.stderr, file);
+    if (process.stderr !== process.stdout) {
+        teeToWritable(process.stderr, file);
+    }
 }
 
 function teeToWritable(std, writable) {
     const stdWrite = std.write.bind(std);
+    const reportError = function reportError(err) {
+        if (err) {
+            stdWrite(toLogMessage(err) + EOL, ENCODING);
+        }
+    };
     const tee = new stream.Writable({
-        decodeStrings: false, objectMode: true,
-        write: function(chunk, encoding, callback) {
-            writable.write(chunk, encoding, function(err) {
-                if (err) {
-                    stdWrite(toLogMessage(err) + EOL, ENCODING);
-                }
-            });
-            stdWrite(chunk, encoding, callback);
+        decodeStrings: false,
+        write: function(chunk, encoding, next) {
+            if (encoding == 'buffer') {
+                writable.write(chunk, reportError);
+                return stdWrite(chunk, next);
+            } else {
+                writable.write(chunk, encoding, reportError);
+                return stdWrite(chunk, encoding, next);
+            }
         }
     });
     std.write = tee.write.bind(tee);
@@ -2032,7 +2040,7 @@ function logFilesWriter(fileNameSuffix) {
     var fileName = null;
     var nextDay = 0;
     const dailyFile = new stream.Writable(
-        {decodeStrings: false, objectMode: true,
+        {decodeStrings: false,
          write: function(chunk, encoding, next) {
              var today = new Date();
              if (+today >= nextDay) {
@@ -2057,7 +2065,11 @@ function logFilesWriter(fileNameSuffix) {
                      deleteOldFiles(LOG_FOLDER, /\.log$/, 7 * 24 * hours);
                  }
              }
-             return fileStream.write(chunk, encoding, next);
+             if (encoding == 'buffer') {
+                 return fileStream.write(chunk, next);
+             } else {
+                 return fileStream.write(chunk, encoding, next);
+             }
          }});
     windowsEOL.pipe(dailyFile);
     return windowsEOL;
