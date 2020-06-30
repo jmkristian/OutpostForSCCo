@@ -10,12 +10,17 @@ For installation and usage instructions, see the UserGuide.html file in each [re
 Source code is stored in this repository.
 To build it, you'll need
 [Git](https://git-scm.com/downloads),
-[Node.js](https://nodejs.org/en/download/)
-[version 4](https://nodejs.org/download/release/v4.9.1/) (yes that old),
+[nvm for Windows](https://github.com/coreybutler/nvm-windows),
 [NSIS](http://nsis.sourceforge.net) version 3 or later
 and a bash shell.
 The bash shell included with Git for Windows is sufficient.
-Don't use a more recent version of Node.js: it will build code that won't run on Windows XP.
+
+Using [nvm](https://github.com/coreybutler/nvm-windows),
+install the 32-bit variant of
+[Node.js](https://nodejs.org/en/download/)
+[version 4.9.1](https://nodejs.org/download/release/v4.9.1/) (yes that old).
+Run "nvm install" from a Windows cmd or PowerShell prompt (not bash).
+That old version of Node.js builds code that runs on Windows XP; newer versions don't.
 
 Clone this repository and then use bash to run ./build.sh in your clone.
 
@@ -45,5 +50,5 @@ Pass the name of your private repository to ./build.sh on the command line.
 
 The installer source code is setup.nsi, and
 the source for most of the installed code is bin/Outpost\_Forms.js.
-The installer configures Outpost to execute launch.vbs or (on Windows XP) launch.cmd.
+The installer configures Outpost to execute launch.vbs.
 For debugging, you might change the configuration to execute launch-v.cmd instead.

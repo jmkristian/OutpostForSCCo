@@ -1,14 +1,15 @@
 {
-  "name": "OutpostForLAARES",
-  "version": "0.2.17",
-  "description": "Add-ons for Outpost Packet Message Manager.",
-  "license": "Apache-2.0",
-  "repository": "https://github.com/jmkristian/Outpost-for-LAARES",
-  "dependencies": {
-    "body-parser": "1.18.3",
-    "concat-stream": "1.6.2",
-    "express": "4.16.3",
-    "html-entities": "1.2.1",
-    "morgan": "1.9.1"
-  }
+    "name": "OutpostForLAARES",
+    "version": "2.20.1",
+    "description": "Add-ons for Outpost Packet Message Manager.",
+    "license": "Apache-2.0",
+    "repository": "https://github.com/jmkristian/OutpostForSCCo",
+    "dependencies": {
+        "body-parser": "1.18.3",
+        "concat-stream": "1.6.2",
+        "express": "4.16.3",
+        "html-entities": "1.2.1",
+        "morgan": "1.9.1",
+        "pkg": "4.2.6"
+    }
 }
