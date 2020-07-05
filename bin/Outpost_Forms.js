@@ -1985,7 +1985,7 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
 
 /** Redirect standard output into log files. */
 function logToFile(fileNameSuffix) {
-    const file = logFilesWriter(fileNameSuffix);
+    const file = toWindowsEOL(logFilesWriter(fileNameSuffix));
     process.stdout.write = process.stderr.write = file.write.bind(file);
 }
 
@@ -2017,13 +2017,13 @@ function teeToWritable(std, writable) {
             }
         }
     });
-    std.write = tee.write.bind(tee);
+    const eol = toWindowsEOL(tee);
+    std.write = eol.write.bind(eol);
 }
 
-/** @return a Writable that stores output in date-stamped files with Windows style line endings. */
-function logFilesWriter(fileNameSuffix) {
-    const windowsEOL = new stream.Transform({
-        // Transform line endings from Unix style to Windows style.
+/** Transform line endings from Unix style to Windows style. */
+function toWindowsEOL(writable) {
+    const transform = new stream.Transform({
         transform: function(chunk, encoding, output) {
             if (encoding == 'buffer') {
                 output(null, new Buffer(chunk.toString('binary')
@@ -2036,10 +2036,16 @@ function logFilesWriter(fileNameSuffix) {
             }
         }
     });
+    transform.pipe(writable);
+    return transform;
+}
+
+/** @return a Writable that stores output in date-stamped files. */
+function logFilesWriter(fileNameSuffix) {
     var fileStream = null;
     var fileName = null;
     var nextDay = 0;
-    const dailyFile = new stream.Writable(
+    return new stream.Writable(
         {decodeStrings: false,
          write: function(chunk, encoding, next) {
              var today = new Date();
@@ -2071,8 +2077,6 @@ function logFilesWriter(fileNameSuffix) {
                  return fileStream.write(chunk, encoding, next);
              }
          }});
-    windowsEOL.pipe(dailyFile);
-    return windowsEOL;
 }
 
 function expandVariablesInFile(variables, fromFile, intoFile) {
