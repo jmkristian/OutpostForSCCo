@@ -1992,10 +1992,8 @@ function logToFile(fileNameSuffix) {
 /** Store a copy of standard output into log files. */
 function teeToFile(fileNameSuffix) {
     const file = logFilesWriter(fileNameSuffix);
-    teeToWritable(process.stdout, file);
-    if (process.stderr !== process.stdout) {
-        teeToWritable(process.stderr, file);
-    }
+    const tee = toWindowsEOL(teeToWritable(process.stdout, file));
+    process.stdout.write = process.stderr.write = tee.write.bind(tee);
 }
 
 function teeToWritable(std, writable) {
@@ -2005,7 +2003,7 @@ function teeToWritable(std, writable) {
             stdWrite(toLogMessage(err) + EOL, ENCODING);
         }
     };
-    const tee = new stream.Writable({
+    return new stream.Writable({
         decodeStrings: false,
         write: function(chunk, encoding, next) {
             if (encoding == 'buffer') {
@@ -2017,8 +2015,6 @@ function teeToWritable(std, writable) {
             }
         }
     });
-    const eol = toWindowsEOL(tee);
-    std.write = eol.write.bind(eol);
 }
 
 /** Transform line endings from Unix style to Windows style. */
