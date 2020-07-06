@@ -46,6 +46,15 @@ Function .onInit
   ${EndIf}
 FunctionEnd
 
+VIProductVersion "0.0.0.0"
+# LoadLanguageFile "${NSISDIR}\Contrib\Language files\English.nlf"
+# VIAddVersionKey /LANG=${LANG_ENGLISH} "FileVersion" "${VersionMajor}.${VersionMinor}"
+VIAddVersionKey "ProductName" "${DisplayName}"
+VIAddVersionKey "ProductVersion" "${VersionMajor}.${VersionMinor}"
+VIAddVersionKey "FileDescription" "Install ${DisplayName}"
+VIAddVersionKey "FileVersion" "${VersionMajor}.${VersionMinor}"
+VIAddVersionKey "LegalCopyright" "2020 by John Kristian"
+
 Function selectOutpostCode
   Call FindOutposts
   ${If} "$OUTPOST_DATA" != ""
