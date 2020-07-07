@@ -39,9 +39,11 @@ const footerFontSize = '7pt';
                         await Promise.race([
                             page.waitForSelector('#loading')
                                 .then(selected => page.waitForSelector('#loading', {hidden: true})),
+                            page.waitForSelector('#err.occured')
+                                .then(selected => {throw new Error(`An error occured in ${pageURL}.`);}),
                             page.waitForSelector('#something-went-wrong')
                                 .then(selected => {throw new Error(`Something went wrong, says ${pageURL}.`);})
-                        ])
+                        ]);
                     } catch(err) {
                         log(err);
                         // Create just one file, with no copyName.
