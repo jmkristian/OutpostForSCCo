@@ -51,6 +51,7 @@ const footerFontSize = '7pt';
                             fs.unlink(files[f], log);
                         }
                         files = files.slice(0, 1);
+                        process.exitCode = 1;
                     }
                     for (let f = 0; f < files.length; ++f) {
                         const fileName = files[f];

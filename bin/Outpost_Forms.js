@@ -662,6 +662,10 @@ function convertPageToFiles(addon_name, pageURL, messageID, copyNames) {
         return promiseSpawn(WEB_TO_PDF, args, {stdio: ['ignore', 'pipe', 'pipe']});
     }).then(function() {
         return fileNames;
+    }, function webToPdfFailed(err) {
+        log(err);
+        process.exitCode = 1;
+        return fileNames;
     });
 }
 
