@@ -2023,14 +2023,21 @@ function teeToWritable(std, writable) {
 
 /** Transform line endings from Unix style to Windows style. */
 function toWindowsEOL(writable) {
+    const insertCR = function insertCR(s) {
+        return s.replace(/\n/g, function(LF, index) {
+            if (index > 0 && s.substring(index - 1, index) == '\r') {
+                return LF; // no change
+            } else {
+                return EOL;
+            }
+        });
+    };
     const transform = new stream.Transform({
         transform: function(chunk, encoding, output) {
             if (encoding == 'buffer') {
-                output(null, new Buffer(chunk.toString('binary')
-                                        .replace(/([^\r])\n/g, '$1' + EOL),
-                                        'binary'));;
+                output(null, new Buffer(insertCR(chunk.toString('binary')), 'binary'));
             } else if (typeof chunk == 'string') {
-                output(null, chunk.replace(/([^\r])\n/g, '$1' + EOL));
+                output(null, insertCR(chunk))
             } else {
                 output(null, chunk); // no change to an object
             }
