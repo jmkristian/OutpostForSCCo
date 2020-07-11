@@ -1,5 +1,6 @@
 ' Run {{PROGRAM_PATH}} with the arguments that were passed to this script,
-' the working directory that contains this script and no visible window.
+' the working directory that contains the folder that contains this script
+' and no visible window.
 
 set FSO = CreateObject("Scripting.FileSystemObject")
 my_folder = FSO.GetParentFolderName(FSO.GetParentFolderName(Wscript.ScriptFullName))
@@ -11,6 +12,7 @@ arguments(0) = Chr(34) & FSO.BuildPath(my_folder, "{{PROGRAM_PATH}}") & Chr(34)
 For i = 0 To WScript.Arguments.Count-1
   arg = WScript.Arguments(i)
   If Len(arg) = 0 Or InStr(arg, " ") > 0 Or InStr(arg, Chr(34)) > 0 Then
+    ' Enquote this argument:
     arg = Chr(34) & replace(arg, Chr(34), Chr(34) & Chr(34)) & Chr(34)
   End If
   arguments(i + 1) = arg
