@@ -6,6 +6,10 @@ const puppeteer = require('puppeteer-core');
 const footerFontSize = '7pt';
 
 (async function() {
+    let files = [];
+    for (let a = 5; a < argv.length; ++a) {
+        files.push(argv[a]);
+    }
     try {
         const tableStyle =
               `font-size:${footerFontSize};` +
@@ -30,29 +34,28 @@ const footerFontSize = '7pt';
                 const pageURL = argv[3];
                 const messageID = argv[4];
                 await page.goto(pageURL);
-                if (argv.length >= 6) {
-                    let files = [];
-                    for (let a = 5; a < argv.length; ++a) {
-                        files.push(argv[a]);
-                    }
+                if (files.length > 0) {
                     try {
                         await Promise.race([
                             page.waitForSelector('#loading')
                                 .then(selected => page.waitForSelector('#loading', {hidden: true})),
+                            page.waitForSelector('#err.occured')
+                                .then(selected => {throw new Error(`An error occured in ${pageURL}.`);}),
                             page.waitForSelector('#something-went-wrong')
                                 .then(selected => {throw new Error(`Something went wrong, says ${pageURL}.`);})
-                        ])
+                        ]);
                     } catch(err) {
                         log(err);
+                        process.exitCode = 1;
                         // Create just one file, with no copyName.
                         for (let f = 2; f < files.length; f += 2) {
                             fs.unlink(files[f], log);
                         }
                         files = files.slice(0, 1);
                     }
-                    for (let f = 0; f < files.length; ++f) {
-                        const fileName = files[f];
-                        const copyName = files[++f];
+                    while (files.length > 0) {
+                        const fileName = files[0];
+                        const copyName = files[1];
                         options.path = path.resolve(fileName);
                         options.footerTemplate = `<table style="${tableStyle}">` +
                             '<tr><td style="width:25%;text-align:left;padding-left:0;">' +
@@ -64,6 +67,7 @@ const footerFontSize = '7pt';
                             '</td></tr>' +
                             '</table>',
                         await page.pdf(options);
+                        files.shift(); files.shift();
                     }
                 }
             }
@@ -73,6 +77,9 @@ const footerFontSize = '7pt';
     } catch(err) {
         log(err);
         process.exitCode = 1;
+        for (let f = 0; f < files.length; f += 2) {
+            fs.unlink(files[f], log);
+        }
         // Wait until all promises are fulfilled or rejected, but no more than a few seconds.
         setTimeout(() => {process.exit(1);}, 3000).unref();
     }

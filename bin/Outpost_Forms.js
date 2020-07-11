@@ -577,7 +577,7 @@ function argvSlice(start) {
 
 function convert() {
     process.chdir(process.argv[4]);
-    fsp.checkFolder(LOG_FOLDER).then(function() {
+    return fsp.checkFolder(LOG_FOLDER).then(function() {
         return teeToFile('convert');
     }).then(convertMessageToFiles);
 }
@@ -661,6 +661,10 @@ function convertPageToFiles(addon_name, pageURL, messageID, copyNames) {
         log(`${WEB_TO_PDF} "` + args.join('" "') + '"')
         return promiseSpawn(WEB_TO_PDF, args, {stdio: ['ignore', 'pipe', 'pipe']});
     }).then(function() {
+        return fileNames;
+    }, function webToPdfFailed(err) {
+        log(err);
+        process.exitCode = 1;
         return fileNames;
     });
 }
@@ -1985,54 +1989,71 @@ function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
 
 /** Redirect standard output into log files. */
 function logToFile(fileNameSuffix) {
-    const file = logFilesWriter(fileNameSuffix);
+    const file = toWindowsEOL(logFilesWriter(fileNameSuffix));
     process.stdout.write = process.stderr.write = file.write.bind(file);
 }
 
 /** Store a copy of standard output into log files. */
 function teeToFile(fileNameSuffix) {
     const file = logFilesWriter(fileNameSuffix);
-    teeToWritable(process.stdout, file);
-    teeToWritable(process.stderr, file);
+    const tee = toWindowsEOL(teeToWritable(process.stdout, file));
+    process.stdout.write = process.stderr.write = tee.write.bind(tee);
 }
 
 function teeToWritable(std, writable) {
     const stdWrite = std.write.bind(std);
-    const tee = new stream.Writable({
-        decodeStrings: false, objectMode: true,
-        write: function(chunk, encoding, callback) {
-            writable.write(chunk, encoding, function(err) {
-                if (err) {
-                    stdWrite(toLogMessage(err) + EOL, ENCODING);
-                }
-            });
-            stdWrite(chunk, encoding, callback);
+    const reportError = function reportError(err) {
+        if (err) {
+            stdWrite(toLogMessage(err) + EOL, ENCODING);
+        }
+    };
+    return new stream.Writable({
+        decodeStrings: false,
+        write: function(chunk, encoding, next) {
+            if (encoding == 'buffer') {
+                writable.write(chunk, reportError);
+                return stdWrite(chunk, next);
+            } else {
+                writable.write(chunk, encoding, reportError);
+                return stdWrite(chunk, encoding, next);
+            }
         }
     });
-    std.write = tee.write.bind(tee);
 }
 
-/** @return a Writable that stores output in date-stamped files with Windows style line endings. */
-function logFilesWriter(fileNameSuffix) {
-    const windowsEOL = new stream.Transform({
-        // Transform line endings from Unix style to Windows style.
+/** Transform line endings from Unix style to Windows style. */
+function toWindowsEOL(writable) {
+    var previous = null;
+    const insertCR = function insertCR(s) {
+        return s.replace(/\n/g, function(LF, index) {
+            if (index > 0) {
+                previous = s.charAt(index - 1);
+            }
+            return (previous == '\r') ? LF : EOL;
+        });
+    };
+    const transform = new stream.Transform({
         transform: function(chunk, encoding, output) {
             if (encoding == 'buffer') {
-                output(null, new Buffer(chunk.toString('binary')
-                                        .replace(/([^\r])\n/g, '$1' + EOL),
-                                        'binary'));;
+                output(null, new Buffer(insertCR(chunk.toString('binary')), 'binary'));
             } else if (typeof chunk == 'string') {
-                output(null, chunk.replace(/([^\r])\n/g, '$1' + EOL));
+                output(null, insertCR(chunk))
             } else {
                 output(null, chunk); // no change to an object
             }
         }
     });
+    transform.pipe(writable);
+    return transform;
+}
+
+/** @return a Writable that stores output in date-stamped files. */
+function logFilesWriter(fileNameSuffix) {
     var fileStream = null;
     var fileName = null;
     var nextDay = 0;
-    const dailyFile = new stream.Writable(
-        {decodeStrings: false, objectMode: true,
+    return new stream.Writable(
+        {decodeStrings: false,
          write: function(chunk, encoding, next) {
              var today = new Date();
              if (+today >= nextDay) {
@@ -2057,10 +2078,12 @@ function logFilesWriter(fileNameSuffix) {
                      deleteOldFiles(LOG_FOLDER, /\.log$/, 7 * 24 * hours);
                  }
              }
-             return fileStream.write(chunk, encoding, next);
+             if (encoding == 'buffer') {
+                 return fileStream.write(chunk, next);
+             } else {
+                 return fileStream.write(chunk, encoding, next);
+             }
          }});
-    windowsEOL.pipe(dailyFile);
-    return windowsEOL;
 }
 
 function expandVariablesInFile(variables, fromFile, intoFile) {
