@@ -600,13 +600,9 @@ function argvSlice(start) {
 
 function decodeArg(value) {
     var wasDecoded = false;
-    var bytes = value.replace(/~../g, function(found) {
-        const n1 = fromHex[found.substring(1,2)];
-        if (n1 == null) return found;
-        const n2 = fromHex[found.substring(2,3)];
-        if (n2 == null) return found;
+    var bytes = value.replace(/~[0-9a-f][0-9a-f]/ig, function(found) {
         wasDecoded = true;
-        return String.fromCharCode((n1 * 16) + n2);
+        return String.fromCharCode(parseInt(found.substring(1), 16));
     });
     return wasDecoded ? utf8.decode(bytes) : value;
 }
