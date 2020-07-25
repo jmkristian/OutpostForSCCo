@@ -624,7 +624,8 @@ function convertMessageToFiles() {
         path.resolve(PackItMsgs, environment.MSG_FILENAME), ENCODING
     ).then(function(message) {
         const parsed = parseMessage(message);
-        const spoolFilePrefix = subjectFromMessage(parsed)
+        const subject = environment.subject || subjectFromMessage(parsed);
+        const spoolFilePrefix = subject
               .replace(/[<>:"/\\|?*]/g, '~')
               .replace(SEQUENCE_REGEX, '~');
         return openMessage(args).then(function(pageURL) {
