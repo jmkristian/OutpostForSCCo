@@ -372,6 +372,9 @@ function build() {
     const programPath = process.argv[5];
     const displayName = process.argv[6];
     return Promise.all([
+        expandVariablesInFile({PROGRAM_PATH: programPath.replace(/\\/g, "\\\\"), DisplayName: displayName},
+                              path.join('bin', 'launch.js'),
+                              path.join('built', 'bin', 'launch.js')),
         expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
                               path.join('bin', 'addon.ini'),
                               path.join('built', 'addons', addonName + '.ini')),
@@ -385,7 +388,7 @@ function build() {
                               path.join('bin', 'manual.html'),
                               path.join('built', 'manual.html'))
     ].concat(
-        ['browse.cmd', 'launch-v.cmd', 'launch.vbs', 'UserGuide.html'].map(function(fileName) {
+        ['browse.cmd', 'launch-v.cmd', 'UserGuide.html'].map(function(fileName) {
             return expandVariablesInFile({PROGRAM_PATH: programPath, DisplayName: displayName},
                                          fileName, path.join('built', fileName));
         })
@@ -432,7 +435,7 @@ function installCmdConvert() {
 }
 
 function installConfigFiles(myDirectory, addonNames, cmdConvert) {
-    const launch = process.argv[3] + ' ' + path.join(myDirectory, 'bin', 'launch.vbs');
+    const launch = process.argv[3] + ' ' + path.join(myDirectory, 'bin', 'launch.js');
     return Promise.all([
         expandVariablesInFile({INSTDIR: myDirectory, LAUNCH: launch}, 'UserGuide.html')
     ].concat(
