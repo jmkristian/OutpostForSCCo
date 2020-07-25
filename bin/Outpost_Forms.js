@@ -66,6 +66,7 @@ const morgan = require('morgan');
 const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
+const utf8 = require('utf8');
 const fsp = { // Like fs, except functions return Promises.
 
     appendFile: function(name, data, options) {
@@ -274,6 +275,24 @@ const NOT_FOUND = 404;
 const CHARSET = 'utf-8'; // for HTTP
 const ENCODING = CHARSET; // for files
 const EOL = '\r\n';
+const fromHex = {
+    '0': 0,
+    '1': 1,
+    '2': 2,
+    '3': 3,
+    '4': 4,
+    '5': 5,
+    '6': 6,
+    '7': 7,
+    '8': 8,
+    '9': 9,
+    'a': 10, 'A': 10,
+    'b': 11, 'B': 11,
+    'c': 12, 'C': 12,
+    'd': 13, 'D': 13,
+    'e': 14, 'E': 14,
+    'f': 15, 'F': 15
+};
 const htmlEntities = new AllHtmlEntities();
 const INI = { // patterns that match lines from a .ini file.
     comment: /^\s*;/,
@@ -320,6 +339,10 @@ var settings = DEFAULT_SETTINGS;
 if (process.argv.length > 2) {
     // With no arguments, do nothing quietly.
     const verb = process.argv[2];
+    if (verb == 'decode') {
+        console.log(argvSlice(3).map(decodeArg).map(JSON.stringify).join(" "));
+        return;
+    }
     ((['build', 'convert', 'serve', 'subject', 'uninstall'].indexOf(verb) >= 0)
      ? Promise.resolve()
      : fsp.checkFolder(LOG_FOLDER).then(function() {logToFile(verb);})
@@ -575,6 +598,19 @@ function argvSlice(start) {
     return args;
 }
 
+function decodeArg(value) {
+    var wasDecoded = false;
+    var bytes = value.replace(/~../g, function(found) {
+        const n1 = fromHex[found.substring(1,2)];
+        if (n1 == null) return found;
+        const n2 = fromHex[found.substring(2,3)];
+        if (n2 == null) return found;
+        wasDecoded = true;
+        return String.fromCharCode((n1 * 16) + n2);
+    });
+    return wasDecoded ? utf8.decode(bytes) : value;
+}
+
 function convert() {
     process.chdir(process.argv[4]);
     return fsp.checkFolder(LOG_FOLDER).then(function() {
@@ -583,7 +619,7 @@ function convert() {
 }
 
 function convertMessageToFiles() {
-    var args = argvSlice(5);
+    var args = argvSlice(5).map(decodeArg);
     const environment = parseArgs(args);
     var message_status = environment.message_status;
     if (!message_status) {
@@ -733,7 +769,7 @@ function moveFile(source, destination) {
 }
 
 function browseMessage() {
-    const args = argvSlice(4);
+    const args = argvSlice(4).map(decodeArg);
     return openMessage(args).then(function displayPage(pageURL) {
         if (pageURL) {
             startProcess('start', [pageURL], {shell: true, detached: true, stdio: 'ignore'});
