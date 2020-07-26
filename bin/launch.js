@@ -1,6 +1,6 @@
-/* Run {{PROGRAM_PATH}} with the arguments that were passed to this script,
-   the working directory that contains the folder that contains this script
-   and no visible window.
+/** Run {{PROGRAM_PATH}} with the arguments that were passed to this script,
+    the working directory that contains the folder that contains this script
+    and no visible window.
 */
 
 var vbExclamation = 48; // Display a yellow exclamation mark
@@ -9,7 +9,7 @@ var vbOKOnly = 0; // Offer an OK button, only
 
 var FSO = WScript.CreateObject('Scripting.FileSystemObject');
 var my_folder = FSO.GetParentFolderName(FSO.GetParentFolderName(WScript.ScriptFullName));
-// WScript.Echo my_folder
+// WScript.Echo(my_folder);
 
 // Construct a command line as a string:
 var argv = WScript.Arguments;
@@ -17,7 +17,7 @@ var arguments = ['"' + FSO.BuildPath(my_folder, '{{PROGRAM_PATH}}') + '"'];
 for (var i = 0; i < argv.length; ++i) {
     var arg = "" + argv(i);
     // WScript.Echo((typeof arg) + " " + arg);
-    if (arg.length = 0 || arg.indexOf(' ') >= 0 || arg.indexOf('"') >= 0) {
+    if (arg.length = 0 || arg.search(/[" \t]/) >= 0) {
         // Enquote this argument:
         arg = '"' + arg.replace(/"/g, '""') + '"';
     }
