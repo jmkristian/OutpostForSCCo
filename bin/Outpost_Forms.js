@@ -583,13 +583,30 @@ function argvSlice(start) {
     return args;
 }
 
+function decodeCommandLine(args) {
+    // Command line arguments are all pairs of --<name> <value>.
+    // Only the values are decoded.
+    for (var i = 0; i < args.length; ++i) {
+        if (args[i].startsWith('--')) {
+            ++i;
+            args[i] = decodeArg(args[i]);
+        }
+    }
+    return args;
+}
+
 function decodeArg(value) {
     var wasDecoded = false;
     var bytes = value.replace(/~[0-9a-f][0-9a-f]/ig, function(found) {
         wasDecoded = true;
         return String.fromCharCode(parseInt(found.substring(1), 16));
     });
-    return wasDecoded ? utf8.decode(bytes) : value;
+    try {
+        return wasDecoded ? utf8.decode(bytes) : value;
+    } catch(err) { // for example the bytes aren't UTF-8
+        log(err);
+        return value;
+    }
 }
 
 function convert() {
@@ -600,7 +617,7 @@ function convert() {
 }
 
 function convertMessageToFiles() {
-    var args = argvSlice(5).map(decodeArg);
+    var args = decodeCommandLine(argvSlice(5));
     const environment = parseArgs(args);
     var message_status = environment.message_status;
     if (!message_status) {
@@ -632,10 +649,6 @@ function convertMessageToFiles() {
     if (spoolDir == null) throw new Error('no SPOOL_DIR in arguments.');
     var copyNames = environment.COPY_NAMES;
     if (copyNames == null) throw new Error('no COPY_NAMES in arguments.');
-    copyNames = copyNames.replace(/\\./g, function(found) {
-        const c = found.substring(1, 2);
-        return (c == 'n') ? '\n' : c;
-    });
     copyNames = copyNames.split('\n');
     return fsp.readFile(
         path.resolve(PackItMsgs, environment.MSG_FILENAME), ENCODING
@@ -750,7 +763,7 @@ function moveFile(source, destination) {
 }
 
 function browseMessage() {
-    const args = argvSlice(4).map(decodeArg);
+    const args = decodeCommandLine(argvSlice(4));
     return openMessage(args).then(function displayPage(pageURL) {
         if (pageURL) {
             startProcess('start', [pageURL], {shell: true, detached: true, stdio: 'ignore'});
