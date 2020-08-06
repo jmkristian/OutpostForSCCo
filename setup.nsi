@@ -280,6 +280,8 @@ Function ${un}DeleteMyFiles
   ${Delete} README.*
   ${Delete} UserGuide.*
   ${Delete} launch.vbs
+  ${Delete} bin\launch.vbs
+  ${Delete} bin\launch.cmd
   ${Delete} launch.cmd
   ${Delete} launch-v.cmd
   ${Delete} version.txt
@@ -289,8 +291,7 @@ Function ${un}DeleteMyFiles
   ${RMDir} "$INSTDIR\pdf"
   ClearErrors
   ${Delete} browse.cmd
-  ${Delete} bin\launch.vbs
-  ${Delete} bin\launch.cmd
+  ${Delete} bin\launch.js
   ${Delete} bin\launch-v.cmd
   ${Delete} "${PROGRAM_PATH}"
   ${RMDir} "$INSTDIR\addons"
@@ -391,7 +392,7 @@ Section "Install"
 
   # Files to install:
   SetOutPath "$INSTDIR\bin"
-  File built\launch.vbs
+  File built\bin\launch.js
   File built\launch-v.cmd
   File built\manual.html
   File bin\message.html
@@ -460,7 +461,7 @@ Section "Install"
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
   ClearErrors
-  ${Execute} '"$WSCRIPT_EXE" bin\launch.vbs dry-run "${PROGRAM_PATH}"'
+  ${Execute} '"$WSCRIPT_EXE" bin\launch.js dry-run "${PROGRAM_PATH}"'
   ${If} ${Errors}
     ${AbortLog} `dry-run failed`
   ${EndIf}

@@ -1,4 +1,4 @@
-@echo This script is for troubleshooting. For normal operation, use launch.vbs.
+@echo This script is for troubleshooting. For normal operation, use launch.js.
 @cd "%~dp0"
 @cd ..
 {{PROGRAM_PATH}} %*
