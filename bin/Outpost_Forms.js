@@ -284,6 +284,7 @@ const INI = { // patterns that match lines from a .ini file.
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
 const LOG_FOLDER = 'logs';
+const NameValueArg = /^--([^-]*)-(.*)/;
 const seconds = 1000;
 const hours = 60 * 60 * seconds;
 const OpdFAIL = 'OpdFAIL';
@@ -584,12 +585,12 @@ function argvSlice(start) {
 }
 
 function decodeCommandLine(args) {
-    // Command line arguments are all pairs of --<name> <value>.
+    // Most args are "--<name>-<value>".
     // Only the values are decoded.
     for (var i = 0; i < args.length; ++i) {
-        if (args[i].startsWith('--')) {
-            ++i;
-            args[i] = decodeArg(args[i]);
+        var nameValue = args[i].match(NameValueArg);
+        if (nameValue) {
+            args[i] = '--' + nameValue[1] + '-' + decodeArg(nameValue[2]);
         }
     }
     return args;
@@ -643,7 +644,7 @@ function convertMessageToFiles() {
         } else {
             message_status = 'sent';
         }
-        args.push('--message_status'); args.push(message_status);
+        args.push('--message_status-' + message_status);
     }
     const spoolDir = environment.SPOOL_DIR;
     if (spoolDir == null) throw new Error('no SPOOL_DIR in arguments.');
@@ -1011,13 +1012,12 @@ function serve() {
             const form = req.body.form;
             const space = form.indexOf(' ');
             const args = [
-                '--message_status', 'manual',
-                '--addon_name', form.substring(0, space),
-                '--ADDON_MSG_TYPE', form.substring(space + 1)];
+                '--message_status-manual',
+                '--addon_name-' + form.substring(0, space),
+                '--ADDON_MSG_TYPE-' + form.substring(space + 1)];
             for (var name in req.body) {
                 if (name != 'form') {
-                    args.push(`--${name}`);
-                    args.push(req.body[name]);
+                    args.push('--' + name + '-' + req.body[name]);
                 }
             }
             return onOpen(formId, args);
@@ -1031,14 +1031,12 @@ function serve() {
     app.post('/manual-view', function(req, res, next) {
         const formId = '' + nextFormId++;
         Promise.resolve().then(function() {
-            var args = ['--message_status', 'received', '--mode', 'readonly'];
+            var args = ['--message_status-received', '--mode-readonly'];
             for (var name in req.body) {
-                args.push(`--${name}`);
-                args.push(req.body[name]);
+                args.push('--' + name + '-' + req.body[name]);
             }
             if (req.body.OpDate && req.body.OpTime) {
-                args.push('--MSG_DATETIME_OP_RCVD')
-                args.push(req.body.OpDate + " " + req.body.OpTime)
+                args.push('--MSG_DATETIME_OP_RCVD-' + req.body.OpDate + " " + req.body.OpTime)
             }
             return onOpen(formId, args);
         }).then(function() {
@@ -1139,9 +1137,10 @@ function onOpen(formId, args) {
     // This code should be kept dead simple, since
     // it can't show a problem to the operator.
     return Promise.resolve().then(function() {
-        for (var a = 0; a+1 < args.length; ++a) {
-            if (args[a] == '--addon_name') {
-                var addon_name = args[a+1];
+        for (var a = 0; a < args.length; ++a) {
+            var nameValue = args[a].match(NameValueArg);
+            if (nameValue && nameValue[1] == 'addon_name') {
+                var addon_name = nameValue[2];
                 return fsp.stat(
                     path.join('addons', addon_name + '.ini')
                 ).catch(function(err) {
@@ -1223,9 +1222,9 @@ function saveFileName(formId) {
 function parseArgs(args) {
     var environment = {};
     for (var i = 0; i < args.length; i++) {
-        var option = args[i];
-        if (option.startsWith('--')) {
-            environment[option.substring(2)] = args[++i];
+        var nameValue = args[i].match(NameValueArg);
+        if (nameValue) {
+            environment[nameValue[1]] = nameValue[2];
         }
     }
     ['COPY_NAMES', 'MSG_INDEX', 'MSG_STATE', 'SPOOL_DIR'].forEach(function(name) {
