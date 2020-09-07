@@ -1137,17 +1137,18 @@ function onOpen(formId, args) {
     // This code should be kept dead simple, since
     // it can't show a problem to the operator.
     return Promise.resolve().then(function() {
+        var addon_name = undefined;
         for (var a = 0; a < args.length; ++a) {
             var nameValue = args[a].match(NameValueArg);
             if (nameValue && nameValue[1] == 'addon_name') {
-                var addon_name = nameValue[2];
-                return fsp.stat(
-                    path.join('addons', addon_name + '.ini')
-                ).catch(function(err) {
-                    throw new Error('This is not a server for ' + addon_name + '.');
-                });
+                addon_name = nameValue[2];
             }
         }
+        return fsp.stat(
+            path.join('addons', addon_name + '.ini')
+        ).catch(function(err) {
+            throw new Error('This is not a server for ' + addon_name + '.');
+        });
     }).then(function() {
         openForms[formId] = {
             args: args,
