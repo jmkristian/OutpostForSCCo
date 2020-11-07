@@ -284,7 +284,7 @@ const INI = { // patterns that match lines from a .ini file.
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
 const LOG_FOLDER = 'logs';
-const NameValueArg = /^--([^-]*)-(.*)/;
+const NameValueArg = /^--([^-]*)-([\S\s]*)/; // The value may contain line breaks.
 const seconds = 1000;
 const hours = 60 * 60 * seconds;
 const OpdFAIL = 'OpdFAIL';
@@ -1595,7 +1595,7 @@ function onEmail(formId, message, res) {
         res.redirect('/form-' + formId);
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
-        res.end(errorToHTML(err, foundForm), CHARSET);
+        res.end(errorToHTML(err, foundForm || message), CHARSET);
     });
 }
 
@@ -1888,7 +1888,8 @@ function parseMessage(message) {
     });
     if (!result.formType) {
         throw "I don't know what form to display, since the message doesn't"
-            + ' contain a line that starts with "#T:" or "#FORMFILENAME:".\n';
+            + ' contain a line that starts with "#T:" or "#FORMFILENAME:".\n'
+            + 'message: ' + JSON.stringify(message) + '\n';
     }
     result.fields = fields;
     return result;
@@ -1979,8 +1980,10 @@ function getAddonForms() {
 }
 
 function errorToHTML(err, state) {
+    const errMessage = errorToMessage(err);
+    log('Error: ' + errMessage + (state ? JSON.stringify(state) : ''));
     var message = 'This information might help resolve the problem:<br/><br/>' + EOL
-        + encodeHTML(errorToMessage(err)).replace(/\r?\n/g, '<br/>' + EOL) + '<br/>' + EOL;
+        + encodeHTML(errMessage).replace(/\r?\n/g, '<br/>' + EOL) + '<br/>' + EOL;
     if (state) {
         var stateString = JSON.stringify(state);
         if (stateString.startsWith('{')) {
