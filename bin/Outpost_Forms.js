@@ -208,25 +208,6 @@ const fsp = { // Like fs, except functions return Promises.
     }
 };
 
-function promiseExecFile(program, args) {
-    return new Promise(function execFile(resolve, reject) {
-        try {
-            child_process.execFile(
-                program, args,
-                function(err, stdout, stderr) {
-                    try {
-                        if (err) reject(err);
-                        else resolve(stdout.toString(ENCODING) + stderr.toString(ENCODING));
-                    } catch(err) {
-                        reject(err);
-                    }
-                });
-        } catch(err) {
-            reject(err);
-        }
-    });
-}
-
 function promiseSpawn(exe, args, options) {
     return new Promise(function spawnChild(resolve, reject) {
         try {
@@ -382,9 +363,6 @@ function build() {
         expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
                               path.join('bin', 'cmd-convert.ini'),
                               path.join('built', 'cmd-convert.ini')),
-        expandVariablesInFile({addon_name: addonName},
-                              path.join('bin', 'Aoclient.ini'),
-                              path.join('built', 'addons', addonName, 'Aoclient.ini')),
         expandVariablesInFile({addon_name: addonName},
                               path.join('bin', 'manual.html'),
                               path.join('built', 'manual.html'))
@@ -1685,9 +1663,9 @@ function respondFromOpdirect(exchange) {
     const res = exchange.res;
     const data = exchange.resBody || '';
     if (data.indexOf('Your PacFORMS submission was successful!') >= 0) {
-        log(context + `from Outpost ${res.statusCode} ${data}`);
-        // It's an old version of Outpost. Maybe Aoclient will work:
-        return submitToAoclient(submission);
+        return {message: "That's an obsolete version of Outpost, it appears.",
+                headers: copyHeaders(res.headers),
+                body: data};
     } else if (res.statusCode < HTTP_OK || res.statusCode >= 300) {
         return {message: 'HTTP status ' + res.statusCode + ' ' + res.statusMessage,
                 headers: copyHeaders(res.headers),
@@ -1744,39 +1722,6 @@ function submitToOpdirect(submission, body) {
         } else {
             throw err;
         }
-    });
-}
-
-function submitToAoclient(submission) {
-    const msgFileName = path.resolve(PackItMsgs, 'form-' + submission.formId + '.txt');
-    // Remove the first line of the Outpost message header:
-    const message = submission.form.message.replace(/^\s*![^\r\n]*[\r\n]+/, '')
-    // Outpost will insert !submission.addonName!.
-    return fsp.writeFile(
-        msgFileName, message, {encoding: ENCODING}
-    ).then(function() {
-        return fsp.unlink(OpdFAIL).catch(function(){});
-    }).then(function() {
-        var options = ['-a', submission.addonName,
-                       '-f', msgFileName,
-                       '-s', submission.subject];
-        if (submission.urgent) {
-            options.push('-u');
-        }
-        const program = path.join ('addons', submission.addonName, 'Aoclient.exe');
-        log('/form-' + submission.formId + ' to ' + program + ' ' + options.join(' '));
-        return promiseExecFile(program, options);
-    }).then(function(output) {
-        return fsp.readFile(
-            OpdFAIL, ENCODING
-        ).then(function(data) {
-            throw `${OpdFAIL} : ${data}\n\n${output}`;
-        }, function readFileFailed(err) {
-            fsp.unlink(msgFileName).then(function() {
-                log("Deleted " + msgFileName);
-            });
-            return null; // success
-        });
     });
 }
 

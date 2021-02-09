@@ -34,7 +34,6 @@ UninstPage instfiles
 Var /GLOBAL DETAIL_LOG_FILE
 Var /GLOBAL OUTPOST_CODE
 Var /GLOBAL OUTPOST_DATA
-Var /GLOBAL AOCLIENT_EXE
 Var /GLOBAL WSCRIPT_EXE
 
 Function .onInit
@@ -137,11 +136,6 @@ Function FindOutpost
       ${EndIf}
     ${EndIf}
     ClearErrors
-    ${If} "$AOCLIENT_EXE" == ""
-      ${If} ${FileExists} "$R0\Aoclient.exe"
-        StrCpy $AOCLIENT_EXE "$R0\Aoclient.exe"
-      ${EndIf}
-    ${EndIf}
   ${EndIf}
   Pop $R1
   Pop $R0
@@ -363,32 +357,16 @@ Section "Install"
   FileWrite $R0 "${VersionMajor}.${VersionMinor}"
   FileClose $R0
 
-  CreateDirectory "$INSTDIR\addons\${addon_name}"
-  StrCpy $R0 "You might not be able to submit messages to Outpost"
+  CreateDirectory "$INSTDIR\addons"
   ${If} "$OUTPOST_CODE" == ""
-    StrCpy $R0 "$R0, because I don't know where it's installed."
     Call FindOutposts # DetailPrint diagnostic information
-  ${ElseIf} "$AOCLIENT_EXE" == ""
-    StrCpy $R0 "$R0, because I can't find Aoclient.exe in $OUTPOST_CODE."
-  ${Else}
-    ${DetailLog} `Copy from $AOCLIENT_EXE`
-    ClearErrors
-    CopyFiles "$AOCLIENT_EXE" "$INSTDIR\addons\${addon_name}\Aoclient.exe"
-    ${If} ${Errors}
-      StrCpy $R0 "$R0, because I can't copy $AOCLIENT_EXE."
-      Call IsUserAdmin
-      Pop $1
-      ${If} $1 != true
-        StrCpy $R0 "$R0 To copy it, try running this installer as an administrator."
-      ${EndIf}
-    ${Else}
-      GoTo AoclientOK
-    ${EndIf}
+    StrCpy $R0 "You might not be able to submit messages to Outpost"
+    StrCpy $R0 "$R0, because I don't know where it's installed."
+    StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
+    MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noOutpostOK
+    ${AbortLog} `Can't find Outpost`
+    noOutpostOK:
   ${EndIf}
-  StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
-  MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK AoclientOK
-  ${AbortLog} `Can't copy Aoclient.exe`
-  AoclientOK:
 
   # Files to install:
   SetOutPath "$INSTDIR\bin"
