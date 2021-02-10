@@ -363,7 +363,7 @@ function build() {
         expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
                               path.join('bin', 'cmd-convert.ini'),
                               path.join('built', 'cmd-convert.ini')),
-        expandVariablesInFile({addon_name: addonName},
+        expandVariablesInFile({addon_version: addonVersion, addon_name: addonName},
                               path.join('bin', 'manual.html'),
                               path.join('built', 'manual.html'))
     ].concat(
