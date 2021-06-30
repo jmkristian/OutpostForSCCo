@@ -369,10 +369,46 @@ if (process.argv.length > 2) {
 
 function build() {
     const addonVersion = process.argv[3];
-    const addonName = process.argv[4];
-    const programPath = process.argv[5];
-    const displayName = process.argv[6];
+    const addonVersionPatch = process.argv[4];
+    const addonName = process.argv[5];
+    const programPath = process.argv[6];
+    const displayName = process.argv[7];
+    const signVersion = function signVersion(codeFile, description) {
+        // Set version resources and sign the given codeFile.
+        const baseName = path.join('built', path.basename(codeFile, '.exe'));
+        const rcFile = baseName + '.rc';
+        const resFile = baseName + '.res';
+        const logFile = resFile + '.log';
+        const tempFile = baseName + '-temp.exe';
+        return expandVariablesInFile(
+            {description: description,
+             product: displayName,
+             productVersion: addonVersion + '.' + addonVersionPatch,
+             fileVersion: addonVersion.replace(/\./g, ',') + ',' + addonVersionPatch + ',0'},
+            path.join('bin', 'version.rc'), rcFile
+        ).then(function() {
+            return ResourceHacker(logFile, [
+                '-open', rcFile,
+                '-save', resFile,
+                '-action', 'compile'
+            ]);
+        }).then(function() {
+            return ResourceHacker(logFile, [
+                '-open', codeFile,
+                '-save', tempFile,
+                '-action', 'addoverwrite',
+                '-res', resFile
+            ]);
+        }).then(function() {
+            return fsp.rename(tempFile, codeFile);
+        }).then(function() {
+            return promiseExecFile(path.join('.', 'sign.cmd'), [codeFile]);
+        }).then(log);
+    };
+
     return Promise.all([
+        signVersion(path.join('built', 'Outpost_Forms.exe'), "HTTP server"),
+        signVersion(path.join('built', 'WebToPDF.exe'), "Convert web page to PDF"),
         expandVariablesInFile({PROGRAM_PATH: programPath.replace(/\\/g, "\\\\"), DisplayName: displayName},
                               path.join('bin', 'launch.js'),
                               path.join('built', 'bin', 'launch.js')),
@@ -394,6 +430,21 @@ function build() {
                                          fileName, path.join('built', fileName));
         })
     ));
+}
+
+function ResourceHacker(logFile, args) {
+    return promiseExecFile(
+        'ResourceHacker', args.concat(['-log', logFile])
+    ).then(log, function(err) {
+        return fsp.readFile(
+            logFile, 'ucs2'
+        ).then(function(messages) {
+            log(messages);
+            throw err;
+        }, function(readFileErr) {
+            throw err; // from ResourceHacker, not readFile
+        });
+    });
 }
 
 function install() {

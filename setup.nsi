@@ -1,4 +1,4 @@
-# Copyright 2018,2019 by John Kristian
+# Copyright 2018,2019,2020,2021 by John Kristian
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+OutFile "${OutFile}"
 
 !define InstalledKey SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall
 
@@ -46,13 +48,13 @@ Function .onInit
   ${EndIf}
 FunctionEnd
 
-VIProductVersion "0.0.0.0"
+VIProductVersion "${VersionMajor}.${VersionMinor}.${VersionPatch}.0"
 # LoadLanguageFile "${NSISDIR}\Contrib\Language files\English.nlf"
 # VIAddVersionKey /LANG=${LANG_ENGLISH} "FileVersion" "${VersionMajor}.${VersionMinor}"
 VIAddVersionKey "ProductName" "${DisplayName}"
-VIAddVersionKey "ProductVersion" "${VersionMajor}.${VersionMinor}"
+VIAddVersionKey "ProductVersion" "${VersionMajor}.${VersionMinor}.${VersionPatch}"
 VIAddVersionKey "FileDescription" "Install ${DisplayName}"
-VIAddVersionKey "FileVersion" "${VersionMajor}.${VersionMinor}"
+VIAddVersionKey "FileVersion" "${VersionMajor}.${VersionMinor}.${VersionPatch}"
 VIAddVersionKey "LegalCopyright" "2020 by John Kristian"
 
 Function selectOutpostCode
@@ -108,7 +110,7 @@ FunctionEnd
       FileOpen $DETAIL_LOG_FILE "$7" w
     ${EndIf}
   ${EndIf}
-  ${DetailLog} `[$2-$1-$0T$4:$5:$6] version ${VersionMajor}.${VersionMinor}`
+  ${DetailLog} `[$2-$1-$0T$4:$5:$6] version ${VersionMajor}.${VersionMinor}.${VersionPatch}`
   ClearErrors
 !macroend
 !define OpenDetailLogFile '!insertmacro "OpenDetailLogFile"'
@@ -360,7 +362,7 @@ Section "Install"
   FileWrite $R0 "$OUTPOST_DATA"
   FileClose $R0
   FileOpen $R0 "version.txt" w
-  FileWrite $R0 "${VersionMajor}.${VersionMinor}"
+  FileWrite $R0 "${VersionMajor}.${VersionMinor}.${VersionPatch}"
   FileClose $R0
 
   CreateDirectory "$INSTDIR\addons\${addon_name}"
@@ -401,7 +403,7 @@ Section "Install"
   File bin\subject.cmd
   ${IfNot} ${IsWinXP}
      File /r webToPDF\Chromium-81.0.4044.92
-     File webToPDF\WebToPDF.exe
+     File built\WebToPDF.exe
      File webToPDF\WebToPDF.js
      File built\cmd-convert.ini
   ${EndIf}
@@ -420,7 +422,7 @@ Section "Install"
   WriteUninstaller "$INSTDIR\uninstall.exe"
   ClearErrors
   SetRegView 32
-  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "${DisplayName} v${VersionMajor}.${VersionMinor}"
+  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayName "${DisplayName} v${VersionMajor}.${VersionMinor}.${VersionPatch}"
   WriteRegStr   HKLM "${REG_SUBKEY}" UninstallString "$\"$INSTDIR\uninstall.exe$\""
   ${If} ${Errors}
     ${DetailLog} `not registered`
@@ -433,9 +435,9 @@ Section "Install"
     ${EndIf}
     MessageBox MB_OK|MB_ICONINFORMATION "$0" /SD IDOK
   ${EndIf}
-  WriteRegStr   HKLM "${REG_SUBKEY}" Publisher "Los Altos ARES"
+  WriteRegStr   HKLM "${REG_SUBKEY}" Publisher "Santa Clara County ARES/RACES"
   WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "$INSTDIR\UserGuide.html"
-  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayVersion "${VersionMajor}.${VersionMinor}"
+  WriteRegStr   HKLM "${REG_SUBKEY}" DisplayVersion "${VersionMajor}.${VersionMinor}.${VersionPatch}"
   WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMajor ${VersionMajor}
   WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMinor ${VersionMinor}
   WriteRegDWORD HKLM "${REG_SUBKEY}" NoModify 1
@@ -468,6 +470,7 @@ Section "Install"
   ${If} "$DETAIL_LOG_FILE" != ""
     FileClose "$DETAIL_LOG_FILE"
   ${EndIf}
+  !finalize '.\sign.cmd "%1"'
 SectionEnd
 
 Section "Uninstall"

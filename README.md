@@ -8,12 +8,18 @@ to Outpost, and a web browser to display and edit forms.
 For installation and usage instructions, see the UserGuide.html file in each [release](https://github.com/jmkristian/OutpostForSCCo/releases).
 
 Source code is stored in this repository.
-To build it, you'll need
-[Git](https://git-scm.com/downloads),
-[nvm for Windows](https://github.com/coreybutler/nvm-windows),
-[NSIS](http://nsis.sourceforge.net) version 3 or later
-and a bash shell.
-The bash shell included with Git for Windows is sufficient.
+To build it, you'll need:
+* [Git](https://git-scm.com/downloads)
+* [nvm for Windows](https://github.com/coreybutler/nvm-windows)
+* [NSIS](http://nsis.sourceforge.net) version 3 or later.
+* [ResourceHacker](http://www.angusj.com/resourcehacker/).
+* [SignTool](https://docs.microsoft.com/en-us/windows/win32/seccrypto/signtool),
+  which is included in the
+  [Windows SDK](https://developer.microsoft.com/en-us/windows/downloads/sdk-archive/)
+  feature Windows App Certification Kit.
+* a code signing certificate and private key
+* a bash shell.
+  The bash shell included with Git for Windows is sufficient.
 
 Using [nvm](https://github.com/coreybutler/nvm-windows),
 install the 32-bit variants of
@@ -23,7 +29,16 @@ and version 10.18.1.
 Run "nvm install" from a Windows cmd or PowerShell prompt (not bash).
 That old version of Node.js builds code that runs on Windows XP; newer versions don't.
 
-Clone this repository and then use bash to run webToPDF/build.sh and then ./build.sh in your clone.
+In your PATH environment variable,
+add the folders that contain ResourceHacker.exe and SignTool.exe
+(so they can be executed in a cmd script).
+
+1. Clone this repository. In your clone:
+1. Create a file signingCert.pfx,
+   which contains your code signing certificate and private key,
+   in PKCS#12 format with no password.
+1. Use bash to run webToPDF/build.sh
+1. Use bash to run ./build.sh
 
 Most improvements to the web user interface will be done in
 [pack-it-forms](https://github.com/jmkristian/pack-it-forms/blob/SCCo.2/README.md)
