@@ -12,9 +12,8 @@ fi
 if [ ! -e node_modules ]; then
     npm install || exit $? # https://docs.npmjs.com/cli/install
 fi
-node_modules/.bin/pkg.cmd -t node4-win-x86 bin/Outpost_Forms.js || exit $?
-mv Outpost_Forms.exe built/ || exit $?
-cp -p webToPDF/WebToPDF.exe built/ || exit $?
+cp -p C:/PackItForms/Outpost/SCCo/bin/SCCoPIFO.exe built/Outpost_Forms.exe || exit $?
+cp -p C:/PackItForms/Outpost/SCCo/bin/WebToPDF.exe built/ || exit $?
 rm -f pack-it-forms/resources/integration/integration.js
 
 for REPO in jmkristian/pack-it-forms "$@"; do
@@ -24,7 +23,7 @@ for REPO in jmkristian/pack-it-forms "$@"; do
     fi
     if [ ! -e "$FORMS" ]; then
         git clone https://github.com/"$REPO".git || exit $?
-        (cd "$FORMS" && git checkout vSCCo.39)
+        (cd "$FORMS" && git checkout vSCCo.37.1)
         rm -rf "$FORMS"/.git*
     fi
     "$FORMS"/resources/integration/scco/build.sh ./buildInstaller.sh\
