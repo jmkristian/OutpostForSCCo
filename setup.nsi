@@ -1,4 +1,4 @@
-# Copyright 2018,2019 by John Kristian
+# Copyright 2018,2019,2020,2021 by John Kristian
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+OutFile "${OutFile}"
 
 !define InstalledKey SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall
 
@@ -45,7 +47,7 @@ Function .onInit
   ${EndIf}
 FunctionEnd
 
-VIProductVersion "0.0.0.0"
+VIProductVersion "${VersionMajor}.${VersionMinor}.0.0"
 # LoadLanguageFile "${NSISDIR}\Contrib\Language files\English.nlf"
 # VIAddVersionKey /LANG=${LANG_ENGLISH} "FileVersion" "${VersionMajor}.${VersionMinor}"
 VIAddVersionKey "ProductName" "${DisplayName}"
@@ -379,7 +381,7 @@ Section "Install"
   File bin\subject.cmd
   ${IfNot} ${IsWinXP}
      File /r webToPDF\Chromium-81.0.4044.92
-     File webToPDF\WebToPDF.exe
+     File built\WebToPDF.exe
      File webToPDF\WebToPDF.js
      File built\cmd-convert.ini
   ${EndIf}
@@ -411,7 +413,7 @@ Section "Install"
     ${EndIf}
     MessageBox MB_OK|MB_ICONINFORMATION "$0" /SD IDOK
   ${EndIf}
-  WriteRegStr   HKLM "${REG_SUBKEY}" Publisher "Los Altos ARES"
+  WriteRegStr   HKLM "${REG_SUBKEY}" Publisher "Santa Clara County ARES/RACES"
   WriteRegStr   HKLM "${REG_SUBKEY}" URLInfoAbout "$INSTDIR\UserGuide.html"
   WriteRegStr   HKLM "${REG_SUBKEY}" DisplayVersion "${VersionMajor}.${VersionMinor}"
   WriteRegDWORD HKLM "${REG_SUBKEY}" VersionMajor ${VersionMajor}
@@ -446,6 +448,7 @@ Section "Install"
   ${If} "$DETAIL_LOG_FILE" != ""
     FileClose "$DETAIL_LOG_FILE"
   ${EndIf}
+  !finalize '.\sign.cmd "%1"'
 SectionEnd
 
 Section "Uninstall"

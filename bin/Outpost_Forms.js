@@ -208,6 +208,25 @@ const fsp = { // Like fs, except functions return Promises.
     }
 };
 
+function promiseExecFile(program, args) {
+    return new Promise(function execFile(resolve, reject) {
+        try {
+            child_process.execFile(
+                program, args,
+                function(err, stdout, stderr) {
+                    try {
+                        if (err) reject(err);
+                        else resolve(stdout.toString(ENCODING) + stderr.toString(ENCODING));
+                    } catch(err) {
+                        reject(err);
+                    }
+                });
+        } catch(err) {
+            reject(err);
+        }
+    });
+}
+
 function promiseSpawn(exe, args, options) {
     return new Promise(function spawnChild(resolve, reject) {
         try {
@@ -353,7 +372,42 @@ function build() {
     const addonName = process.argv[4];
     const programPath = process.argv[5];
     const displayName = process.argv[6];
+    const signVersion = function signVersion(codeFile, description) {
+        // Set version resources and sign the given codeFile.
+        const baseName = path.join('built', path.basename(codeFile, '.exe'));
+        const rcFile = baseName + '.rc';
+        const resFile = baseName + '.res';
+        const logFile = resFile + '.log';
+        const tempFile = baseName + '-temp.exe';
+        return expandVariablesInFile(
+            {description: description,
+             product: displayName,
+             productVersion: addonVersion,
+             fileVersion: addonVersion.replace(/\./g, ',') + ',0,0'},
+            path.join('bin', 'version.rc'), rcFile
+        ).then(function() {
+            return ResourceHacker(logFile, [
+                '-open', rcFile,
+                '-save', resFile,
+                '-action', 'compile'
+            ]);
+        }).then(function() {
+            return ResourceHacker(logFile, [
+                '-open', codeFile,
+                '-save', tempFile,
+                '-action', 'addoverwrite',
+                '-res', resFile
+            ]);
+        }).then(function() {
+            return fsp.rename(tempFile, codeFile);
+        }).then(function() {
+            return promiseExecFile(path.join('.', 'sign.cmd'), [codeFile]);
+        }).then(log);
+    };
+
     return Promise.all([
+        signVersion(path.join('built', 'Outpost_Forms.exe'), "HTTP server"),
+        signVersion(path.join('built', 'WebToPDF.exe'), "Convert web page to PDF"),
         expandVariablesInFile({PROGRAM_PATH: programPath.replace(/\\/g, "\\\\"), DisplayName: displayName},
                               path.join('bin', 'launch.js'),
                               path.join('built', 'bin', 'launch.js')),
@@ -372,6 +426,21 @@ function build() {
                                          fileName, path.join('built', fileName));
         })
     ));
+}
+
+function ResourceHacker(logFile, args) {
+    return promiseExecFile(
+        'ResourceHacker', args.concat(['-log', logFile])
+    ).then(log, function(err) {
+        return fsp.readFile(
+            logFile, 'ucs2'
+        ).then(function(messages) {
+            log(messages);
+            throw err;
+        }, function(readFileErr) {
+            throw err; // from ResourceHacker, not readFile
+        });
+    });
 }
 
 function install() {

@@ -1,0 +1,20 @@
+VS_VERSION_INFO VERSIONINFO
+    FILEVERSION    {{fileVersion}}
+    PRODUCTVERSION {{fileVersion}}
+{
+    BLOCK "StringFileInfo"
+    {
+        BLOCK "040904b0"
+        {
+            VALUE "ProductName",     "{{product}}\0"
+            VALUE "ProductVersion",  "{{productVersion}}\0"
+            VALUE "FileDescription", "{{description}}\0"
+            VALUE "FileVersion",     "{{productVersion}}\0"
+            VALUE "LegalCopyright",  "2020 by John Kristian\0"
+        }
+    }
+    BLOCK "VarFileInfo"
+    {
+        VALUE "Translation", 0x409, 1200
+    }
+}
