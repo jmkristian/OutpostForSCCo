@@ -67,146 +67,7 @@ const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
 const utf8 = require('utf8');
-const fsp = { // Like fs, except functions return Promises.
-
-    appendFile: function(name, data, options) {
-        return new Promise(function appendFile(resolve, reject) {
-            try {
-                fs.appendFile(name, data, options, function(err) {
-                    if (err) reject(err);
-                    else resolve(true);
-                });
-            } catch(err) {
-                reject(err);
-            }
-        });
-    },
-
-    checkFolder: function(name) {
-        return fsp.stat(name).then(
-            function(stats) {
-                return false; // not created
-            },
-            function(err) {
-                return fsp.createFolder(name);
-            });
-    },
-
-    copyFile: function(source, target) {
-        return new Promise(function copyFile(resolve, reject) {
-            var settled = false;
-            function settle(err) {
-                if (!settled) {
-                    settled = true;
-                    if (err) reject(err);
-                    else resolve();
-                }
-            }
-            try {
-                const from = fs.createReadStream(source);
-                from.on('error', settle);
-                const into = fs.createWriteStream(target);
-                into.on('error', settle);
-                into.on('close', function() {settle();});
-                from.pipe(into);
-            } catch(err) {
-                settle(err);
-            }
-        });
-    },
-
-    createFolder: function(name) {
-        return new Promise(function createFolder(resolve, reject) {
-            try {
-                fs.mkdir(name, function(err) {
-                    if (err) reject(err);
-                    else resolve(true); // created
-                });
-            } catch(err) {
-                reject(err);
-            }
-        });
-    },
-
-    readdir: function(name) { // @return Promise<array of String>
-        return new Promise(function readdir(resolve, reject) {
-            try {
-                fs.readdir(name, function(err, files) {
-                    if (err) reject(err);
-                    else resolve(files);
-                });
-            } catch(err) {
-                reject(err);
-            }
-        });
-    },
-
-    readFile: function(name, options) { // @return Promise<String or Buffer>
-        return new Promise(function readFile(resolve, reject) {
-            try {
-                fs.readFile(name, options, function(err, data) {
-                    if (err) reject(err);
-                    else resolve(data);
-                });
-            } catch(err) {
-                reject(err);
-            }
-        });
-    },
-
-    rename: function(oldPath, newPath) {
-        return new Promise(function rename(resolve, reject) {
-            try {
-                fs.rename(oldPath, newPath, function(err) {
-                    if (err) reject(err);
-                    else resolve();
-                });
-            } catch(err) {
-                reject(err);
-            }
-        });
-    },
-
-    stat: function(name) {
-        return new Promise(function stat(resolve, reject) {
-            try {
-                fs.stat(name, function(err, stats) {
-                    if (err) reject(err);
-                    else if (stats) resolve(stats);
-                    else reject(`No Stats from ${name}`);
-                });
-            } catch(err) {
-                reject(err);
-            }
-        });
-    },
-
-    unlink: function(name) { // @return Promise<String or Buffer>
-        return new Promise(function unlink(resolve, reject) {
-            try {
-                fs.unlink(name, function(err) {
-                    if (err) reject(err);
-                    else resolve();
-                });
-            } catch(err) {
-                reject(err);
-            }
-        });
-    },
-
-    writeFile: function(name, data, options) {
-        return new Promise(function writeFile(resolve, reject) {
-            try {
-                fs.writeFile(name, data, options, function(err) {
-                    if (err) reject(err);
-                    else resolve(true);
-                });
-            } catch(err) {
-                reject(err);
-            }
-        });
-    }
-};
+const fsp = require('./fsp.js');
 
 function promiseExecFile(program, args) {
     return new Promise(function execFile(resolve, reject) {
@@ -374,33 +235,12 @@ function build() {
     const displayName = process.argv[6];
     const signVersion = function signVersion(codeFile, description) {
         // Set version resources and sign the given codeFile.
-        const baseName = path.join('built', path.basename(codeFile, '.exe'));
-        const rcFile = baseName + '.rc';
-        const resFile = baseName + '.res';
-        const logFile = resFile + '.log';
-        const tempFile = baseName + '-temp.exe';
-        return expandVariablesInFile(
-            {description: description,
-             product: displayName,
-             productVersion: addonVersion,
-             fileVersion: addonVersion.replace(/\./g, ',') + ',0,0'},
-            path.join('bin', 'version.rc'), rcFile
+        return promiseExecFile(
+            path.join('webToPDF', 'setVersion.exe'),
+            [codeFile, addonVersion, displayName, description]
+        ).then(
+            log
         ).then(function() {
-            return ResourceHacker(logFile, [
-                '-open', rcFile,
-                '-save', resFile,
-                '-action', 'compile'
-            ]);
-        }).then(function() {
-            return ResourceHacker(logFile, [
-                '-open', codeFile,
-                '-save', tempFile,
-                '-action', 'addoverwrite',
-                '-res', resFile
-            ]);
-        }).then(function() {
-            return fsp.rename(tempFile, codeFile);
-        }).then(function() {
             return promiseExecFile(path.join('.', 'sign.cmd'), [codeFile]);
         }).then(log);
     };
@@ -426,21 +266,6 @@ function build() {
                                          fileName, path.join('built', fileName));
         })
     ));
-}
-
-function ResourceHacker(logFile, args) {
-    return promiseExecFile(
-        'ResourceHacker', args.concat(['-log', logFile])
-    ).then(log, function(err) {
-        return fsp.readFile(
-            logFile, 'ucs2'
-        ).then(function(messages) {
-            log(messages);
-            throw err;
-        }, function(readFileErr) {
-            throw err; // from ResourceHacker, not readFile
-        });
-    });
 }
 
 function install() {

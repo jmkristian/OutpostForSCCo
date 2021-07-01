@@ -7,6 +7,8 @@
 
 rm -rf built/addons
 mkdir -p built/addons || exit $?
+cp -p built/bin/Outpost_Forms.exe built/ || exit $?
+cp -p webToPDF/WebToPDF.exe built/ || exit $?
 node bin/Outpost_Forms.js build $VersionMajor.$VersionMinor "$1" bin\\"$3" "$2" || exit $?
 cp -p "$FORMS"/resources/integration/scco/"$1".nsi built/addon.nsi || exit $?
 ./setup.cmd "$1" "$2" "bin\\$3" "$4" || exit $?

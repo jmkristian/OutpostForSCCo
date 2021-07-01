@@ -6,3 +6,4 @@ if [ `node --version` != "v10.18.1" ]; then
 fi
 npm install || exit $? # https://docs.npmjs.com/cli/install
 node_modules/.bin/pkg.cmd -t node10-win-x86 WebToPDF.js || exit $?
+node_modules/.bin/pkg.cmd -t node10-win-x86 setVersion.js || exit $?

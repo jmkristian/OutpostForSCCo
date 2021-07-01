@@ -12,7 +12,6 @@ To build it, you'll need:
 * [Git](https://git-scm.com/downloads)
 * [nvm for Windows](https://github.com/coreybutler/nvm-windows)
 * [NSIS](http://nsis.sourceforge.net) version 3 or later.
-* [ResourceHacker](http://www.angusj.com/resourcehacker/).
 * [SignTool](https://docs.microsoft.com/en-us/windows/win32/seccrypto/signtool),
   which is included in the
   [Windows SDK](https://developer.microsoft.com/en-us/windows/downloads/sdk-archive/)
@@ -29,9 +28,8 @@ and version 10.18.1.
 Run "nvm install" from a Windows cmd or PowerShell prompt (not bash).
 That old version of Node.js builds code that runs on Windows XP; newer versions don't.
 
-In your PATH environment variable,
-add the folders that contain ResourceHacker.exe and SignTool.exe
-(so they can be executed in a cmd script).
+In your PATH environment variable, add the folder that contains SignTool.exe
+(so it can be executed by the script sign.cmd).
 
 1. Clone this repository. In your clone:
 1. Create a file signingCert.pfx,
