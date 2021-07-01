@@ -60,6 +60,7 @@ const child_process = require('child_process');
 const concat_stream = require('concat-stream');
 const express = require('express');
 const fs = require('fs');
+const fsp = require('./fsp.js');
 const http = require('http');
 const makeTemp = require('tmp');
 const morgan = require('morgan');
@@ -67,26 +68,14 @@ const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
 const utf8 = require('utf8');
-const fsp = require('./fsp.js');
+const utilities = require('./utilities');
 
-function promiseExecFile(program, args) {
-    return new Promise(function execFile(resolve, reject) {
-        try {
-            child_process.execFile(
-                program, args,
-                function(err, stdout, stderr) {
-                    try {
-                        if (err) reject(err);
-                        else resolve(stdout.toString(ENCODING) + stderr.toString(ENCODING));
-                    } catch(err) {
-                        reject(err);
-                    }
-                });
-        } catch(err) {
-            reject(err);
-        }
-    });
-}
+const errorToMessage = utilities.errorToMessage;
+const enquoteRegex = utilities.enquoteRegex;
+const expandVariables = utilities.expandVariables;
+const expandVariablesInFile = utilities.expandVariablesInFile;
+const log = utilities.log;
+const toLogMessage = utilities.toLogMessage;
 
 function promiseSpawn(exe, args, options) {
     return new Promise(function spawnChild(resolve, reject) {
@@ -187,15 +176,11 @@ if (process.argv.length > 2) {
         console.log(argvSlice(3).map(decodeArg).map(JSON.stringify).join(" "));
         return;
     }
-    ((['build', 'convert', 'serve', 'subject', 'uninstall'].indexOf(verb) >= 0)
+    ((['convert', 'serve', 'subject', 'uninstall'].indexOf(verb) >= 0)
      ? Promise.resolve()
      : fsp.checkFolder(LOG_FOLDER).then(function() {logToFile(verb);})
     ).then(function() {
         switch(verb) {
-        case 'build':
-            // Customize various files for a given add-on.
-            // This happens before creating an installer.
-            return build();
         case 'install':
             // Edit various files depending on how this program was installed.
             return install();
@@ -226,46 +211,6 @@ if (process.argv.length > 2) {
         log(err);
         process.exitCode = 1;
     });
-}
-
-function build() {
-    const addonVersion = process.argv[3];
-    const addonName = process.argv[4];
-    const programPath = process.argv[5];
-    const displayName = process.argv[6];
-    const signVersion = function signVersion(codeFile, description) {
-        // Set version resources and sign the given codeFile.
-        return promiseExecFile(
-            path.join('webToPDF', 'setVersion.exe'),
-            [codeFile, addonVersion, displayName, description]
-        ).then(
-            log
-        ).then(function() {
-            return promiseExecFile(path.join('.', 'sign.cmd'), [codeFile]);
-        }).then(log);
-    };
-
-    return Promise.all([
-        signVersion(path.join('built', 'Outpost_Forms.exe'), "HTTP server"),
-        signVersion(path.join('built', 'WebToPDF.exe'), "Convert web page to PDF"),
-        expandVariablesInFile({PROGRAM_PATH: programPath.replace(/\\/g, "\\\\"), DisplayName: displayName},
-                              path.join('bin', 'launch.js'),
-                              path.join('built', 'bin', 'launch.js')),
-        expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
-                              path.join('bin', 'addon.ini'),
-                              path.join('built', 'addons', addonName + '.ini')),
-        expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
-                              path.join('bin', 'cmd-convert.ini'),
-                              path.join('built', 'cmd-convert.ini')),
-        expandVariablesInFile({addon_version: addonVersion, addon_name: addonName},
-                              path.join('bin', 'manual.html'),
-                              path.join('built', 'manual.html'))
-    ].concat(
-        ['browse.cmd', 'launch-v.cmd', 'UserGuide.html'].map(function(fileName) {
-            return expandVariablesInFile({PROGRAM_PATH: programPath, DisplayName: displayName},
-                                         fileName, path.join('built', fileName));
-        })
-    ));
 }
 
 function install() {
@@ -1640,7 +1585,7 @@ function onGetManual(res) {
                 });
             res.send(expandVariables(data, {form_options: form_options.join('')}));
         });
-    }, function(err) {
+    }).catch(function(err) {
         res.send(errorToHTML(err, template));
     });
 }
@@ -1959,59 +1904,6 @@ function logFilesWriter(fileNameSuffix) {
          }});
 }
 
-function expandVariablesInFile(variables, fromFile, intoFile) {
-    if (!intoFile) intoFile = fromFile;
-    return fsp.checkFolder(
-        path.dirname(intoFile)
-    ).then(function() {
-        return fsp.readFile(fromFile, ENCODING);
-    }).then(function(data) {
-        var newData = expandVariables(data, variables);
-        if (newData != data || intoFile != fromFile) {
-            return fsp.writeFile(
-                intoFile, newData, {encoding: ENCODING}
-            ).then(function() {
-                log(JSON.stringify(variables) + ' in ' + intoFile);
-            });
-        }
-    });
-}
-
-function expandVariables(data, values) {
-    for (var v in values) {
-        data = data.replace(new RegExp(enquoteRegex('{{' + v + '}}'), 'g'), values[v]);
-    }
-    return data;
-}
-
-function errorToMessage(err) {
-    if (err == null) {
-        return null;
-    } else if (err instanceof Error && err.stack) {
-        return err.stack;
-    } else if (typeof err == 'string') {
-        return err;
-    } else {
-        return JSON.stringify(err);
-    }
-}
-
-function log(data) {
-    if (data) {
-        console.log(toLogMessage(data));
-    }
-}
-
-function toLogMessage(data) {
-    const message = (typeof data == 'object') ? errorToMessage(data) : ('' + data);
-    return '[' + new Date().toISOString() + '] ' + message;
-}
-
 function encodeHTML(text) {
     return htmlEntities.encode(text + '');
-}
-
-function enquoteRegex(text) {
-    // Crude but adequate:
-    return ('' + text).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 }

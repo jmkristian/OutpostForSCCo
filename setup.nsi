@@ -380,6 +380,7 @@ Section "Install"
   File bin\Outpost_Forms.js
   File bin\server.ini
   File bin\subject.cmd
+  File bin\utilities.js
   ${IfNot} ${IsWinXP}
      File /r webToPDF\Chromium-81.0.4044.92
      File built\WebToPDF.exe
