@@ -1,4 +1,4 @@
-# Copyright 2018,2019,2020,2021 by John Kristian
+# Copyright 2021 by John Kristian
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ VIAddVersionKey "ProductName" "${DisplayName}"
 VIAddVersionKey "ProductVersion" "${VersionMajor}.${VersionMinor}"
 VIAddVersionKey "FileDescription" "Install ${DisplayName}"
 VIAddVersionKey "FileVersion" "${VersionMajor}.${VersionMinor}"
-VIAddVersionKey "LegalCopyright" "2020 by John Kristian"
+VIAddVersionKey "LegalCopyright" "2021 by John Kristian"
 
 Function selectOutpostCode
   Call FindOutposts

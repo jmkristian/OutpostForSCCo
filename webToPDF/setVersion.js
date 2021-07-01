@@ -47,7 +47,7 @@ if (!fileName.toLowerCase().endsWith('.exe')) {
                     ProductVersion: productVersion,
                     FileDescription: fileDescription,
                     FileVersion: productVersion,
-                    LegalCopyright: '2020 by John Kristian',
+                    LegalCopyright: '2021 by John Kristian',
                     OriginalFilename: '',
                 });
             }

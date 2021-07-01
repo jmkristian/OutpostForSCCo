@@ -1,4 +1,4 @@
-/* Copyright 2018, 2019 by John Kristian
+/* Copyright 2021 by John Kristian
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
