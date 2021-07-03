@@ -12,8 +12,8 @@ fi
 if [ ! -e node_modules ]; then
     npm install || exit $? # https://docs.npmjs.com/cli/install
 fi
-cp -p C:/PackItForms/Outpost/SCCo/bin/SCCoPIFO.exe built/Outpost_Forms.exe || exit $?
-cp -p C:/PackItForms/Outpost/SCCo/bin/WebToPDF.exe built/ || exit $?
+cp -p C:/PackItForms-3.2/Outpost/SCCo/bin/SCCoPIFO.exe built/Outpost_Forms.exe || exit $?
+cp -p C:/PackItForms-3.2/Outpost/SCCo/bin/WebToPDF.exe built/ || exit $?
 rm -f pack-it-forms/resources/integration/integration.js
 
 for REPO in jmkristian/pack-it-forms "$@"; do
