@@ -17,35 +17,46 @@
 
 const addonVersion = process.argv[2];
 const addonName = process.argv[3];
-const programPath = process.argv[4];
-const displayName = process.argv[5];
+const displayName = process.argv[4];
+const programName = process.argv[5];
 
 const child_process = require('child_process');
 const path = require('path');
 const utilities = require('./bin/utilities.js');
 const expandVariablesInFile = utilities.expandVariablesInFile;
 const log = utilities.log;
+const programPath = path.join('bin', programName);
 
 Promise.all(
     [
-        signVersion(path.join('built', 'Outpost_Forms.exe'), "HTTP server"),
-        signVersion(path.join('built', 'WebToPDF.exe'), "Convert web page to PDF"),
-        expandVariablesInFile({PROGRAM_PATH: programPath.replace(/\\/g, "\\\\"), DisplayName: displayName},
-                              path.join('bin', 'launch.js'),
-                              path.join('built', 'bin', 'launch.js')),
-        expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
-                              path.join('bin', 'addon.ini'),
-                              path.join('built', 'addons', addonName + '.ini')),
-        expandVariablesInFile({addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
-                              path.join('bin', 'cmd-convert.ini'),
-                              path.join('built', 'cmd-convert.ini')),
-        expandVariablesInFile({addon_version: addonVersion, addon_name: addonName},
-                              path.join('bin', 'manual.html'),
-                              path.join('built', 'manual.html'))
+        signVersion(
+            path.join('built', 'Outpost_Forms.exe'),
+            path.join('built', programPath),
+            "HTTP server"),
+        signVersion(
+            path.join('webToPDF', 'built', 'WebToPDF.exe'),
+            path.join('built', 'webToPDF', 'WebToPDF.exe'),
+            'Convert web page to PDF'),
+        expandVariablesInFile(
+            {addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
+            path.join('bin', 'addon.ini'),
+            path.join('built', 'addons', addonName + '.ini')),
+        expandVariablesInFile(
+            {addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
+            path.join('bin', 'cmd-convert.ini'),
+            path.join('built', 'webToPDF', 'cmd-convert.ini')),
+        buildFile(
+            {PROGRAM_PATH: programPath.replace(/\\/g, "\\\\"), DisplayName: displayName},
+            path.join('bin', 'launch.js')),
+        buildFile(
+            {addon_version: addonVersion, addon_name: addonName},
+            path.join('bin', 'manual.html')),
     ].concat(
-        ['browse.cmd', 'launch-v.cmd', 'UserGuide.html'].map(function(fileName) {
-            return expandVariablesInFile({PROGRAM_PATH: programPath, DisplayName: displayName},
-                                         fileName, path.join('built', fileName));
+        ['browse.cmd', path.join('bin', 'launch-v.cmd'), 'UserGuide.html'
+        ].map(function(fileName) {
+            return buildFile(
+                {PROGRAM_PATH: programPath, DisplayName: displayName},
+                fileName);
         })
     )
 ).catch(function(err) {
@@ -53,15 +64,19 @@ Promise.all(
     process.exitCode = 1;
 });
 
-function signVersion(codeFile, description) {
-    // Set version resources and sign the given codeFile.
+function buildFile(variables, fileName) {
+    return expandVariablesInFile(variables, fileName, path.join('built', fileName));
+}
+
+function signVersion(inFile, outFile, description) {
+    // Set version resources and sign the given file.
     return promiseExecFile(
-        path.join('webToPDF', 'setVersion.exe'),
-        [codeFile, addonVersion, displayName, description]
+        path.join('webToPDF', 'built', 'setVersion.exe'),
+        [inFile, outFile, addonVersion, displayName, description]
     ).then(
         log
     ).then(function() {
-        return promiseExecFile(path.join('.', 'sign.cmd'), [codeFile]);
+        return promiseExecFile(path.join('.', 'sign.cmd'), [outFile]);
     }).then(log);
 }
 

@@ -1,15 +1,16 @@
 const resedit = require('resedit');
 const fsp = require('../bin/fsp.js');
 
-let fileName = process.argv[2];
-let productVersion = process.argv[3];
-let productName = process.argv[4];
-let fileDescription = process.argv[5];
-if (!fileName.toLowerCase().endsWith('.exe')) {
-    console.log(fileName + ' is not a .exe');
+let inFile = process.argv[2];
+let outFile = process.argv[3];
+let productVersion = process.argv[4];
+let productName = process.argv[5];
+let fileDescription = process.argv[6];
+if (!inFile.toLowerCase().endsWith('.exe')) {
+    console.log(inFile + ' is not a .exe');
     process.exitCode = 2;
 } else {
-    fsp.readFile(fileName).then(function(data) {
+    fsp.readFile(inFile).then(function(data) {
         // (the Node.js Buffer instance can be specified directly to NtExecutable.from)
         let exe = resedit.NtExecutable.from(data);
         let res = resedit.NtExecutableResource.from(exe);
@@ -54,7 +55,7 @@ if (!fileName.toLowerCase().endsWith('.exe')) {
             vi.outputToResourceEntries(res.entries);
         }
         res.outputResource(exe);
-        return fsp.writeFile(fileName, Buffer.from(exe.generate()));
+        return fsp.writeFile(outFile, Buffer.from(exe.generate()));
     }).catch(function(err) {
         console.log(err);
         process.exitCode = 1;

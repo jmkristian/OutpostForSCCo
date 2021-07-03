@@ -5,10 +5,8 @@
 # $3 = the name of the HTTP server.exe (not including its folder name)
 # $4 = the name of the installer.exe (not including its folder name)
 
-rm -rf built/addons
-mkdir -p built/addons || exit $?
-cp -p built/bin/Outpost_Forms.exe built/ || exit $?
-cp -p webToPDF/WebToPDF.exe built/ || exit $?
-node ./buildInstaller.js $VersionMajor.$VersionMinor "$1" bin\\"$3" "$2" || exit $?
+rm -rf built/addons built/bin
+mkdir -p built/addons built/bin || exit $?
+node ./buildInstaller.js $VersionMajor.$VersionMinor "$1" "$2" "$3" || exit $?
 cp -p "$FORMS"/resources/integration/scco/"$1".nsi built/addon.nsi || exit $?
 ./setup.cmd "$1" "$2" "bin\\$3" "$4" || exit $?

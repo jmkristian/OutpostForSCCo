@@ -5,5 +5,9 @@ if [ `node --version` != "v10.18.1" ]; then
     nvm use 10.18.1 32 || exit $? # https://github.com/coreybutler/nvm-windows
 fi
 npm install || exit $? # https://docs.npmjs.com/cli/install
-node_modules/.bin/pkg.cmd -t node10-win-x86 WebToPDF.js || exit $?
+rm -rf built
+mkdir built || exit $?
+node_modules/.bin/pkg.cmd -t node10-win-x86 bin/WebToPDF.js || exit $?
+mv WebToPDF.exe built || exit $?
 node_modules/.bin/pkg.cmd -t node10-win-x86 setVersion.js || exit $?
+mv setVersion.exe built/ || exit $?

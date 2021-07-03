@@ -372,26 +372,22 @@ Section "Install"
 
   # Files to install:
   SetOutPath "$INSTDIR\bin"
-  File built\bin\launch.js
-  File built\launch-v.cmd
-  File built\manual.html
   File bin\fsp.js
   File bin\message.html
   File bin\Outpost_Forms.js
   File bin\server.ini
   File bin\subject.cmd
   File bin\utilities.js
+  File /r built\bin\*.*
   ${IfNot} ${IsWinXP}
-     File /r webToPDF\Chromium-81.0.4044.92
-     File built\WebToPDF.exe
-     File webToPDF\WebToPDF.js
-     File built\cmd-convert.ini
+     File /r built\webToPDF\*.*
+     File /r webToPDF\bin\*.*
   ${EndIf}
+  SetOutPath "$INSTDIR\addons"
+  File /r built\addons\*.*
   SetOutPath "$INSTDIR"
   File built\browse.cmd
   File built\UserGuide.html
-  File /r built\addons
-  File "/oname=${PROGRAM_PATH}" built\Outpost_Forms.exe
   Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"
   File icon-*.png

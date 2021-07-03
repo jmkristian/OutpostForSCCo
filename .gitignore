@@ -20,5 +20,6 @@
 /sh.exe.stackdump
 /signingCert.*
 /webToPDF/*.exe
-/webToPDF/Chromium*
+/webToPDF/built
+/webToPDF/bin/Chromium*
 /webToPDF/node_modules
