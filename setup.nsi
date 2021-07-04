@@ -299,6 +299,15 @@ FunctionEnd
 !insertmacro defineGlobalFunctions ""
 !insertmacro defineGlobalFunctions "un."
 
+Function un.DeleteAllFiles
+  Call un.DeleteMyFiles
+  ${Delete} silent.log
+  ${Delete} uninstallFrom.txt
+  ${RMDir} "$INSTDIR\bin"
+  ${RMDir} "$INSTDIR\logs"
+  ${RMDir} "$INSTDIR\saved"
+FunctionEnd
+
 Section "Install"
   # Where to install files:
   CreateDirectory "$INSTDIR"
@@ -333,6 +342,11 @@ Section "Install"
   ${DetailLog} `Outpost code$OUTPOST_CODE`
 
   Call DeleteMyFiles
+  ${If} ${Errors}
+    ${DetailLog} "Try again to delete old files."
+    Sleep 2000
+    Call DeleteMyFiles
+  ${EndIf}
   ${If} ${Errors}
     # Sadly, it may take time for ${PROGRAM_PATH} to be deleted.
     # There are several possible causes, including zealous antivirus.
@@ -462,11 +476,12 @@ Section "Uninstall"
 
   Call un.SetShellVarContextAppropriately
   ${Delete} "$SMPROGRAMS\SCCo Packet\Uninstall ${DisplayName}.lnk"
-  Call un.DeleteMyFiles
-  ${Delete} silent.log
-  ${Delete} uninstallFrom.txt
-  ${RMDir} "$INSTDIR\logs"
-  ${RMDir} "$INSTDIR\saved"
+  Call un.DeleteAllFiles
+  ${If} ${Errors}
+    ${DetailLog} "Try again to delete files."
+    Sleep 2000
+    Call un.DeleteAllFiles
+  ${EndIf}
   ${If} ${Errors}
     StrCpy $R0 "Some files were not deleted from $INSTDIR."
     MessageBox MB_OK|MB_ICONINFORMATION "$R0" /SD IDOK
