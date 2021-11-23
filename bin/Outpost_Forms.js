@@ -853,12 +853,18 @@ function serve() {
                 input[name] = req.body[name];
             }
             if (input.message && input.addon_name) {
-                var start = '!' + input.addon_name + '!';
-                var pattern = new RegExp('[\r\n]' + enquoteRegex(start) + '[\r\n]');
-                var junk = pattern.exec(input.message);
-                if (junk) {
-                    // Ignore the junk characters preceding start:
-                    input.message = input.message.substring(junk.index + 1);
+                // Perhaps the user entered some extra text preceding the message,
+                // for example email headers like To or Subject.
+                var start = enquoteRegex('!' + input.addon_name + '!') + '[\r\n]';
+                var pattern = new RegExp('^' + start);
+                if (!pattern.test(input.message)) {
+                    // That's not ideal. Does start appear later in the message?
+                    pattern = new RegExp('[\r\n]' + start);
+                    var foundIt = pattern.exec(input.message);
+                    if (foundIt) {
+                        // Ignore the surplus text preceding start:
+                        input.message = input.message.substring(foundIt.index + 1);
+                    }
                 }
             }
             if (input.OpDate && input.OpTime) {
