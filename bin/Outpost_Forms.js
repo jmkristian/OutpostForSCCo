@@ -1652,7 +1652,6 @@ function parseMessage(message) {
     var fieldValue = "";
     message.split(/[\r\n]+/).every(function(line) {
         if (!line) return true;
-        var idx = 0;
         if (fieldName == null) {
             switch(line.charAt(0)) {
             case '!':
@@ -1670,15 +1669,15 @@ function parseMessage(message) {
                 }
                 break;
             default:
-                idx = line.indexOf(':');
-                if (idx >= 0) {
-                    fieldName = line.substring(0, idx);
-                    while (++idx < line.length && line.charAt(idx) != '[');
+                var found = /:\s*\[/.exec(line);
+                if (found) {
+                    fieldName = line.substring(0, found.index);
+                    line = line.substring(found.index + found[0].length - 1);
                 }
             }
         }
         if (fieldName != null) {
-            fieldValue += line.substring(idx);
+            fieldValue += line;
             var value = unbracket_data(fieldValue);
             if (value != null) {
                 // Field is complete on this line
