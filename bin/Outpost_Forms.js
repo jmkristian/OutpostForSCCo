@@ -848,12 +848,25 @@ function serve() {
     app.post('/manual-view', function(req, res, next) {
         const formId = '' + nextFormId++;
         Promise.resolve().then(function() {
-            var args = ['--message_status-received', '--mode-readonly'];
+            var input = {};
             for (var name in req.body) {
-                args.push('--' + name + '-' + req.body[name]);
+                input[name] = req.body[name];
             }
-            if (req.body.OpDate && req.body.OpTime) {
-                args.push('--MSG_DATETIME_OP_RCVD-' + req.body.OpDate + " " + req.body.OpTime)
+            if (input.message && input.addon_name) {
+                var start = '!' + input.addon_name + '!';
+                var pattern = new RegExp('[\r\n]' + enquoteRegex(start) + '[\r\n]');
+                var junk = pattern.exec(input.message);
+                if (junk) {
+                    // Ignore the junk characters preceding start:
+                    input.message = input.message.substring(junk.index + 1);
+                }
+            }
+            if (input.OpDate && input.OpTime) {
+                input.MSG_DATETIME_OP_RCVD = (input.OpDate + " " + input.OpTime);
+            }
+            var args = [];
+            for (var name in input) {
+                args.push('--' + name + '-' + input[name]);
             }
             return onOpen(formId, args);
         }).then(function() {
