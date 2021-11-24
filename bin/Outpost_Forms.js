@@ -151,7 +151,6 @@ const SEQUENCE_MARK = '^'; // must be OK in a file name, and come after '.' in l
 const SEQUENCE_REGEX = /\^/g; // matches all occurrences of SEQUENCE_MARK
 const SETTINGS_FILE = path.join('bin', 'server.ini');
 const StopServer = '/stopSCCoPIFO';
-const SUBMIT_TIMEOUT_SEC = 30;
 const TEXT_HTML = 'text/html; charset=' + CHARSET;
 const TEXT_PLAIN = 'text/plain; charset=' + CHARSET;
 const WEB_TO_PDF = path.join('bin', 'WebToPDF.exe');
@@ -163,6 +162,7 @@ const DEFAULT_SETTINGS = {
     Opdirect: {
         host: LOCALHOST,
         port: 9334,
+        timeout: 30 * seconds,
         method: 'POST',
         path: '/TBD'
     }
@@ -194,7 +194,7 @@ if (process.argv.length > 2) {
             // Make sure a server is running, and then send process.argv[4..] to it.
             return browseMessage();
         case 'serve':
-            // Serve HTTP requests until a few minutes after there are no forms open.
+            // Serve HTTP requests until a while after there are no forms open.
             serve();
             break;
         case 'stop':
@@ -623,6 +623,7 @@ function openForm(args) {
     }).then(function(port) {
         var options = {host: LOCALHOST,
                        port: parseInt(port, 10),
+                       timeout: 3 * 60 * seconds,
                        method: 'POST',
                        path: OpenOutpostMessage,
                        headers: {'Content-Type': JSON_TYPE + '; charset=' + CHARSET}};
@@ -669,6 +670,9 @@ function httpExchange(options) {
     req.on('aborted', onError('req.aborted'));
     req.on('error', onError('req.error'));
     req.on('timeout', onError('req.timeout'));
+    if (options.timeout != null) {
+        req.setTimeout(options.timeout);
+    }
     exchange.req = req;
     return exchange;
 }
@@ -727,6 +731,7 @@ function stopServers() {
                 httpExchange({
                     host: LOCALHOST,
                     port: parseInt(port, 10),
+                    timeout: 60 * seconds,
                     method: 'POST',
                     path: StopServer
                 }) // no request data
@@ -1314,10 +1319,12 @@ function updateSettings() {
                     }
                 };
             });
-            if ((typeof fileSettings.Opdirect.port) == 'string') {
-                fileSettings.Opdirect.port = parseInt(fileSettings.Opdirect.port);
-            }
             newSettings = merge(DEFAULT_SETTINGS, fileSettings);
+            ['port', 'timeout'].forEach(function(name) {
+                if ((typeof newSettings.Opdirect[name]) == 'string') {
+                    newSettings.Opdirect[name] = parseInt(newSettings.Opdirect[name]);
+                }
+            });
             log('settings = ' + JSON.stringify(newSettings));
             return newSettings;
         });
@@ -1552,6 +1559,7 @@ function respondFromOpdirect(exchange) {
 */
 function submitToOpdirect(submission, body) {
     const context = submission.formId ? ('/form-' + submission.formId + ' ') : '';
+    const options = settings.Opdirect;
     return Promise.resolve().then(function() {
         // URL encode the 'E' in '#EOF', to prevent Outpost from treating this as a PacFORM message:
         body = body.replace(/%23EOF/gi, function(match) {
@@ -1565,18 +1573,19 @@ function submitToOpdirect(submission, body) {
         // finds there is no parameter named formtext and fails.
         // A new server recognizes &4VAO= as the end-of-message marker.
         // Either server ignores the HTTP Content-Length header; it just scans for the marker.
-        const options = settings.Opdirect;
         // Send an HTTP request.
         log(context + 'to Outpost ' + JSON.stringify(options) + ' ' + body);
         const exchange = httpExchange(options);
         exchange.req.setHeader('Content-Type', 'application/x-www-form-urlencoded');
-        exchange.req.setTimeout(SUBMIT_TIMEOUT_SEC * seconds);
         return httpPromise(exchange, body);
     }).catch(function(err) {
         if (err == 'req.timeout' || err == 'res.timeout') {
-            throw "Outpost didn't respond within " + SUBMIT_TIMEOUT_SEC + ' seconds.';
+            throw "Opdirect didn't respond within " + options.timeout + ' milliseconds.'
+                + EOL + JSON.stringify(options);
         } else if ((err + '').indexOf(' ECONNREFUSED ') >= 0) {
-            throw "Opdirect isn't running, it appears." + EOL + err;
+            throw "Opdirect isn't running, it appears."
+                + EOL + JSON.stringify(options)
+                + EOL + err;
         } else {
             throw err;
         }
