@@ -586,6 +586,11 @@ function browseMessage() {
         if (pageURL) {
             startProcess('start', [pageURL], {shell: true, detached: true, stdio: 'ignore'});
         }
+    }, function openMessageFailed(err) {
+        log(err);
+        // Exit swiftly, so the user will see an error message swiftly.
+        return promiseTimeout(2 * seconds) // Allow time to flush the log.
+            .then(function() {process.exit(2);});
     });
 }
 
