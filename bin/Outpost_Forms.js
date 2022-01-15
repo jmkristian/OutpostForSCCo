@@ -471,7 +471,7 @@ function convertMessageToFiles() {
     return fsp.readFile(
         path.resolve(PackItMsgs, environment.MSG_FILENAME), ENCODING
     ).then(function(message) {
-        const parsed = parseMessage(message);
+        const parsed = parseMessage(message, environment);
         const subject = environment.subject || subjectFromMessage(parsed);
         const spoolFilePrefix = subject
               .replace(/[<>:"/\\|?*]/g, '~')
@@ -808,7 +808,7 @@ function serve() {
         res.end();
     });
     app.post('/email-:formId', function(req, res, next) {
-        onEmail(req.params.formId, req.body.formtext, res);
+        onEmail(req.params.formId, req.body, res);
     });
     app.post('/submit-:formId', function(req, res, next) {
         onSubmit(req.params.formId, req.body, res,
@@ -1198,7 +1198,7 @@ function loadForm(formId, form) {
     ).then(function(message) {
         form.message = message;
         if (message) {
-            const parsed = parseMessage(message);
+            const parsed = parseMessage(message, form.environment);
             if (!form.environment.ADDON_MSG_TYPE) {
                 form.environment.ADDON_MSG_TYPE = parsed.formType;
             }
@@ -1432,13 +1432,15 @@ function onSaveMessage(formId, req) {
     });
 }
 
-function onEmail(formId, message, res) {
+function onEmail(formId, reqBody, res) {
+    const message = reqBody.formtext;
     var foundForm = null;
     return keepAlive(formId).then(function(form) {
         foundForm = form;
         form.message = message;
         form.environment.emailing = true;
-        form.environment.subject = subjectFromMessage(parseMessage(message));
+        form.environment.subject =
+            reqBody.subject || subjectFromMessage(parseMessage(message, form.environment));
         form.environment.mode = 'readonly';
         res.redirect('/form-' + formId);
     }).catch(function(err) {
@@ -1452,10 +1454,10 @@ function onSubmit(formId, q, res, fromOutpostURL) {
     return keepAlive(formId).then(function(form) {
         foundForm = form;
         const message = q.formtext;
-        const parsed = parseMessage(message);
+        const parsed = parseMessage(message, form.environment);
         const fields = parsed.fields;
         const handling = fields['5.'] || '';
-        form.environment.subject = subjectFromMessage(parsed);
+        form.environment.subject = q.subject || subjectFromMessage(parsed);
         if (form.environment.message_status == 'manual') {
             form.environment.message_status = 'manual-created';
             form.message = message;
@@ -1659,7 +1661,7 @@ function toShortName(fieldName) {
     return fieldName;
 }
 
-function parseMessage(message) {
+function parseMessage(message, environment) {
     var result = {};
     var fields = {};
     var fieldName = null;
@@ -1702,7 +1704,7 @@ function parseMessage(message) {
         }
         return true;
     });
-    if (!result.formType) {
+    if (!result.formType && !(environment && environment.ADDON_MSG_TYPE)) {
         throw "I don't know what form to display, since the message doesn't"
             + ' contain a line that starts with "#T:" or "#FORMFILENAME:".\n'
             + 'message: ' + JSON.stringify(message) + '\n';
