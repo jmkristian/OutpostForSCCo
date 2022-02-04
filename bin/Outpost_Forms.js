@@ -1226,10 +1226,15 @@ function getForm(form, res) {
             + "I received " + JSON.stringify(formType)
             + " instead of the name of a form.\n";
     }
-    if (form.environment.message_status == 'received') {
-        const receiverFileName = formType.replace(/\.([^.]*)$/, '.receiver.$1');
-        if (fs.existsSync(path.join(PackItForms, receiverFileName))) {
-            formType = receiverFileName;
+    const receiverFileName = formType.replace(/\.([^.]*)$/, '.receiver.$1');
+    if (form.environment.message_status == 'received'
+        && fs.existsSync(path.join(PackItForms, receiverFileName))) {
+        formType = receiverFileName;
+    } else {
+        const readOnlyFileName = formType.replace(/\.([^.]*)$/, '.read-only.$1');
+        if (form.environment.mode == 'readonly'
+            && fs.existsSync(path.join(PackItForms, readOnlyFileName))) {
+            formType = readOnlyFileName;
         }
     }
     return fsp.readFile(
