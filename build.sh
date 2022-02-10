@@ -3,6 +3,7 @@
 cd `dirname "$0"` || exit $?
 export VersionMajor=3
 export VersionMinor=4
+export VersionBeta=
 rm -rf built logs
 mkdir -p built/bin built/webToPDF
 if [ `node --version` != "v4.9.1" ]; then
@@ -26,5 +27,5 @@ for REPO in jmkristian/pack-it-forms "$@"; do
         rm -rf "$FORMS"/.git*
     fi
     "$FORMS"/resources/integration/scco/build.sh ./buildInstaller.sh\
-            "$VersionMajor.$VersionMinor" || exit
+            "$VersionMajor.$VersionMinor$VersionBeta" || exit
 done

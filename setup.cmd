@@ -7,6 +7,7 @@
 @"C:\Program Files (x86)\NSIS\makensis.exe" ^
   /DVersionMajor=%VersionMajor% ^
   /DVersionMinor=%VersionMinor% ^
+  /DVersionBeta=%VersionBeta% ^
   /Daddon_name=%1 ^
   /DDisplayName=%2 ^
   /DPROGRAM_PATH=%3 ^
