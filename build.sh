@@ -2,7 +2,7 @@
 # This script can be executed by the bash that's packaged with git for Windows.
 cd `dirname "$0"` || exit $?
 export VersionMajor=3
-export VersionMinor=5
+export VersionMinor=6
 export VersionBeta=
 rm -rf built logs
 mkdir -p built/bin built/webToPDF
@@ -23,7 +23,7 @@ for REPO in jmkristian/pack-it-forms "$@"; do
     fi
     if [ ! -e "$FORMS" ]; then
         git clone https://github.com/"$REPO".git || exit $?
-        (cd "$FORMS" && git checkout vSCCo.40)
+        (cd "$FORMS" && git checkout vSCCo.41)
         rm -rf "$FORMS"/.git*
     fi
     "$FORMS"/resources/integration/scco/build.sh ./buildInstaller.sh\
