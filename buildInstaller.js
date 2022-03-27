@@ -33,10 +33,6 @@ Promise.all(
             path.join('built', 'Outpost_Forms.exe'),
             path.join('built', programPath),
             "HTTP server"),
-        signVersion(
-            path.join('webToPDF', 'built', 'WebToPDF.exe'),
-            path.join('built', 'webToPDF', 'WebToPDF.exe'),
-            'Convert web page to PDF'),
         expandVariablesInFile(
             {addon_version: addonVersion, addon_name: addonName, PROGRAM_PATH: programPath},
             path.join('bin', 'addon.ini'),
