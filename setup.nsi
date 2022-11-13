@@ -22,8 +22,8 @@ OutFile "${OutFile}"
 Name "${WINDOW_TITLE}" "forms"
 
 RequestExecutionLevel highest
+Page directory
 Page custom selectOutpostCode "" "${WINDOW_TITLE} Setup"
-Page directory ifOutpostDataDefined
 Page instfiles
 UninstPage uninstConfirm
 UninstPage instfiles
@@ -69,12 +69,6 @@ Function selectOutpostCode
     Call FindOutpost
   ${EndIf}
   Pop $R0
-FunctionEnd
-
-Function ifOutpostDataDefined
-  ${If} "$OUTPOST_DATA" == ""
-    Abort # that is, don't show this page.
-  ${EndIf}
 FunctionEnd
 
 !macro DetailLog message
@@ -328,18 +322,19 @@ Section "Install"
   ${If} ${Silent}
     Call FindOutposts
   ${EndIf}
-  ${If} "$OUTPOST_DATA" == ""
-    StrCpy $R0 "I won't add forms to Outpost"
-    StrCpy $R0 "$R0, because I didn't find Outpost's data folder."
-    StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
-    MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noFormsOK
-    Call FindOutposts # DetailPrint diagnostic information
-    ${AbortLog} `No Outpost data folder`
-    noFormsOK:
-  ${Else}
-    ${DetailLog} `Outpost data$OUTPOST_DATA`
-  ${EndIf}
   ${DetailLog} `Outpost code$OUTPOST_CODE`
+  ${DetailLog} `Outpost data$OUTPOST_DATA`
+  ${If} "$OUTPOST_DATA" == ""
+    ${If} "$OUTPOST_CODE" != ""
+      StrCpy $R0 "I won't add forms to Outpost"
+      StrCpy $R0 "$R0, because I didn't find Outpost's data folder."
+      StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
+      MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noFormsOK
+      Call FindOutposts # DetailPrint diagnostic information
+      ${AbortLog} `No Outpost data folder`
+      noFormsOK:
+    ${EndIf}
+  ${EndIf}
 
   Call DeleteMyFiles
   ${If} ${Errors}
@@ -353,7 +348,7 @@ Section "Install"
     StrCpy $R0 "Some files were not deleted from $INSTDIR. Try again?"
     MessageBox MB_YESNO|MB_DEFBUTTON1|MB_ICONINFORMATION "$R0" /SD IDYES IDNO noDeleteAgain
     StrCpy $R0 0
-    ${DoUntil} $R0 = 12
+    ${DoUntil} $R0 = 6
       ${DetailLog} `Wait $R0 seconds`
       IntOp $R1 $R0 * 1000
       Sleep $R1
@@ -374,15 +369,6 @@ Section "Install"
   FileClose $R0
 
   CreateDirectory "$INSTDIR\addons"
-  ${If} "$OUTPOST_CODE" == ""
-    Call FindOutposts # DetailPrint diagnostic information
-    StrCpy $R0 "You might not be able to submit messages to Outpost"
-    StrCpy $R0 "$R0, because I don't know where it's installed."
-    StrCpy $R0 "$R0  Do you want to continue installing ${DisplayName}?"
-    MessageBox MB_OKCANCEL|MB_DEFBUTTON2|MB_ICONEXCLAMATION "$R0" /SD IDOK IDOK noOutpostOK
-    ${AbortLog} `Can't find Outpost`
-    noOutpostOK:
-  ${EndIf}
 
   # Files to install:
   SetOutPath "$INSTDIR\bin"
