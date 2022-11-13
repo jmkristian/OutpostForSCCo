@@ -9,9 +9,11 @@ For installation and usage instructions, see the UserGuide.html file in each [re
 
 Source code is stored in this repository.
 To build it, you'll need:
-* [Git](https://git-scm.com/downloads)
+* [Git](https://git-scm.com/downloads) configured with core.autocrlf true,
+  so it will check out text files with CRLF but check them in with LF.
 * [nvm for Windows](https://github.com/coreybutler/nvm-windows)
-* [NSIS](http://nsis.sourceforge.net) version 3 or later.
+* [NSIS](http://nsis.sourceforge.net) version 3 or later,
+  with the [Simple Firewall Plugin](https://nsis.sourceforge.io/NSIS_Simple_Firewall_Plugin).
 * [SignTool](https://docs.microsoft.com/en-us/windows/win32/seccrypto/signtool),
   which is included in the
   [Windows SDK](https://developer.microsoft.com/en-us/windows/downloads/sdk-archive/)
