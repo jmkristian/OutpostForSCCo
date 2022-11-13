@@ -446,9 +446,9 @@ Section "Install"
   ${EndIf}
   SimpleFC::addApplication "${DisplayName}" "${PROGRAM_PATH}" 1 2 "" 1
   ClearErrors
-  ${Execute} '"${PROGRAM_PATH}" install "$WSCRIPT_EXE" $OUTPOST_DATA'
+  ${Execute} '"$WSCRIPT_EXE" bin\launch.js install "$WSCRIPT_EXE" $OUTPOST_DATA'
   ${If} ${Errors}
-    ${AbortLog} `"${PROGRAM_PATH}" install failed`
+    ${AbortLog} `"$WSCRIPT_EXE" bin\launch.js install failed`
   ${EndIf}
 
   # Execute a dry run, to encourage antivirus/firewall software to accept the new code.
