@@ -281,6 +281,7 @@ Function ${un}DeleteMyFiles
   ${RMDir} "$INSTDIR\pdf"
   ClearErrors
   ${Delete} browse.cmd
+  ${Delete} manual.cmd
   ${Delete} bin\launch.js
   ${Delete} bin\launch-v.cmd
   ${Delete} "${PROGRAM_PATH}"
@@ -386,7 +387,8 @@ Section "Install"
   SetOutPath "$INSTDIR\addons"
   File /r built\addons\*.*
   SetOutPath "$INSTDIR"
-  File built\browse.cmd
+  File browse.cmd
+  File built\manual.cmd
   File built\UserGuide.html
   Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"

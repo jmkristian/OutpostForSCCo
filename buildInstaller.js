@@ -48,7 +48,7 @@ Promise.all(
             {addon_version: addonVersion, addon_name: addonName},
             path.join('bin', 'manual.html')),
     ].concat(
-        ['browse.cmd', path.join('bin', 'launch-v.cmd'), 'UserGuide.html'
+        ['manual.cmd', path.join('bin', 'launch-v.cmd'), 'UserGuide.html'
         ].map(function(fileName) {
             return buildFile(
                 {PROGRAM_PATH: programPath, DisplayName: displayName},
