@@ -767,16 +767,15 @@ function serve() {
     const app = express();
     app.set('etag', false); // convenient for troubleshooting
     app.set('trust proxy', ['loopback']); // to find the IP address of a client
-    app.get('/ping-:formId', function(req, res, next) {
+    app.get('/ping-:formId', function(req, res) {
         keepAlive(req.params.formId);
-        res.statusCode = NOT_FOUND;
         noCache(res);
-        res.end(); // with no body. The client ignores this response.
+        res.sendStatus(NOT_FOUND); // with no body. The client ignores this response.
     });
     app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
     app.use(bodyParser.json({type: JSON_TYPE}));
     app.use(bodyParser.urlencoded({extended: false}));
-    app.post(OpenOutpostMessage, function(req, res, next) {
+    app.post(OpenOutpostMessage, function(req, res) {
         const args = req.body; // an array, thanks to bodyParser.json
         if (!args || !args.length) { // a dry run
             res.end();
@@ -797,43 +796,43 @@ function serve() {
             });
         }
     });
-    app.get('/form-:formId', function(req, res, next) {
-        onGetForm(req.params.formId, req, res);
+    app.get('/form-:formId', function(req, res) {
+        onForm(req.params.formId, req, res);
     });
-    app.get('/message-:formId/:subject', function(req, res, next) {
-        onGetMessage(req.params.formId, req, res);
+    app.put('/message-:formId', function(req, res) {
+        onPutMessage(req.params.formId, req, res);
     });
-    app.post('/save-:formId', function(req, res, next) {
-        onSaveMessage(req.params.formId, req);
-        res.end();
-    });
-    app.post('/email-:formId', function(req, res, next) {
+    app.post('/email-:formId', function(req, res) {
         onEmail(req.params.formId, req.body, res);
     });
-    app.post('/submit-:formId', function(req, res, next) {
-        onSubmit(req.params.formId, req.body, res,
-                 `http://${req.get('host')}/fromOutpost-${req.params.formId}`);
+    app.post('/submit-:formId', function(req, res) {
+        onSubmit(req.params.formId, req, res);
     });
-    app.get('/fromOutpost-:formId', function(req, res, next) {
+    app.get('/fromOutpost-:formId', function(req, res) {
         var form = openForms[req.params.formId];
-        res.set(form.fromOutpost.headers);
-        res.end(form.fromOutpost.body);
+        if (!form) {
+            res.end();
+        } else {
+            // Relay the response from Outpost to the browser.
+            res.set(form.fromOutpost.headers);
+            res.end(form.fromOutpost.body);
+        }
     });
-    app.get('/msgs/:msgno', function(req, res, next) {
+    app.get('/msgs/:msgno', function(req, res) {
         // The client may not get the message this way,
         // since the server doesn't know what the formId is.
         res.statusCode = NOT_FOUND;
         res.end(); // with no body
     });
-    app.post(StopServer, function(req, res, next) {
+    app.post(StopServer, function(req, res) {
         res.end(); // with no body
         log(StopServer);
         exitSoon();
     });
-    app.get('/manual', function(req, res, next) {
-        onGetManual(res);
+    app.get('/manual', function(req, res) {
+        onManual(res);
     });
-    app.post('/manual-create', function(req, res, next) {
+    app.post('/manual-create', function(req, res) {
         const formId = '' + nextFormId++;
         Promise.resolve().then(function() {
             const form = req.body.form;
@@ -855,7 +854,16 @@ function serve() {
             res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
         });
     });
-    app.post('/manual-view', function(req, res, next) {
+    app.post('/manual-submit-:formId', function(req, res) {
+        onManualSubmit(req.params.formId, req, res);
+    });
+    app.get('/manual-message-:formId', function(req, res) {
+        onManualMessage(req.params.formId, req, res);
+    });
+    app.get('/manual-command-:formId/:subject', function(req, res) {
+        onManualCommand(req.params.formId, req, res);
+    });
+    app.post('/manual-view', function(req, res) {
         const formId = '' + nextFormId++;
         Promise.resolve().then(function() {
             var input = {};
@@ -1005,6 +1013,21 @@ function onOpen(formId, args) {
 }
 
 /** @return Promise<form> */
+function requireForm(formId) {
+    return keepAlive(formId).then(function(form) {
+        if (form) return form;
+        log(`form ${formId} is not open`);
+        if (formId <= 0) {
+            throw 'Form numbers start with 1.';
+        } else if (formId < nextFormId) {
+            throw new Error('Form ' + formId + ' was discarded, since it was closed.');
+        } else {
+            throw new Error('Form ' + formId + ' has not been opened.');
+        }
+    });
+}
+
+/** @return Promise<form> */
 function keepAlive(formId) {
     return findForm(formId).then(function(form) {
         if (form) {
@@ -1020,18 +1043,17 @@ function keepAlive(formId) {
 function findForm(formId) {
     return Promise.resolve().then(function(form) {
         var form = openForms[formId]
-        if (form != null) return form;
+        if (form) return form;
         const fileName = saveFileName(formId);
         return fsp.readFile(fileName, ENCODING).then(function(data) {
             form = JSON.parse(data);
             if (form) {
-                form.quietTime = 0;
                 openForms[formId] = form;
-                log('Read ' + fileName);
+                log(`Read form from ${fileName}`);
             }
             return form;
         });
-    }).catch(log);
+    }).catch(log); // and return undefined
 }
 
 function closeForm(formId) {
@@ -1124,58 +1146,24 @@ function getMessage(environment) {
     });
 }
 
-function onGetMessage(formId, req, res) {
-    var foundForm = null;
-    return keepAlive(formId).then(function(form) {
-        foundForm = form;
-        noCache(res);
-        if (form) {
-            res.set({'Content-Type': TEXT_PLAIN});
-            res.end('#Subject: ' + form.environment.subject + EOL + form.message, CHARSET);
-        } else if (formId < nextFormId) {
-            throw new Error('message ' + formId + ' was discarded, since it was closed.');
-        } else {
-            throw new Error('message ' + formId + ' has not been opened.');
-        }
-    }).catch(function(err) {
-        res.set({'Content-Type': TEXT_HTML});
-        res.end(errorToHTML(err, foundForm), CHARSET);
-    });
-}
-
 /** Handle an HTTP GET /form-id request. */
-function onGetForm(formId, req, res) {
-    var foundForm = null;
-    return keepAlive(formId).then(function(form) {
-        foundForm = form;
+function onForm(formId, req, res) {
+    res.set({'Content-Type': TEXT_HTML});
+    var form = null;
+    return requireForm(formId).then(function(foundForm) {
+        form = foundForm;
         noCache(res);
-        res.set({'Content-Type': TEXT_HTML});
-        if (formId <= 0) {
-            throw 'Form numbers start with 1.';
-        } else if (!form) {
-            log('/form-' + formId + ' is not open');
-            if (formId < nextFormId) {
-                throw '/form-' + formId + ' was discarded, since it was submitted or closed.';
-            } else {
-                throw '/form-' + formId + ' has not been opened.';
-            }
-        } else {
-            log('/form-' + formId + ' viewed');
-            updateSettings();
-            return loadForm(
-                formId, form
-            ).then(function() {
-                if (form.environment.message_status == 'manual-created') {
-                    return getManualMessage(formId, form);
-                } else {
-                    return getForm(form, res);
-                }
-            }).then(function(data) {
-                res.end(data, CHARSET);
-            });
-        }
+        log('/form-' + formId + ' viewed');
+        updateSettings();
+        return loadForm(
+            formId, form
+        ).then(function() {
+            return getForm(form, res);
+        }).then(function(data) {
+            res.end(data, CHARSET);
+        });
     }).catch(function(err) {
-        res.end(errorToHTML(err, foundForm), CHARSET);
+        res.end(errorToHTML(err, form), CHARSET);
     });
 }
 
@@ -1183,12 +1171,14 @@ function loadForm(formId, form) {
     if (!form.environment) {
         form.environment = parseArgs(form.args);
         form.environment.emailURL = '/email-' + formId;
-        form.environment.submitURL = '/submit-' + formId;
+        form.environment.submitURL =
+            (form.environment.message_status == 'manual'
+             ? '/manual-submit-' : '/submit-')
+            + formId;
     }
-    if (form.environment.mode == 'readonly') {
-        form.environment.pingURL = '/ping-' + formId;
-    } else {
-        form.environment.saveURL = '/save-' + formId;
+    form.environment.pingURL = '/ping-' + formId;
+    if (form.environment.mode != 'readonly') {
+        form.environment.saveURL = '/message-' + formId;
     }
     if (form.message != null) {
         return Promise.resolve();
@@ -1264,20 +1254,6 @@ function getForm(form, res) {
             delete form.environment.emailing;
         }
         return html;
-    });
-}
-
-function getManualMessage(formId, form) {
-    const template = path.join('bin', 'message.html');
-    return fsp.readFile(
-        template, {encoding: ENCODING}
-    ).then(function(data) {
-        return expandVariables(data, {
-            SUBJECT: encodeHTML(form.environment.subject),
-            MESSAGE: encodeHTML(form.message),
-            MESSAGE_URL: '/message-' + formId
-                + '/' + encodeURIComponent(form.environment.subject)
-        });
     });
 }
 
@@ -1414,34 +1390,32 @@ function noCache(res) {
              'Expires': '0'}); // proxies
 }
 
-function onSaveMessage(formId, req) {
-    return findForm(formId).then(function(form) {
-        if (form) {
-            var charset = CHARSET;
-            const contentType = req.headers['content-type'];
-            if (contentType) {
-                const found = /; *charset=([^ ;]+)/i.exec(contentType);
-                if (found) {
-                    charset = found[1];
-                }
+function onPutMessage(formId, req, res) {
+    requireForm(formId).then(function(form) {
+        var charset = CHARSET;
+        const contentType = req.headers['content-type'];
+        if (contentType) {
+            const found = /; *charset=([^ ;]+)/i.exec(contentType);
+            if (found) {
+                charset = found[1];
             }
-            req.pipe(concat_stream(function(buffer) {
-                var message = buffer.toString(charset);
-                log('/save-' + formId + ' ' + message.length);
-                keepAlive(formId);
-                form.message = message;
-            }));
-        } else {
-            log('form ' + formId + ' not saved');
         }
+        req.pipe(concat_stream(function(buffer) {
+            form.message = buffer.toString(charset);
+            log(`onPutMessage ${formId} ${form.message.length}`);
+            res.end();
+        }));
+    }).catch(function(err) {
+        log(err);
+        res.sendStatus(NOT_FOUND); // probably
     });
 }
 
 function onEmail(formId, reqBody, res) {
     const message = reqBody.formtext;
-    var foundForm = null;
-    return keepAlive(formId).then(function(form) {
-        foundForm = form;
+    var form = null;
+    return requireForm(formId).then(function(foundForm) {
+        form = foundForm;
         form.message = message;
         form.environment.emailing = true;
         form.environment.subject =
@@ -1450,41 +1424,48 @@ function onEmail(formId, reqBody, res) {
         res.redirect('/form-' + formId);
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
-        res.end(errorToHTML(err, foundForm || message), CHARSET);
+        res.end(errorToHTML(err, form || message), CHARSET);
     });
 }
 
-function onSubmit(formId, q, res, fromOutpostURL) {
-    var foundForm = null;
-    return keepAlive(formId).then(function(form) {
-        foundForm = form;
-        const message = q.formtext;
-        const parsed = parseMessage(message, form.environment);
-        const fields = parsed.fields;
-        const handling = fields['5.'] || '';
-        form.environment.subject = q.subject || subjectFromMessage(parsed);
-        if (form.environment.message_status == 'manual') {
-            form.environment.message_status = 'manual-created';
-            form.message = message;
-            return null;
-        }
-        // Outpost requires Windows-style line breaks:
-        form.message = message.replace(/([^\r])\n/g, '$1' + EOL);
+function saveForm(form, req) {
+    const reqBody = req.body;
+    const message = reqBody.formtext;
+    form.environment.subject = reqBody.subject
+        || subjectFromMessage(parseMessage(message, form.environment));
+    // Outpost requires Windows-style line breaks:
+    form.message = message.replace(/([^\r])\n/g, '$1' + EOL);
+    log(`saveForm ${form.message.length}`);
+}
+
+function isUrgent(message, environment) {
+    const parsed = parseMessage(message, environment);
+    const handling = parsed.fields['5.'] || '';
+    return (['IMMEDIATE', 'I'].indexOf(handling) >= 0);
+}
+
+function onSubmit(formId, req, res) {
+    var form = null;
+    return requireForm(formId).then(function(foundForm) {
+        form = foundForm;
+        const message = req.body.formtext;
+        saveForm(form, req);
         const submission = {
             formId: formId,
             form: form,
             addonName: form.environment.addon_name,
             subject: form.environment.subject,
-            urgent: (['IMMEDIATE', 'I'].indexOf(handling) >= 0)
+            urgent: isUrgent(message, form.environment)
         };
         return submitToOpdirect(submission, messageForOpdirect(submission));
     }).then(
         respondFromOpdirect
     ).then(function(fromOutpost) {
+        log(`/submit-${formId} from Outpost ` + JSON.stringify(fromOutpost));
         if (fromOutpost) {
             res.set({'Content-Type': TEXT_HTML});
-            foundForm.fromOutpost = fromOutpost;
-            log(`/form-${formId} from Outpost ` + JSON.stringify(fromOutpost));
+            form.fromOutpost = fromOutpost;
+            fromOutpostURL = `http://${req.get('host')}/fromOutpost-${formId}`
             var page = PROBLEM_HEADER + EOL
                 + 'When the message was submitted, Outpost responded:<br/><br/>' + EOL
                 + '<iframe src="' + fromOutpostURL + '" style="width:95%;"></iframe><br/><br/>' + EOL;
@@ -1498,8 +1479,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
             page += '</body></html>';
             res.end(page, CHARSET);
         } else {
-            log('/form-' + formId + ' submitted');
-            foundForm.environment.mode = 'readonly';
+            form.environment.mode = 'readonly';
             // Don't closeForm, so the operator can view it.
             // But do delete its save file (if any):
             const fileName = saveFileName(formId);
@@ -1510,7 +1490,7 @@ function onSubmit(formId, q, res, fromOutpostURL) {
         }
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
-        res.end(errorToHTML(err, foundForm && foundForm.environment), CHARSET);
+        res.end(errorToHTML(err, form && form.environment), CHARSET);
     });
 }
 
@@ -1605,13 +1585,13 @@ function submitToOpdirect(submission, body) {
 }
 
 /** Handle an HTTP GET /manual request. */
-function onGetManual(res) {
+function onManual(res) {
     keepAlive(0);
     res.set({'Content-Type': TEXT_HTML});
-    const template = path.join('bin', 'manual.html');
+    const templateFile = path.join('bin', 'manual.html');
     return fsp.readFile(
-        template, {encoding: ENCODING}
-    ).then(function(data) {
+        templateFile, {encoding: ENCODING}
+    ).then(function(template) {
         return getAddonForms().then(function(forms) {
             var form_options = forms
                 .filter(function(form) {return !!(form.a && form.t);})
@@ -1623,10 +1603,58 @@ function onGetManual(res) {
                         + encodeHTML(form.fn ? form.fn.replace(/_/g, ' ') : form.t)
                         + '</option>';
                 });
-            res.send(expandVariables(data, {form_options: form_options.join('')}));
+            res.end(expandVariables(template, {form_options: form_options.join('')}));
         });
     }).catch(function(err) {
-        res.send(errorToHTML(err, template));
+        res.end(errorToHTML(err, templateFile));
+    });
+}
+
+function onManualSubmit(formId, req, res) {
+    var form = null;
+    return requireForm(formId).then(function(foundForm) {
+        form = foundForm;
+        saveForm(form, req);
+        res.redirect('/manual-message-' + formId);
+    }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err, form && form.environment), CHARSET);
+    });
+}
+
+function onManualMessage(formId, req, res) {
+    var form = null;
+    res.set({'Content-Type': TEXT_HTML});
+    return requireForm(formId).then(function(foundForm) {
+        form = foundForm;
+        const templateFile = path.join('bin', 'message.html');
+        return fsp.readFile(templateFile, {encoding: ENCODING});
+    }).then(function(template) {
+        res.end(expandVariables(template, {
+            pingURL: `'/ping-${formId}'`, // a javascript expression
+            Urgent: JSON.stringify(isUrgent(form.message, form.environment)),
+            Subject: encodeHTML(form.environment.subject),
+            Message: encodeHTML(form.message),
+            CommandURL: '/manual-command-' + formId
+                + '/' + encodeURIComponent(form.environment.subject)
+        }), CHARSET);
+    }).catch(function(err) {
+        res.end(errorToHTML(err, form && form.environment), CHARSET);
+    });
+}
+
+function onManualCommand(formId, req, res) {
+    var form = null;
+    return requireForm(formId).then(function(foundForm) {
+        form = foundForm;
+        noCache(res);
+        const result = req.query.prefix + form.message + req.query.suffix;
+        // The user can send this string to JNOS to send the message.
+        res.set({'Content-Type': TEXT_PLAIN});
+        res.end(result, CHARSET);
+    }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err, form), CHARSET);
     });
 }
 

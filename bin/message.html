@@ -4,29 +4,135 @@
     <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
     <link rel="stylesheet" type="text/css" href="resources/css/pack-it-forms.css"/>
     <style>
-      td {
-          padding-top:1em;
-          padding-bottom:1em;
+      th {
+          padding-top:0.75em;
+          text-align:right;
+          vertical-align:top;
       }
-      pre {
-          background-color: white;
-          margin-top: 0;
-          margin-bottom: 0;
+      td {
+          border:0px;
+          padding-top:0.5em;
       }
     </style>
-    <title>{{SUBJECT}}</title>
+    <title>{{Subject}}</title>
+    <script type="text/javascript">
+      var pingURL = {{pingURL}};
+      if (pingURL) {
+          // Ping the server periodically, to retain the message while this page is open.
+          setInterval(function ping() {
+              var img = new Image();
+              // To discourage caching, use a new query string for each ping.
+              img.src = pingURL + '?i=' + Math.random();
+              img = undefined; // encourage garbage collection
+          }, 30000); // every 30 seconds
+      }
+      function endsWith(s, end) {
+          return (s != null) && (end != null) && s.substring(s.length - end.length) == end;
+      }
+      function toAddresses(from) {
+          var into = [];
+          var items = from.split(/[,;]/);
+          for (i = 0; i < items.length; ++i) {
+              var value = items[i].trim();
+              if (value) {
+                  into.push(value);
+              }
+          }
+          return into;
+      }
+      var EOL = '\r\n';
+      function toPrefix(to) {
+          var Bulletin = document.getElementById('Bulletin');
+          var urgent = document.getElementById('Urgent').checked;
+          var addresses = toAddresses(document.getElementById('To').value);
+          var subject = document.getElementById('Subject').value;
+          var prefix = '';
+          switch(addresses.length) {
+          case 0:
+          case 1:
+              Bulletin.disabled = false;
+              prefix = (Bulletin.checked ? 'SB ' : 'SP ') + (addresses[0] || '<address>');
+              break;
+          default:
+              Bulletin.checked = false;
+              Bulletin.disabled = true;
+              prefix = 'SC ' + addresses[0] + EOL + addresses.slice(1).join(',');
+              break;
+          }
+          return prefix
+              + EOL + subject
+              + EOL + (urgent ? '!URG!' : '');
+      }
+      var CommandURL;
+      function updateCommand() {
+          var message = document.getElementById('Message').value;
+          var prefix = toPrefix();
+          var suffix = ((message && endsWith(message, '\n')) ? '' : EOL)
+              + '/EX' + EOL;
+          document.getElementById('Command').value = prefix + message + suffix;
+          document.getElementById('CommandLink').href = CommandURL
+              + '?prefix=' + encodeURIComponent(prefix)
+              + '&suffix=' + encodeURIComponent(suffix);
+      }
+      function onLoad() {
+          CommandURL = document.getElementById('CommandLink').href;
+          document.getElementById('Urgent').checked = {{Urgent}};
+          updateCommand();
+          document.getElementById('To').focus();
+      }
+      function selectAll(element) {
+          element.select();
+          setTimeout(function() {
+              element.scrollTop = 0;
+          }, 5);
+      }
+    </script>
   </head>
-  <body style="padding-top:1em;">
-    <b>Send <a href="{{MESSAGE_URL}}">the message</a> using the following information:</b>
-    <span style="float:right;">PIF: 1.1</span>
-    <table style="margin-top:0.5em;">
-      <tr>
-        <td style="text-align:right;white-space:nowrap;width:1px;">Subject:</td>
-        <td><pre>{{SUBJECT}}</pre></td>
-      </tr><tr>
-        <td style="text-align:right;white-space:nowrap;width:1px;">Message:</td>
-        <td><pre>{{MESSAGE}}</pre></td>
-      </tr>
-    </table>
+  <body style="padding-top:1em;" onload="onLoad();">
+    Send the message using the following information:
+    <span style="float:right;">PIF: 2.0</span>
+    <form onsubmit="return false;">
+      <table>
+        <tr>
+          <th style="width:1px;"><label for="Urgent">Urgent:</label></th>
+          <td>
+            <input id="Urgent" type="checkbox" tabindex="1"
+                   onchange="updateCommand();"/>
+            <label>&nbsp;&nbsp;
+              Bulletin:
+              <input id="Bulletin" type="checkbox" tabindex="2"
+                     onchange="updateCommand();"/>
+            </label>
+          </td>
+        </tr><tr>
+          <th>To:</th>
+          <td>
+            <input id="To" type="text" tabindex="3"
+                   placeholder="a comma-separated list"
+                   title="a comma-separated list"
+                   onchange="updateCommand();"
+                   oninput="updateCommand();"/>
+          </td>
+        </tr><tr>
+          <th>Subject:</th>
+          <td>
+            <textarea id="Subject" readonly rows="1" tabindex="4"
+                      onfocus="selectAll(this);">{{Subject}}</textarea>
+          </td>
+        </tr><tr>
+          <th>Message:</th>
+          <td>
+            <textarea id="Message" readonly rows="6" tabindex="5"
+                      onfocus="selectAll(this);">{{Message}}</textarea>
+          </td>
+        </tr><tr>
+          <th><a id="CommandLink" href="{{CommandURL}}">BBS command:</a></th>
+          <td>
+            <textarea id="Command" readonly rows="6" tabindex="6"
+                      onfocus="selectAll(this);"></textarea>
+          </td>
+        </tr>
+      </table>
+    </form>
   </body>
 </html>
