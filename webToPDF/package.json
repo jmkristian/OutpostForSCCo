@@ -6,7 +6,7 @@
     "repository": "https://github.com/jmkristian/OutpostForSCCo",
     "dependencies": {
         "resedit": "0.7.0",
-        "pkg": "4.3.8",
+        "pkg": "4.5.1",
         "puppeteer-core": "2.1.1"
     }
 }
