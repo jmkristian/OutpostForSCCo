@@ -832,27 +832,14 @@ function serve() {
     app.get('/manual', function(req, res) {
         onManual(res);
     });
+    app.post('/manual-put-:pageId', function(req, res) {
+        onManualPut(req.params.pageId, req, res);
+    });
+    app.get('/manual-get-:pageId/:subject', function(req, res) {
+        onManualGet(req.params.pageId, req, res);
+    });
     app.post('/manual-create', function(req, res) {
-        const formId = '' + nextFormId++;
-        Promise.resolve().then(function() {
-            const form = req.body.form;
-            const space = form.indexOf(' ');
-            const args = [
-                '--message_status-manual',
-                '--addon_name-' + form.substring(0, space),
-                '--ADDON_MSG_TYPE-' + form.substring(space + 1)];
-            for (var name in req.body) {
-                if (name != 'form') {
-                    args.push('--' + name + '-' + req.body[name]);
-                }
-            }
-            return onOpen(formId, args);
-        }).then(function() {
-            res.redirect('/form-' + formId);
-        }, function openFailed(err) {
-            res.set({'Content-Type': TEXT_HTML});
-            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
-        });
+        onManualCreate(req, res);
     });
     app.post('/manual-submit-:formId', function(req, res) {
         onManualSubmit(req.params.formId, req, res);
@@ -864,41 +851,7 @@ function serve() {
         onManualCommand(req.params.formId, req, res);
     });
     app.post('/manual-view', function(req, res) {
-        const formId = '' + nextFormId++;
-        Promise.resolve().then(function() {
-            var input = {};
-            for (var name in req.body) {
-                input[name] = req.body[name];
-            }
-            if (input.message && input.addon_name) {
-                // Perhaps the user entered some extra text preceding the message,
-                // for example email headers like To or Subject.
-                var start = enquoteRegex('!' + input.addon_name + '!') + '[\r\n]';
-                var pattern = new RegExp('^' + start);
-                if (!pattern.test(input.message)) {
-                    // That's not ideal. Does start appear later in the message?
-                    pattern = new RegExp('[\r\n]' + start);
-                    var foundIt = pattern.exec(input.message);
-                    if (foundIt) {
-                        // Ignore the surplus text preceding start:
-                        input.message = input.message.substring(foundIt.index + 1);
-                    }
-                }
-            }
-            if (input.OpDate && input.OpTime) {
-                input.MSG_DATETIME_OP_RCVD = (input.OpDate + " " + input.OpTime);
-            }
-            var args = [];
-            for (var name in input) {
-                args.push('--' + name + '-' + input[name]);
-            }
-            return onOpen(formId, args);
-        }).then(function() {
-            res.redirect('/form-' + formId);
-        }, function openFailed(err) {
-            res.set({'Content-Type': TEXT_HTML});
-            res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
-        });
+        onManualView(req, res);
     });
     app.get('/pdf/\*.pdf', express.static('.', {setHeaders: function(res, path, stat) {
         res.set('Content-Type', 'application/pdf');
@@ -1042,7 +995,7 @@ function keepAlive(formId) {
 /** @return Promise<form> */
 function findForm(formId) {
     return Promise.resolve().then(function(form) {
-        var form = openForms[formId]
+        var form = openForms[formId];
         if (form) return form;
         const fileName = saveFileName(formId);
         return fsp.readFile(fileName, ENCODING).then(function(data) {
@@ -1206,7 +1159,7 @@ function loadForm(formId, form) {
 }
 
 function getForm(form, res) {
-    log(form.environment);
+    log('getForm ' + JSON.stringify(form.environment));
     if (!form.environment.addon_name) {
         throw new Error('addon_name is ' + form.environment.addon_name + '\n');
     }
@@ -1428,13 +1381,21 @@ function onEmail(formId, reqBody, res) {
     });
 }
 
+/** Change Unix style line endings to Windows style. */
+function toEOL(from) {
+    return from && from
+        .replace(/([^\r])\n/g, '$1' + EOL)
+        .replace(/([^\r])\n/g, '$1' + EOL);
+    // You have to do it twice to handle multiple consecutive blank lines.
+}
+
 function saveForm(form, req) {
     const reqBody = req.body;
     const message = reqBody.formtext;
     form.environment.subject = reqBody.subject
         || subjectFromMessage(parseMessage(message, form.environment));
     // Outpost requires Windows-style line breaks:
-    form.message = message.replace(/([^\r])\n/g, '$1' + EOL);
+    form.message = toEOL(message);
     log(`saveForm ${form.message.length}`);
 }
 
@@ -1594,19 +1555,107 @@ function onManual(res) {
     ).then(function(template) {
         return getAddonForms().then(function(forms) {
             var form_options = forms
-                .filter(function(form) {return !!(form.a && form.t);})
+                .filter(function(form) {return !!form.t;})
                 .map(function(form) {
                     return EOL
                         + '<option value="'
-                        + encodeHTML(form.a + ' ' + form.t)
+                        + encodeHTML(form.t)
                         + '">'
                         + encodeHTML(form.fn ? form.fn.replace(/_/g, ' ') : form.t)
                         + '</option>';
                 });
-            res.end(expandVariables(template, {form_options: form_options.join('')}));
+            const pageId = '' + nextFormId++;
+            openForms[pageId] = {quietTime: 0};
+            res.end(expandVariables(template, {
+                form_options: form_options.join(''),
+                pageId: pageId}));
         });
     }).catch(function(err) {
         res.end(errorToHTML(err, templateFile));
+    });
+}
+
+function onManualPut(pageId, req, res) {
+    var form = null;
+    return requireForm(pageId).then(function(foundForm) {
+        form = foundForm;
+        var lengths = {};
+        if (req.body) {
+            for (name in req.body) {
+                var value = req.body[name];
+                form[name] = value;
+                lengths[name] = value.length;
+            }
+        }
+        res.set({'Content-Type': TEXT_PLAIN});
+        res.end('put ' + JSON.stringify(lengths));
+    }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err, form && form.environment), CHARSET);
+    });
+}
+
+function onManualGet(pageId, req, res) {
+    var form = null;
+    noCache(res);
+    return requireForm(pageId).then(function(foundForm) {
+        form = foundForm;
+        value = toEOL(form[req.query.field || 'message']);
+        res.set({'Content-Type': TEXT_PLAIN});
+        res.end(value, CHARSET);
+    }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err, form && form.environment), CHARSET);
+    });
+}
+
+function onManualCreate(req, res) {
+    const formId = '' + nextFormId++;
+    return Promise.resolve().then(function() {
+        const args = ['--message_status-manual'];
+        for (var name in req.body) {
+            args.push('--' + name + '-' + req.body[name]);
+        }
+        return onOpen(formId, args);
+    }).then(function() {
+        res.redirect('/form-' + formId);
+    }, function openFailed(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
+    });
+}
+
+function onManualView(req, res) {
+    const formId = '' + nextFormId++;
+    return Promise.resolve().then(function() {
+        var input = {};
+        for (var name in req.body) {
+            input[name] = req.body[name];
+        }
+        if (input.message && input.addon_name) {
+            // Perhaps the user entered some extra text preceding the message,
+            // for example email headers like To or Subject.
+            var start = enquoteRegex('!' + input.addon_name + '!') + '[\r\n]';
+            var pattern = new RegExp(start);
+            var foundIt = pattern.exec(input.message);
+            if (foundIt) {
+                // Ignore the surplus text preceding start:
+                input.message = input.message.substring(foundIt.index);
+            }
+        }
+        if (input.OpDate && input.OpTime) {
+            input.MSG_DATETIME_OP_RCVD = (input.OpDate + " " + input.OpTime);
+        }
+        var args = ['--message_status-received', '--mode-readonly'];
+        for (var name in input) {
+            args.push('--' + name + '-' + input[name]);
+        }
+        return onOpen(formId, args);
+    }).then(function() {
+        res.redirect('/form-' + formId);
+    }, function openFailed(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
     });
 }
 
@@ -1636,7 +1685,7 @@ function onManualMessage(formId, req, res) {
             Subject: encodeHTML(form.environment.subject),
             Message: encodeHTML(form.message),
             CommandURL: '/manual-command-' + formId
-                + '/' + encodeURIComponent(form.environment.subject)
+                + '/' + encodeURIComponent(form.environment.subject) + '.txt'
         }), CHARSET);
     }).catch(function(err) {
         res.end(errorToHTML(err, form && form.environment), CHARSET);
@@ -1645,9 +1694,9 @@ function onManualMessage(formId, req, res) {
 
 function onManualCommand(formId, req, res) {
     var form = null;
+    noCache(res);
     return requireForm(formId).then(function(foundForm) {
         form = foundForm;
-        noCache(res);
         const result = req.query.prefix + form.message + req.query.suffix;
         // The user can send this string to JNOS to send the message.
         res.set({'Content-Type': TEXT_PLAIN});

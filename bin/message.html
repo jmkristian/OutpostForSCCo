@@ -63,19 +63,18 @@
               + EOL + subject
               + EOL + (urgent ? '!URG!' : '');
       }
-      var CommandURL;
       function updateCommand() {
           var message = document.getElementById('Message').value;
           var prefix = toPrefix();
           var suffix = ((message && endsWith(message, '\n')) ? '' : EOL)
               + '/EX' + EOL;
           document.getElementById('Command').value = prefix + message + suffix;
-          document.getElementById('CommandLink').href = CommandURL
+          document.getElementById('CommandLink').href =
+              "{{CommandURL}}" // might contain ' characters
               + '?prefix=' + encodeURIComponent(prefix)
               + '&suffix=' + encodeURIComponent(suffix);
       }
       function onLoad() {
-          CommandURL = document.getElementById('CommandLink').href;
           document.getElementById('Urgent').checked = {{Urgent}};
           updateCommand();
           document.getElementById('To').focus();
@@ -126,8 +125,11 @@
                       onfocus="selectAll(this);">{{Message}}</textarea>
           </td>
         </tr><tr>
-          <th><a id="CommandLink" href="{{CommandURL}}">BBS command:</a></th>
-          <td>
+          <th>
+            BBS command:
+            <br/><br/>
+            <a id="CommandLink" href="">Download</a>
+          </th><td>
             <textarea id="Command" readonly rows="6" tabindex="6"
                       onfocus="selectAll(this);"></textarea>
           </td>

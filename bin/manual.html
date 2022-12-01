@@ -4,18 +4,30 @@
     <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
     <link rel="stylesheet" type="text/css" href="resources/css/pack-it-forms.css"/>
     <style>
-      form input[type="button"], form input[type="reset"]  {
-          background-color: #bbeeff;
+      form {
+          max-width: 8in;
+          min-width: 5in;
       }
-      form input[type="submit"]  {
+      form input[type="submit"] {
+          background-color: #ffffff;
           font-weight: bold;
-          background-color: #bbeeff;
       }
-      form td.input-label {
-          text-align: right;
-          vertical-align: middle;
-          white-space: nowrap;
-          width: 1px;
+      form input[type="submit"]:enabled  {
+          background-color: #a8e8a8;
+      }
+      table.block {
+          background-color: #f8f8f8;
+      }
+      table.block-caption {
+          background-color: #bbeeff;
+          border-top: 1px solid #aaaaaa;
+          margin-top: 2em;
+      }
+      table.block-caption td {
+          padding: 4pt 4pt;
+      }
+      td.label-sameline{
+          font-weight: bold;
       }
     </style>
     <title>SCCo PackItForms</title>
@@ -23,18 +35,84 @@
       setInterval(function() {
           var img = new Image();
           // To discourage caching, use a new query string for each ping.
-          img.src = "/ping-0?i=" + Math.random();
+          img.src = "/ping-{{pageId}}?i=" + Math.random();
           img = undefined;
       }, 30000); // call ping every 30 seconds
-      function onFormToCreate(value) {
-          var button = document.getElementById("create-form");
-          button.disabled = !value;
+      function selectAll(element) {
+          setTimeout(function() {
+              element.select();
+              element.scrollTop = 0;
+          }, 5);
       }
-      function onMessage() {
-          var message = document.getElementById("message");
-          var button = document.getElementById("view-message");
-          button.disabled = !(message.value && message.value.trim()
-                              && document.getElementById("view-form").checkValidity());
+      function fireEvent(target, eventName) {
+          var event = document.createEvent('Event');
+          event.initEvent(eventName, true, true);
+          target.dispatchEvent(event);
+          onInput();
+      }
+      function changeValue(inputID, newValue) {
+          var input = document.getElementById(inputID);
+          if (input && input.value != newValue) {
+              input.value = newValue;
+              fireEvent(input, 'change');
+          }
+      }
+      function setEnabled(button, enabled) {
+          button.disabled = !enabled;
+      }
+      function onInput() {
+          // Form validity doesn't get updated immediately.
+          // So wait a bit before calling checkValidity.
+          setTimeout(function checkFormsValid() {
+              var valid = document.getElementById("create-form").checkValidity();
+              var value = document.getElementById("create-type").value;
+              setEnabled(document.getElementById("create-button"), valid && value);
+              valid = document.getElementById("view-form").checkValidity();
+              value = document.getElementById("message").value;
+              setEnabled(document.getElementById("view-button"), valid && value && value.trim());
+          }, 10);
+      }
+      function saveMessage(message) {
+          var copy = document.getElementById("message-copy");
+          if (copy && copy.value != message) {
+              copy.value = message;
+              var manualPut = document.getElementById("manual-put");
+              manualPut.submit();
+          }
+          var subject = "message";
+          var found = /[\r\n]Subject:([^\r\n]*)/.exec("\n" + message);
+          if (found) {
+              subject = found[1].trim();
+          }
+          document.getElementById("message-link").href =
+              "/manual-get-{{pageId}}/"
+              + encodeURIComponent(subject) + ".txt"
+              + "?field=message";
+      }
+      function onMessageInput() {
+          function twoDigits(number) {
+              var result = number + "";
+              while (result.length < 2) {
+                  result = "0" + result;
+              }
+              return result;
+          }
+          var message = document.getElementById("message").value;
+          var newDate = "";
+          var newTime = "";
+          if (message) {
+              var now = new Date();
+              newDate = twoDigits(now.getMonth() + 1)
+                  + "/" + twoDigits(now.getDate())
+                  + "/" + now.getFullYear();
+              newTime = twoDigits(now.getHours())
+                  + ":" + twoDigits(now.getMinutes());
+          }
+          saveMessage(message);
+          changeValue("message-number", "");
+          changeValue("message-date", newDate);
+          changeValue("message-time", newTime);
+          onInput();
       }
       function uploadMessage(file) {
           var reader = new FileReader();
@@ -42,7 +120,7 @@
               var message = document.getElementById("message");
               message.value = e.target.result;
               document.getElementById("message-file-name").innerText = file.name;
-              onMessage();
+              onMessageInput();
           };
           reader.readAsText(file);
       }
@@ -59,120 +137,141 @@
           return false;
       }
       function onMessageClear() {
-          document.getElementById("view-message").disabled = true;
           document.getElementById("message-file-name").innerText = "";
+          onInput();
       }
-      function setFormDefaultValues() {
-          function twoDigits(number) {
-              var result = number + "";
-              while (result.length < 2) {
-                  result = "0" + result;
+      function onLoad() {
+          var message = document.getElementById("message");
+          message.addEventListener('change', onMessageInput);
+          message.addEventListener('input', onMessageInput);
+          Array.prototype.forEach.call(document.querySelectorAll(
+              'form input[type="text"]'), function(input) {
+                  input.addEventListener('change', onInput);
+                  input.addEventListener('input', onInput);
+              });
+          // Wait for field values to be initialized (e.g. when navigating back).
+          setTimeout(function() {
+              onInput();
+              saveMessage(message.value);
+              var opName = document.getElementById("op-name");
+              if (!opName.value) {
+                  opName.focus();
               }
-              return result;
-          }
-          var today = new Date();
-          today = twoDigits(today.getMonth() + 1) + "/" + twoDigits(today.getDate()) + "/" + today.getFullYear();
-          Array.prototype.forEach.call(document.querySelectorAll("form input.date"), function(input) {
-              input.value = today;
-          });
+          }, 10);
       }
-      window.onload = setFormDefaultValues;
+      window.onload = onLoad;
     </script>
   </head>
-  <body style="padding-top:1em;">
+  <body style="padding-top:1em;background-color:#d0d0d0;">
     <span style="font-size:125%;font-weight:bold;">Santa Clara County ARES/RACES PackItForms</span>
-    <span style="float:right;">PIF: 1.3</span>
-    <form action="/manual-create" method="POST" target="_blank">
-      <input name="addon_version" type="text" style="display:none;" value="{{addon_version}}"/>
-      <table style="margin-top:0.5em;">
+    <span style="float:right;">PIF: 2.1</span>
+    <form id="create-form" action="/manual-create" method="POST" target="_blank">
+      <input type="text" style="display:none;" name="addon_name" value="{{addon_name}}"/>
+      <input type="text" style="display:none;" name="addon_version" value="{{addon_version}}"/>
+      <table class="same-line-label-layout" style="margin-top:1em;">
         <tr>
-          <td colspan="2">
-            <fieldset class="horizontal">
-              <b>Create a message to send:</b>
-              Enter information below and then click
-              <input id="create-form" type="submit" value="Create" disabled/>
+          <td class="label-sameline">
+            Operator name:
+            <input type="text" id="op-name" name="operator_name" required
+                   oninput="changeValue('op-name-copy', this.value)"
+                   placeholder="personal (not tactical)"
+                   style="width:20em;margin-right:1em;"/>
+            Call sign:
+            <input type="text" id="op-call" name="operator_call_sign" required
+                   oninput="changeValue('op-call-copy', this.value)"
+                   class="call-sign"/>
           </td>
-        </tr><tr>
-          <td class="input-label">Form type:</td>
-          <td>
-            <select name="form" onchange="onFormToCreate(this.value)">
+        </tr>
+      </table>
+      <table class="block-caption">
+        <tr>
+          <td>Create a form to send</td>
+        </tr>
+      </table>
+      <table class="block">
+        <tr>
+          <td class="label-sameline">
+            Form type:
+            <select id="create-type" name="ADDON_MSG_TYPE" required onchange="onInput()">
               <option value="" selected disabled></option>{{form_options}}
             </select>
           </td>
         </tr><tr>
-          <td class="input-label">Sender's name:</td>
-          <td><input name="operator_name" type="text" style="width:20em;"/></td>
-        </tr><tr>
-          <td class="input-label">Sender's call sign:</td>
-          <td><input name="operator_call_sign" type="text" class="call-sign"/></td>
+          <td>
+            <input type="submit" id="create-button" value="Create Form" disabled/>
+          </td>
         </tr>
       </table>
     </form>
-    <br/>
-    <form id="view-form" action="/manual-view" method="POST" target="_blank" oninput="onMessage()">
-      <table>
+    <form id="view-form" action="/manual-view" method="POST" target="_blank">
+      <input type="text" style="display:none;" name="addon_name" value="{{addon_name}}"/>
+      <input type="text" style="display:none;" name="addon_version" value="{{addon_version}}"/>
+      <input type="text" style="display:none;" required id="op-name-copy" name="operator_name"/>
+      <input type="text" style="display:none;" required id="op-call-copy" name="operator_call_sign"/>
+      <table class="block-caption">
         <tr>
-          <td colspan="5">
-            <fieldset class="horizontal">
-              <b>View a received message:</b>
-              Enter information below and then click
-              <input type="submit" id="view-message" value="View" disabled/>
-              To clear the information, click
-              <input type="reset" value="Clear" onclick="onMessageClear(event)"/>
-            </fieldset>
-          </td>
-        </tr><tr>
-          <td class="input-label">Destination Msg #:</td>
-          <td colspan="4" class="label-sameline">
-            <input type="text" name="MSG_LOCAL_ID" class="message-number">
-          </td>
-        </tr><tr>
-          <td style="text-align:right;">Message:</td>
+          <td>View a received message</td>
+        </tr>
+      </table>
+      <table class="block">
+        <tr>
           <td colspan="4">
-            <fieldset class="horizontal">
-              Paste or drop the message below, or
-              <input type="button" value="upload it from a file."
-                     onclick="document.getElementById('message-file').click()"/>
-              <input id="message-file" type="file" style="display:none;"
-                     onchange="onMessageFile(this)"/>
-              <span id="message-file-name" style="margin-left:1em;"></span>
-            </fieldset>
-            <textarea name="message" id="message" rows="24" style="font-weight:normal;"
-                      placeholder="!{{addon_name}}!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
-                      onchange="onMessage()" oninput="onMessage()"
-                      ondrop="return onMessageDrop(event)"
-                      ></textarea>
+            Enter the received message, including the Subject and other headers.
+            You can paste, drag and drop or upload a file.
           </td>
         </tr><tr>
-          <td class="input-label">Receiving Operator:</td>
-          <td style="width:50%;padding-right:0;">
+          <td colspan="4">
             <table class="same-line-label-layout">
               <tr>
-                <td style="width:1px;padding-right:0;">Name:</td>
-                <td style="padding-left:0;">
-                  <input type="text" name="operator_name" required style="margin-left:0;"/>
+                <th>
+                  Message:
+                  <br/><br/>
+                  <input type="button" value="Upload"
+                         onclick="document.getElementById('message-file').click()"/>
+                  <input type="file" id="message-file" style="display:none;"
+                         onchange="onMessageFile(this)"/>
+                  <span id="message-file-name" style="display:none;"></span>
+                  <br/><br/>
+                  <a id="message-link" target="_blank" href="">Download</a>
+                </th><td>
+                  <textarea name="message" id="message" rows="12" style="font-weight:normal;" required
+                            placeholder="Date: ...&#10;Subject: ...&#10;&#10;!{{addon_name}}!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
+                            onfocus="selectAll(this)" ondrop="return onMessageDrop(event)"
+                            ></textarea>
                 </td>
               </tr>
             </table>
-          </td><td class="label-sameline">
-            Call Sign:
-            <input type="text" name="operator_call_sign" required class="call-sign"/>
+          </td>
+        </tr><tr>
+          <td class="label-sameline">
+            Destination Message Number:
+            <input type="text" id="message-number" name="MSG_LOCAL_ID" required
+                   class="message-number">
           </td><td class="label-sameline">
             Date:
-            <input type="text" name="OpDate" required class="date"
+            <input type="text" id="message-date" name="OpDate" required class="date"
                    pattern="(0[1-9]|1[012])/(0[1-9]|1[0-9]|2[0-9]|3[01])/[1-2][0-9][0-9][0-9]"
                    placeholder="mm/dd/yyyy"/>
           </td><td class="label-sameline">
             Time:
-            <input type="text" name="OpTime" required class="time"
+            <input type="text" id="message-time" name="OpTime" required class="time"
                    pattern="([01][0-9]|2[0-3]):?[0-5][0-9]|2400|24:00"
                    placeholder="hh:mm"/>
+          </td><td>
+          </td>
+        </tr><tr>
+          <td colspan="4">
+            <input type="submit" id="view-button" value="View Form" disabled/>
+            <input type="reset" value="Reset Fields" style="margin-left:2em;"
+                   onclick="onMessageClear(event)"/>
           </td>
         </tr>
       </table>
-      <input type="text" name="addon_name" value="{{addon_name}}" style="display:none;"/>
-      <input type="text" name="message_status" value="received" style="display:none;"/>
-      <input type="text" name="mode" value="readonly" style="display:none;"/>
+    </form>
+    <form style="display:none" id="manual-put"
+          method="POST" action="/manual-put-{{pageId}}" target="hidden-iframe">
+      <textarea name="message" id="message-copy"></textarea>
+      <iframe name="hidden-iframe"></iframe>
     </form>
   </body>
 </html>
