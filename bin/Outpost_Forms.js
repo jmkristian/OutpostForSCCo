@@ -118,6 +118,7 @@ function promiseTimeout(msec) {
 }
 
 const HTTP_OK = 200;
+const FOUND = 302;
 const SEE_OTHER = 303;
 const FORBIDDEN = 403;
 const NOT_FOUND = 404;
@@ -852,6 +853,15 @@ function serve() {
     });
     app.post('/manual-view', function(req, res) {
         onManualView(req, res);
+    });
+    app.get('/manual-edit-log', function(req, res) {
+        editManualLog(req, res);
+    });
+    app.post('/manual-edit-log', function(req, res) {
+        postManualLog(req, res);
+    });
+    app.get('/manual-log', function(req, res) {
+        getManualLog(res);
     });
     app.get('/pdf/\*.pdf', express.static('.', {setHeaders: function(res, path, stat) {
         res.set('Content-Type', 'application/pdf');
@@ -1664,6 +1674,7 @@ function onManualSubmit(formId, req, res) {
     return requireForm(formId).then(function(foundForm) {
         form = foundForm;
         saveForm(form, req);
+        logManualSubmit(form);
         res.redirect('/manual-message-' + formId);
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
@@ -1689,6 +1700,245 @@ function onManualMessage(formId, req, res) {
         }), CHARSET);
     }).catch(function(err) {
         res.end(errorToHTML(err, form && form.environment), CHARSET);
+    });
+}
+
+function logManualSubmit(form) {
+    const logFile = path.join(LOG_FOLDER, 'manual-log.json'); 
+    return fsp.readFile(
+        logFile, {encoding: ENCODING}
+    ).then(function(data) {
+        return Promise.resolve(JSON.parse(data));
+    }, function readFailed(err) {
+        return Promise.resolve({});
+    }).then(function(logData) {
+        const message = parseMessage(form.message);
+        log('logManualSubmit message ' + JSON.stringify(message));
+        var subject = form.environment.subject || message.formType;
+        const fields = message.fields;
+        const found = new RegExp(
+            '^' + enquoteRegex(fields.MsgNo) + '_[IPR]_')
+              .exec(subject);
+        if (found) {
+            subject = subject.substring(found[0].length);
+        }
+        if (subject.length > 40) {
+            subject = subject.substring(0, 37) + '...';
+        }
+        const logEntry = {
+            time: fields.OpTime,
+            fromCall: 'from TODO',
+            fromNumber: fields.MsgNo,
+            toCall: 'to TODO',
+            subject: subject,
+        };
+        if (logData.messages == null) {
+            logData.messages = [];
+        }
+        logData.messages.push(logEntry);
+        return logData;
+    }).then(function(logData) {
+        return fsp.writeFile(
+            logFile, JSON.stringify(logData),
+            {encoding: ENCODING}
+        );
+    }).catch(log);
+}
+
+const MANUAL_LOG_FILE = path.join(LOG_FOLDER, 'manual-log.json');
+
+const manualLogFieldNames = [
+    'incidentName',
+    'activationNumber',
+    'fromDate',
+    'fromTime',
+    'toDate',
+    'toTime',
+    'netName',
+    'radioOperator',
+    'preparedBy',
+    'datePrepared',
+    'timePrepared',
+];
+
+const manualLogFieldClasses = {
+    fromDate: 'date',
+    fromTime: 'time',
+    toDate: 'date',
+    toTime: 'time',
+    datePrepared: 'date',
+    timePrepared: 'time',
+};
+
+const manualLogMessageFieldNames = [
+    'time', 'fromCall', 'fromNumber', 'toCall', 'toNumber', 'subject'
+];
+
+const manualLogMessageFieldClasses = {
+    time: 'time',
+    fromCall: 'call-sign',
+    toCall: 'call-sign',
+    fromNumber: 'message-number',
+    toNumber: 'message-number',
+};
+
+const manualLogPatterns = {
+    date: ' pattern="(0[1-9]|1[012])/(0[1-9]|1[0-9]|2[0-9]|3[01])/[1-2][0-9][0-9][0-9]"',
+    time: ' pattern="([01][0-9]|2[0-3]):?[0-5][0-9]|2400|24:00"',
+};
+
+function readManualLog() {
+    return fsp.readFile(
+        MANUAL_LOG_FILE, {encoding: ENCODING}
+    ).then(function(data) {
+        return Promise.resolve(JSON.parse(data));
+    }, function readFailed(err) {
+        log(err);
+        return Promise.resolve({});
+    }); 
+}
+
+function editManualLog(req, res, data) {
+    return (data ? Promise.resolve(data) : readManualLog()).then(function(data) {
+        log('editManualLog data ' + JSON.stringify(data));
+        manualLogFieldNames.forEach(function(field) {
+            var clazz = manualLogFieldClasses[field];
+            var attrs = '';
+            if (clazz) {
+                attrs += ` class="${clazz}" placeholder="${clazz}"`;
+                attrs += manualLogPatterns[clazz] || '';
+            }
+            data[field] = `<input type="text" name="`
+                + encodeHTML(field)
+                + `"${attrs} value="`
+                + encodeHTML(data[field] || '')
+                + `" required/>${EOL}` ;
+        });
+        data.messages.push(null); // enable adding a row at the end
+        var messageRows = '';
+        for (m in data.messages) {
+            var message = data.messages[m];
+            messageRows += `</tr><tr class="message-edit">${EOL}`;
+            manualLogMessageFieldNames.forEach(function(field) {
+                var clazz = manualLogMessageFieldClasses[field];
+                var attrs = clazz ? ` class="${clazz}"` : '';
+                attrs += manualLogPatterns[clazz] || '';
+                if (message && clazz == 'time') {
+                    attrs += ' required';
+                }
+                var input = `<input type="text" name="`
+                    + encodeHTML(`${m}.${field}`)
+                    + `"${attrs} value="`
+                    + encodeHTML((message && message[field]) || '')
+                    + `"/>` ;
+                attrs = (clazz && m == 0) ? ` style="width:1px;"` : '';
+                messageRows += `    <td${attrs}>${input}</td>${EOL}`;
+            });
+            messageRows += `  <td style="width:72px;">${EOL}    `
+                + `<button onclick="insertMessage(${m})"><img alt="+" src="icon-insert.png"/></button>${EOL}`;
+            if (message != null) {
+                messageRows += '  '
+                    + `<button onclick="deleteMessage(${m})" style="background-color:#ffcccc;">`
+                    + `<img alt="-" src="icon-delete.png"/>`
+                    + `</button>${EOL}  </td>${EOL}`;
+            }
+        }
+        data.messages = messageRows;
+        data.afterLoad = '';
+        data.submitButtons =
+            '<input type="submit" name="printButton" value="Print"/>'
+            + '</td><td style="width:1px;">'
+            + '<input type="submit" name="saveButton" value="Save"/>';
+        return sendManualLog(res, data);
+    }).catch(function(err) {
+        res.end(errorToHTML(err), CHARSET);
+    });
+}
+
+function getManualLogMessage(req, m, message) {
+    var empty = true;
+    manualLogMessageFieldNames.forEach(function(field) {
+        message[field] = req.body[`${m}.${field}`];
+        empty = empty && !(message[field]);
+    });
+    return !empty;
+}
+
+function postManualLog(req, res) {
+    return readManualLog().then(function(data) {
+        // TODO: update the data with values from req
+        manualLogFieldNames.forEach(function(field) {
+            data[field] = req.body[field];
+        });
+        for (m in data.messages) {
+            getManualLogMessage(req, m, data.messages[m]);
+        }
+        var newMessage = {};
+        var addedMessage = getManualLogMessage(req, data.messages.length, newMessage);
+        if (addedMessage) {
+            data.messages.push(newMessage);
+        }
+        if (req.body.insertIndex) {
+            var i = parseInt(req.body.insertIndex);
+            // If we just added a message and inserted at the new message index,
+            // don't insert another item into data.messages.
+            if (i < data.messages.length + (addedMessage ? -1 : 1)) {
+                data.messages.splice(i, 0, {});
+            }
+        }
+        if (req.body.deleteIndex) {
+            data.messages.splice(parseInt(req.body.deleteIndex), 1);
+        }
+        const newData = JSON.stringify(data);
+        log(`postManualLog data ${newData}`);
+        return fsp.writeFile(
+            MANUAL_LOG_FILE, newData, {encoding: ENCODING}
+        ).then(function() {
+            return Promise.resolve(data);
+        });
+    }).then(function(data) {
+        if (req.body.printButton) {
+            res.redirect(SEE_OTHER, `http://${LOCALHOST}:${myServerPort}/manual-log`);
+        } else {
+            res.redirect(SEE_OTHER, req.headers.referer);
+        }
+    }).catch(function(err) {
+        res.end(errorToHTML(err), CHARSET);
+    });
+}
+
+function getManualLog(res) {
+    return readManualLog().then(function(data) {
+        log(`getManualLog data ${data}`);
+        manualLogFieldNames.forEach(function(field) {
+            data[field] = data[field] ? encodeHTML(data[field]) : '&nbsp;';
+        });
+        var messageRows = '';
+        (data.messages || []).forEach(function(message) {
+            messageRows += `</tr><tr class="message-data">${EOL}`;
+            manualLogMessageFieldNames.forEach(function(field) {
+                var attrs = (field == 'subject') ? ' colspan="2"' : '';
+                messageRows += `<td${attrs}>`
+                    + (message[field] ? encodeHTML(message[field]) : '&nbsp;')
+                    + `</td>${EOL}`;
+            });
+        });
+        data.messages = messageRows;
+        data.afterLoad = 'window.print();';
+        data.submitButtons = '';
+        return sendManualLog(res, data);
+    }).catch(function(err) {
+        res.end(errorToHTML(err), CHARSET);
+    });
+}
+
+function sendManualLog(res, data) {
+    res.set({'Content-Type': TEXT_HTML});
+    var template = null;
+    return fsp.readFile(
+        path.join('bin', 'manual-log.html'), {encoding: ENCODING}
+    ).then(function(template) {
+        res.end(expandVariables(template, data), CHARSET);
     });
 }
 

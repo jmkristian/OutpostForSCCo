@@ -167,8 +167,8 @@
     <span style="font-size:125%;font-weight:bold;">Santa Clara County ARES/RACES PackItForms</span>
     <span style="float:right;">PIF: 2.1</span>
     <form id="create-form" action="/manual-create" method="POST" target="_blank">
-      <input type="text" style="display:none;" name="addon_name" value="{{addon_name}}"/>
-      <input type="text" style="display:none;" name="addon_version" value="{{addon_version}}"/>
+      <input type="text" style="display:none;" name="addon_name" value="SCCoPIFO"/>
+      <input type="text" style="display:none;" name="addon_version" value="3.10c"/>
       <table class="same-line-label-layout" style="margin-top:1em;">
         <tr>
           <td class="label-sameline">
@@ -206,8 +206,8 @@
       </table>
     </form>
     <form id="view-form" action="/manual-view" method="POST" target="_blank">
-      <input type="text" style="display:none;" name="addon_name" value="{{addon_name}}"/>
-      <input type="text" style="display:none;" name="addon_version" value="{{addon_version}}"/>
+      <input type="text" style="display:none;" name="addon_name" value="SCCoPIFO"/>
+      <input type="text" style="display:none;" name="addon_version" value="3.10c"/>
       <input type="text" style="display:none;" required id="op-name-copy" name="operator_name"/>
       <input type="text" style="display:none;" required id="op-call-copy" name="operator_call_sign"/>
       <table class="block-caption">
@@ -238,7 +238,7 @@
                      style="font-weight:normal;">Download</a>
                 </th><td>
                   <textarea name="message" id="message" rows="12" style="font-weight:normal;" required
-                            placeholder="Date: ...&#10;Subject: ...&#10;&#10;!{{addon_name}}!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
+                            placeholder="Date: ...&#10;Subject: ...&#10;&#10;!SCCoPIFO!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
                             onfocus="selectAll(this)" ondrop="return onMessageDrop(event)"
                             ></textarea>
                 </td>
@@ -276,5 +276,6 @@
       <textarea name="message" id="message-copy"></textarea>
       <iframe name="hidden-iframe"></iframe>
     </form>
+    <br/> <b><a href="/manual-edit-log" target="_blank">ICS-309 log</a></b>
   </body>
 </html>

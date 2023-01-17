@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <link rel="stylesheet" type="text/css" href="resources/css/pack-it-forms.css"/>
+    <style>
+      form {
+          max-width: 8in;
+          min-width: 5in;
+      }
+      .message-data {
+          font-family: consolas,monaco,profont,monospace;
+      }
+      table {
+          background-color: #ffffff;
+          border-left: 2px solid;
+          border-right: 2px solid;
+      }
+      table tr.first-row>td,
+      table tr>td.first-row {
+          border-bottom: 2px solid;
+      }
+      table tr.last-row>td {
+          border-top: 2px solid;
+      }
+      .caption,
+      table.same-line-label-layout>tr>td.caption,
+      table.same-line-label-layout>tbody>tr>td.caption {
+          font-size: 80%;
+          padding-bottom: 1em;
+      }
+      tr.captions>td {
+          text-align: center;
+      }
+      form button,
+      form input[type="submit"] {
+          background-color: #a8e8a8;
+          border: 2px solid;
+          display: inline-block;
+          font-weight: bold;
+      }
+      form input[type="text"].message-number {
+          width: 10ex;
+      }
+      form tr.message-data td:nth-child(odd),
+      form tr.message-edit td:nth-child(odd) {
+          border-right: 2px solid;
+      }
+      form tr.message-edit td {
+          padding: 0;
+          vertical-align: middle;
+      }
+      form tr.message-edit input[type="text"].time {
+          width: 9ex;
+      }
+      form tr.message-edit button {
+          display: inline-block;
+      }
+    </style>
+    <title>ICS-309</title>
+    <script type="text/javascript">
+      function insertMessage(index) {
+          document.getElementById("insert-index").value = index + '';
+          document.getElementById("the-form").submit();
+      }
+      function deleteMessage(index) {
+          document.getElementById("delete-index").value = index + '';
+          document.getElementById("the-form").submit();
+      }
+      function onLoad() {
+          setTimeout(function afterLoad() {
+              {{afterLoad}}
+          }, 10);
+      }
+      window.onload = onLoad;
+    </script>
+  </head>
+  <body style="background-color:#ffffff;padding-top:1em;">
+    <form id="the-form" method="POST"><!-- action="/manual-edit-log" -->
+      <input type="text" style="display:none;" name="insertIndex" id="insert-index" value=""/>
+      <input type="text" style="display:none;" name="deleteIndex" id="delete-index" value=""/>
+      <input type="text" style="display:none;" name="addon_name" value="{{addon_name}}"/>
+      <input type="text" style="display:none;" name="addon_version" value="{{addon_version}}"/>
+      <table style="border-top:2px solid;">
+        <tr>
+          <td class="label">
+            <span style="font-size:125%;font-weight:bold;">COMM Log</span>
+            <br/>ICS 309-SCCo
+            <br/>ARES/RACES
+          </td><td>
+            <table class="same-line-label-layout">
+              <tr>
+                <td class="caption">
+                  1. Incident Name and Activation Number
+                </td>
+              </tr><tr>
+                <td>{{incidentName}}</td>
+              </tr><tr>
+                <td>{{activationNumber}}</td>
+              </tr>
+            </table>
+          </td><td>
+            <table class="same-line-label-layout">
+              <tr>
+                <td colspan="4" class="caption">
+                  2. Operational Period (Date/Time)
+                </td>
+              </tr><tr>
+                <td></td>
+                <td>{{fromDate}}</td>
+                <td></td>
+                <td>{{toDate}}</td>
+              </tr><tr>
+                <td class="label">From:</td>
+                <td>{{fromTime}}</td>
+                <td class="label">To:</td>
+                <td>{{toTime}}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <table id="form-row-1">
+        <tr>
+          <td style="width:50%;">
+            <table class="same-line-label-layout">
+              <tr>
+                <td class="caption">
+                  3. Radio Net Name (for NCOs) or Position/Tactical Call
+                </td>
+              </tr><tr>
+                <td>{{netName}}</td>
+              </tr>
+            </table>
+          </td><td>
+            <table class="same-line-label-layout">
+              <tr>
+                <td class="caption">
+                  4. Radio Operator (Name, Call Sign)
+                </td>
+              </tr><tr>
+                <td>{{radioOperator}}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <table style="border-bottom:2px solid;">
+        <tr style="background-color:#bbbbbb;">
+          <td style="border-right:none;width:1px;">5.</td>
+          <td colspan="6" style="border-left:none;font-weight:bold;text-align:center;">COMMUNICATIONS LOG</td>
+        </tr>
+        <tr class="captions">
+          <td rowspan="2" class="first-row"
+              style="border-right:2px solid;font-size:80%;vertical-align:bottom;">
+            Time<br/>(24:00)
+          </td><td colspan="2" style="border-right:2px solid;">
+            FROM
+          </td><td colspan="2" style="border-right:2px solid;">
+            TO
+          </td><td colspan="2" rowspan="2" class="first-row"
+                   style="text-align:left;vertical-align:middle;">
+            Message
+          </td>
+        </tr><tr class="captions first-row" style="font-size:80%;">
+          <td>
+            Call Sign/ID
+          </td><td style="border-right:2px solid;">
+            Msg #
+          </td><td>
+            Call Sign/ID
+          </td><td style="border-right:2px solid;">
+            Msg #
+          </td>
+{{messages}}
+        </tr><tr class="last-row">
+          <td colspan="3">
+            <div class="caption">6. Prepared By (Name, Call Sign)</div>
+            {{preparedBy}}
+          </td>
+          <td colspan="2" class="caption">6A. Signature</td>
+          <td colspan="2">
+            <div class="caption">7. Date &amp; Time Prepared</div>
+            {{datePrepared}}&nbsp;&nbsp;{{timePrepared}}
+          </td>
+        </tr>
+      </table>
+      <table class="same-line-label-layout" style="margin-top:1em;">
+        <tr>
+          <td>ICS 309-SCCo ARES/RACES (Rev. 2021-Apr-08)</td>
+          <td style="width:1px;">
+            {{submitButtons}}
+          </td>
+        </tr><tr>
+          <td>PIF: 1.0</td>
+        </tr>
+      </table>
+    </form>
+  </body>
+</html>
