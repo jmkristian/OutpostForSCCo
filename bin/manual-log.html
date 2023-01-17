@@ -59,6 +59,10 @@
     </style>
     <title>ICS-309</title>
     <script type="text/javascript">
+      var inputPatterns = {
+          date: "([01]?[1-9])/([0123]?[1-9])/[1-2][0-9][0-9][0-9]",
+          time: "([01]?[0-9]|2[0-3]):?[0-5][0-9]|2400|24:00"
+      };
       function insertMessage(index) {
           document.getElementById("insert-index").value = index + '';
           document.getElementById("the-form").submit();
@@ -70,6 +74,13 @@
       function onLoad() {
           setTimeout(function afterLoad() {
               {{afterLoad}}
+              for (clazz in inputPatterns) {
+                  Array.prototype.forEach.call(
+                      document.querySelectorAll('input[type="text"].' + clazz),
+                      function(input) {
+                          input.pattern = inputPatterns[clazz];
+                      });
+              }
           }, 10);
       }
       window.onload = onLoad;
@@ -149,8 +160,7 @@
         <tr style="background-color:#bbbbbb;">
           <td style="border-right:none;width:1px;">5.</td>
           <td colspan="6" style="border-left:none;font-weight:bold;text-align:center;">COMMUNICATIONS LOG</td>
-        </tr>
-        <tr class="captions">
+        </tr><tr class="captions">
           <td rowspan="2" class="first-row"
               style="border-right:2px solid;font-size:80%;vertical-align:bottom;">
             Time<br/>(24:00)

@@ -1660,6 +1660,7 @@ function onManualView(req, res) {
         for (var name in input) {
             args.push('--' + name + '-' + input[name]);
         }
+        logManualView(req, args);
         return onOpen(formId, args);
     }).then(function() {
         res.redirect('/form-' + formId);
@@ -1703,48 +1704,6 @@ function onManualMessage(formId, req, res) {
     });
 }
 
-function logManualSubmit(form) {
-    const logFile = path.join(LOG_FOLDER, 'manual-log.json'); 
-    return fsp.readFile(
-        logFile, {encoding: ENCODING}
-    ).then(function(data) {
-        return Promise.resolve(JSON.parse(data));
-    }, function readFailed(err) {
-        return Promise.resolve({});
-    }).then(function(logData) {
-        const message = parseMessage(form.message);
-        log('logManualSubmit message ' + JSON.stringify(message));
-        var subject = form.environment.subject || message.formType;
-        const fields = message.fields;
-        const found = new RegExp(
-            '^' + enquoteRegex(fields.MsgNo) + '_[IPR]_')
-              .exec(subject);
-        if (found) {
-            subject = subject.substring(found[0].length);
-        }
-        if (subject.length > 40) {
-            subject = subject.substring(0, 37) + '...';
-        }
-        const logEntry = {
-            time: fields.OpTime,
-            fromCall: 'from TODO',
-            fromNumber: fields.MsgNo,
-            toCall: 'to TODO',
-            subject: subject,
-        };
-        if (logData.messages == null) {
-            logData.messages = [];
-        }
-        logData.messages.push(logEntry);
-        return logData;
-    }).then(function(logData) {
-        return fsp.writeFile(
-            logFile, JSON.stringify(logData),
-            {encoding: ENCODING}
-        );
-    }).catch(log);
-}
-
 const MANUAL_LOG_FILE = path.join(LOG_FOLDER, 'manual-log.json');
 
 const manualLogFieldNames = [
@@ -1782,20 +1741,107 @@ const manualLogMessageFieldClasses = {
     toNumber: 'message-number',
 };
 
-const manualLogPatterns = {
-    date: ' pattern="(0[1-9]|1[012])/(0[1-9]|1[0-9]|2[0-9]|3[01])/[1-2][0-9][0-9][0-9]"',
-    time: ' pattern="([01][0-9]|2[0-3]):?[0-5][0-9]|2400|24:00"',
-};
+function getSubject(message) {
+    var subject = message.headers.subject;
+    if (!subject) {
+        subject = message.formType || '';
+        if (subject.startsWith('form-')) {
+            subject = subject.substring(5);
+        }
+        if (subject.endsWith('.html')) {
+            subject = subject.substring(0, subject.length - 5);
+        }
+    }
+    return subject;
+}
 
-function readManualLog() {
-    return fsp.readFile(
-        MANUAL_LOG_FILE, {encoding: ENCODING}
-    ).then(function(data) {
-        return Promise.resolve(JSON.parse(data));
-    }, function readFailed(err) {
-        log(err);
-        return Promise.resolve({});
-    }); 
+function logManualView(req, args) {
+    readManualLog().then(function(data) {
+        const message = parseMessage(req.body.message);
+        log('logManualView message ' + JSON.stringify(message));
+        const fields = message.fields;
+        var subject = getSubject(message);
+        var fromCall = fields.OpCall || '';
+        var fromNumber = fields.MsgNo || '';
+        if (!fromCall) { // Find fromCall in the From header.
+            var from = message.headers.from || '';
+            var atSign = from.indexOf('@');
+            if (atSign > 0) {
+                fromCall = from.substring(0, atSign);
+            }
+        }
+        if (!fromNumber) { // Extract fromNumber out of the subject.
+            var found = /^(([A-Z0-9]{1,3}-)?\d+[A-Z]?)_/i.exec(subject);
+            if (found) {
+                fromNumber = found[1];
+                subject = subject.substring(found[0].length);
+            }
+        } else { // Remove fromNumber from the subject.
+            var found =new RegExp(
+                '^' + enquoteRegex(fromNumber) + '_', 'i')
+                .exec(subject);
+            if (found) {
+                subject = subject.substring(found[0].length);
+            }
+        }
+        var found = /^[IPR]_/.exec(subject);
+        if (found) {
+            subject = subject.substring(found[0].length);
+        }
+        if (subject.length > 40) {
+            subject = subject.substring(0, 37) + '...';
+        }
+        const logEntry = {
+            time: req.body.OpTime || '',
+            fromCall: fromCall,
+            fromNumber: fromNumber,
+            toCall: req.body.operator_call_sign || '',
+            toNumber: req.body.MSG_LOCAL_ID || '',
+            subject: subject,
+        };
+        if (data.messages == null) {
+            data.messages = [];
+        }
+        data.messages.push(logEntry);
+        return fsp.writeFile(
+            MANUAL_LOG_FILE, JSON.stringify(data), {encoding: ENCODING}
+        );
+    }).catch(log);
+}
+
+function logManualSubmit(form) {
+    readManualLog().then(function(data) {
+        const message = parseMessage(form.message);
+        log('logManualSubmit message ' + JSON.stringify(message));
+        const fields = message.fields;
+        var fromNumber = fields.MsgNo || '';
+        var subject = form.environment.subject || getSubject(message);
+        const found = new RegExp(
+            '^' + enquoteRegex(fromNumber) + '_[IPR]_')
+              .exec(subject);
+        if (found) { // Remove fromNumber from subject.
+            subject = subject.substring(found[0].length);
+        }
+        if (subject.length > 40) {
+            subject = subject.substring(0, 37) + '...';
+        }
+        const logEntry = {
+            time: fields.OpTime,
+            fromCall: 'TODO',
+            fromNumber: fromNumber,
+            toCall: 'TODO',
+            subject: subject,
+        };
+        if (data.messages == null) {
+            data.messages = [];
+        }
+        data.messages.push(logEntry);
+        return data;
+    }).then(function(data) {
+        return fsp.writeFile(
+            MANUAL_LOG_FILE, JSON.stringify(data), {encoding: ENCODING}
+        );
+    }).catch(log);
 }
 
 function editManualLog(req, res, data) {
@@ -1806,7 +1852,6 @@ function editManualLog(req, res, data) {
             var attrs = '';
             if (clazz) {
                 attrs += ` class="${clazz}" placeholder="${clazz}"`;
-                attrs += manualLogPatterns[clazz] || '';
             }
             data[field] = `<input type="text" name="`
                 + encodeHTML(field)
@@ -1822,7 +1867,6 @@ function editManualLog(req, res, data) {
             manualLogMessageFieldNames.forEach(function(field) {
                 var clazz = manualLogMessageFieldClasses[field];
                 var attrs = clazz ? ` class="${clazz}"` : '';
-                attrs += manualLogPatterns[clazz] || '';
                 if (message && clazz == 'time') {
                     attrs += ' required';
                 }
@@ -1894,7 +1938,7 @@ function postManualLog(req, res) {
         return fsp.writeFile(
             MANUAL_LOG_FILE, newData, {encoding: ENCODING}
         ).then(function() {
-            return Promise.resolve(data);
+            return data;
         });
     }).then(function(data) {
         if (req.body.printButton) {
@@ -1940,6 +1984,17 @@ function sendManualLog(res, data) {
     ).then(function(template) {
         res.end(expandVariables(template, data), CHARSET);
     });
+}
+
+function readManualLog() {
+    return fsp.readFile(
+        MANUAL_LOG_FILE, {encoding: ENCODING}
+    ).then(function(data) {
+        return JSON.parse(data);
+    }, function readFailed(err) {
+        log(err);
+        return {};
+    }); 
 }
 
 function onManualCommand(formId, req, res) {
@@ -1994,19 +2049,24 @@ function toShortName(fieldName) {
 }
 
 function parseMessage(message, environment) {
-    var result = {};
-    var fields = {};
+    var result = {headers: {}, fields: {}};
+    var fields = result.headers;
     var fieldName = null;
     var fieldValue = "";
-    message.split(/[\r\n]+/).every(function(line) {
-        if (!line) return true;
+    message.split(/\r?\n/).every(function(line) {
+        if (!line) {
+            fields = result.fields;
+            return true; // continue parsing
+        }
         if (fieldName == null) {
             switch(line.charAt(0)) {
             case '!':
+                fields = result.fields;
                 if (line == '!/ADDON!') return false; // ignore subsequent lines
                 if (!result.addonName) result.addonName = line.match(/^!([^!]*)/)[1];
                 break;
             case '#':
+                fields = result.fields;
                 var found = /^#\s*(T|FORMFILENAME):(.*)/.exec(line);
                 if (found) {
                     result.formType = found[2].trim();
@@ -2017,31 +2077,44 @@ function parseMessage(message, environment) {
                 }
                 break;
             default:
-                var found = /:\s*\[/.exec(line);
-                if (found) {
-                    fieldName = line.substring(0, found.index);
-                    line = line.substring(found.index + found[0].length - 1);
+                if (fields === result.headers) {
+                    var found = /^(\S+)\s*:\s*/.exec(line);
+                    if (found) {
+                        fieldName = found[1];
+                        line = line.substring(found[0].length);
+                    }
+                } else {
+                    var found = /:\s*\[/.exec(line);
+                    if (found) {
+                        fieldName = line.substring(0, found.index);
+                        line = line.substring(found.index + found[0].length - 1);
+                    }
                 }
             }
         }
         if (fieldName != null) {
             fieldValue += line;
-            var value = unbracket_data(fieldValue);
-            if (value != null) {
-                // Field is complete on this line
-                fields[toShortName(fieldName)] = value;
+            if (fields === result.headers) {
+                fields[fieldName.toLowerCase()] = fieldValue;
                 fieldName = null;
                 fieldValue = "";
+            } else {
+                var value = unbracket_data(fieldValue);
+                if (value != null) {
+                    // Field is complete on this line
+                    fields[toShortName(fieldName)] = value;
+                    fieldName = null;
+                    fieldValue = "";
+                }
             }
         }
-        return true;
+        return true; // continue parsing
     });
     if (!result.formType && !(environment && environment.ADDON_MSG_TYPE)) {
         throw "I don't know what form to display, since the message doesn't"
             + ' contain a line that starts with "#T:" or "#FORMFILENAME:".\n'
             + 'message: ' + JSON.stringify(message) + '\n';
     }
-    result.fields = fields;
     return result;
 }
 
