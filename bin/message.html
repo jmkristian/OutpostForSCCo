@@ -13,6 +13,9 @@
           border:0px;
           padding-top:0.5em;
       }
+      form input[type="submit"]  {
+          background-color: #a8e8a8;
+      }
     </style>
     <title>{{Subject}}</title>
     <script type="text/javascript">
@@ -26,58 +29,23 @@
               img = undefined; // encourage garbage collection
           }, 30000); // every 30 seconds
       }
-      function endsWith(s, end) {
-          return (s != null) && (end != null) && s.substring(s.length - end.length) == end;
-      }
-      function toAddresses(from) {
-          var into = [];
-          var items = from.split(/[,;]/);
-          for (i = 0; i < items.length; ++i) {
-              var value = items[i].trim();
-              if (value) {
-                  into.push(value);
-              }
+      function updateCheckboxes() {
+          var bulletin = document.getElementById('Bulletin');
+          if (document.getElementById('To').value.split(/[,;]/).length > 1) {
+              bulletin.checked = false;
+              bulletin.disabled = true;
+          } else {
+              bulletin.disabled = false;
           }
-          return into;
-      }
-      var EOL = '\r\n';
-      function toPrefix(to) {
-          var Bulletin = document.getElementById('Bulletin');
-          var urgent = document.getElementById('Urgent').checked;
-          var addresses = toAddresses(document.getElementById('To').value);
-          var subject = document.getElementById('Subject').value;
-          var prefix = '';
-          switch(addresses.length) {
-          case 0:
-          case 1:
-              Bulletin.disabled = false;
-              prefix = (Bulletin.checked ? 'SB ' : 'SP ') + (addresses[0] || '<address>');
-              break;
-          default:
-              Bulletin.checked = false;
-              Bulletin.disabled = true;
-              prefix = 'SC ' + addresses[0] + EOL + addresses.slice(1).join(',');
-              break;
-          }
-          return prefix
-              + EOL + subject
-              + EOL + (urgent ? '!URG!' : '');
-      }
-      function updateCommand() {
-          var message = document.getElementById('Message').value;
-          var prefix = toPrefix();
-          var suffix = ((message && endsWith(message, '\n')) ? '' : EOL)
-              + '/EX' + EOL;
-          document.getElementById('Command').value = prefix + message + suffix;
-          document.getElementById('CommandLink').href =
-              "{{CommandURL}}" // might contain ' characters
-              + '?prefix=' + encodeURIComponent(prefix)
-              + '&suffix=' + encodeURIComponent(suffix);
       }
       function onLoad() {
           document.getElementById('Urgent').checked = {{Urgent}};
-          updateCommand();
           document.getElementById('To').focus();
+          if ({{readOnly}}) {
+              document.getElementById('Subject').readOnly = true;
+              document.getElementById('Message').readOnly = true;
+          }
+          updateCheckboxes();
       }
       function selectAll(element) {
           element.select();
@@ -90,48 +58,42 @@
   <body style="padding-top:1em;" onload="onLoad();">
     Send the message using the following information:
     <span style="float:right;">PIF: 2.0</span>
-    <form onsubmit="return false;">
+    <form id="Form" method="POST" action="{{CommandURL}}">
       <table>
         <tr>
           <th style="width:1px;"><label for="Urgent">Urgent:</label></th>
           <td>
-            <input id="Urgent" type="checkbox" tabindex="1"
-                   onchange="updateCommand();"/>
+            <input id="Urgent" name="urgent" type="checkbox" value="true" tabindex="1"/>
             <label>&nbsp;&nbsp;
               Bulletin:
-              <input id="Bulletin" type="checkbox" tabindex="2"
-                     onchange="updateCommand();"/>
+              <input id="Bulletin" name="bulletin" type="checkbox" value="true" tabindex="2"/>
             </label>
           </td>
         </tr><tr>
           <th>To:</th>
           <td>
-            <input id="To" type="text" tabindex="3"
+            <input id="To" name="to" type="text" required tabindex="3"
+                   onchange="updateCheckboxes()"
+                   oninput="updateCheckboxes()"
                    placeholder="a comma-separated list"
-                   title="a comma-separated list"
-                   onchange="updateCommand();"
-                   oninput="updateCommand();"/>
+                   title="a comma-separated list"/>
           </td>
         </tr><tr>
           <th>Subject:</th>
           <td>
-            <textarea id="Subject" readonly rows="1" tabindex="4"
+            <textarea id="Subject" name="subject" rows="1" required tabindex="4"
                       onfocus="selectAll(this);">{{Subject}}</textarea>
           </td>
         </tr><tr>
           <th>Message:</th>
           <td>
-            <textarea id="Message" readonly rows="6" tabindex="5"
+            <textarea id="Message" name="message" rows="6" tabindex="5"
                       onfocus="selectAll(this);">{{Message}}</textarea>
           </td>
         </tr><tr>
-          <th>
-            BBS command:
-            <br/><br/>
-            <a id="CommandLink" href="" style="font-weight:normal;">Download</a>
-          </th><td>
-            <textarea id="Command" readonly rows="6" tabindex="6"
-                      onfocus="selectAll(this);"></textarea>
+          <td>
+          </td><td>
+            <input type="submit" value="Send"/>
           </td>
         </tr>
       </table>

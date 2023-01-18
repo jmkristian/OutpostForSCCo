@@ -73,23 +73,6 @@
               setEnabled(document.getElementById("view-button"), valid && value && value.trim());
           }, 10);
       }
-      function saveMessage(message) {
-          var copy = document.getElementById("message-copy");
-          if (copy && copy.value != message) {
-              copy.value = message;
-              var manualPut = document.getElementById("manual-put");
-              manualPut.submit();
-          }
-          var subject = "message";
-          var found = /[\r\n]Subject:([^\r\n]*)/.exec("\n" + message);
-          if (found) {
-              subject = found[1].trim();
-          }
-          document.getElementById("message-link").href =
-              "/manual-get-{{pageId}}/"
-              + encodeURIComponent(subject) + ".txt"
-              + "?field=message";
-      }
       function onMessageInput() {
           function twoDigits(number) {
               var result = number + "";
@@ -109,7 +92,6 @@
               newTime = twoDigits(now.getHours())
                   + ":" + twoDigits(now.getMinutes());
           }
-          saveMessage(message);
           changeValue("message-number", "");
           changeValue("message-date", newDate);
           changeValue("message-time", newTime);
@@ -153,7 +135,6 @@
           // Wait for field values to be initialized (e.g. when navigating back).
           setTimeout(function() {
               onInput();
-              saveMessage(message.value);
               var opName = document.getElementById("op-name");
               if (!opName.value) {
                   opName.focus();
@@ -167,49 +148,58 @@
     <span style="font-size:125%;font-weight:bold;">Santa Clara County ARES/RACES PackItForms</span>
     <span style="float:right;">PIF: 2.1</span>
     <form id="create-form" action="/manual-create" method="POST" target="_blank">
-      <input type="text" style="display:none;" name="addon_name" value="SCCoPIFO"/>
-      <input type="text" style="display:none;" name="addon_version" value="3.10c"/>
+      <input type="text" style="display:none;" name="addon_name" value="{{addon_name}}"/>
+      <input type="text" style="display:none;" name="addon_version" value="{{addon_version}}"/>
       <table class="same-line-label-layout" style="margin-top:1em;">
         <tr>
-          <td class="label-sameline">
+          <th style="text-align:right;">
             Operator name:
+          </th><td style="padding-bottom:1em;">
             <input type="text" id="op-name" name="operator_name" required
                    oninput="changeValue('op-name-copy', this.value)"
                    placeholder="for example Herman Munster"
-                   title="for example Herman Munster"
-                   style="width:20em;margin-right:1em;"/>
-            FCC Call sign:
-            <input type="text" id="op-call" name="operator_call_sign" required
+                   title="for example Herman Munster"/>
+          </td>
+        </tr><tr>
+          <th style="text-align:right;width:1px;">
+            Operator call sign:
+          </th><td class="label-sameline">
+            <input type="text" class="call-sign" id="op-call" name="operator_call_sign" required
                    oninput="changeValue('op-call-copy', this.value)"
-                   class="call-sign"/>
+                   style="margin-right:1em;"/>
+            Tactical call sign:
+            <input type="text" class="call-sign" id="tac-call" name="tactical_call_sign"
+                   oninput="changeValue('tac-call-copy', this.value)"/>
           </td>
         </tr>
       </table>
       <table class="block-caption">
         <tr>
-          <td>Create a form to send</td>
+          <td>Create a message to send</td>
         </tr>
       </table>
       <table class="block">
         <tr>
           <td class="label-sameline">
-            Form type:
+            Message type:
             <select id="create-type" name="ADDON_MSG_TYPE" required onchange="onInput()">
-              <option value="" selected disabled></option>{{form_options}}
+              <option value="" selected disabled></option>
+              <option value="/plainText">Plain Text Message</option>{{form_options}}
             </select>
           </td>
         </tr><tr>
           <td>
-            <input type="submit" id="create-button" value="Create Form" disabled/>
+            <input type="submit" id="create-button" value="Create Message" disabled/>
           </td>
         </tr>
       </table>
     </form>
     <form id="view-form" action="/manual-view" method="POST" target="_blank">
-      <input type="text" style="display:none;" name="addon_name" value="SCCoPIFO"/>
-      <input type="text" style="display:none;" name="addon_version" value="3.10c"/>
+      <input type="text" style="display:none;" name="addon_name" value="{{addon_name}}"/>
+      <input type="text" style="display:none;" name="addon_version" value="{{addon_version}}"/>
       <input type="text" style="display:none;" required id="op-name-copy" name="operator_name"/>
       <input type="text" style="display:none;" required id="op-call-copy" name="operator_call_sign"/>
+      <input type="text" style="display:none;" id="tac-call-copy" name="tactical_call_sign"/>
       <table class="block-caption">
         <tr>
           <td>View a received message</td>
@@ -233,9 +223,6 @@
                   <input type="file" id="message-file" style="display:none;"
                          onchange="onMessageFile(this)"/>
                   <span id="message-file-name" style="display:none;"></span>
-                  <br/><br/>
-                  <a id="message-link" target="_blank" href=""
-                     style="font-weight:normal;">Download</a>
                 </th><td>
                   <textarea name="message" id="message" rows="12" style="font-weight:normal;" required
                             placeholder="Date: ...&#10;From: ...&#10;Subject: ...&#10;&#10;!SCCoPIFO!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
@@ -247,11 +234,7 @@
           </td>
         </tr><tr>
           <td class="label-sameline">
-            Destination Message Number:
-            <input type="text" id="message-number" name="MSG_LOCAL_ID" required
-                   class="message-number">
-          </td><td class="label-sameline">
-            Date:
+            Received Date:
             <input type="text" id="message-date" name="OpDate" required class="date"
                    pattern="(0[1-9]|1[012])/(0[1-9]|1[0-9]|2[0-9]|3[01])/[1-2][0-9][0-9][0-9]"
                    placeholder="mm/dd/yyyy"/>
@@ -270,11 +253,6 @@
           </td>
         </tr>
       </table>
-    </form>
-    <form style="display:none" id="manual-put"
-          method="POST" action="/manual-put-{{pageId}}" target="hidden-iframe">
-      <textarea name="message" id="message-copy"></textarea>
-      <iframe name="hidden-iframe"></iframe>
     </form>
     <br/> <b><a href="/manual-edit-log" target="_blank">ICS-309 log</a></b>
   </body>

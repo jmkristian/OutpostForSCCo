@@ -800,9 +800,6 @@ function serve() {
     app.get('/form-:formId', function(req, res) {
         onForm(req.params.formId, req, res);
     });
-    app.put('/message-:formId', function(req, res) {
-        onPutMessage(req.params.formId, req, res);
-    });
     app.post('/email-:formId', function(req, res) {
         onEmail(req.params.formId, req.body, res);
     });
@@ -833,9 +830,6 @@ function serve() {
     app.get('/manual', function(req, res) {
         onManual(res);
     });
-    app.post('/manual-put-:pageId', function(req, res) {
-        onManualPut(req.params.pageId, req, res);
-    });
     app.get('/manual-get-:pageId/:subject', function(req, res) {
         onManualGet(req.params.pageId, req, res);
     });
@@ -848,20 +842,23 @@ function serve() {
     app.get('/manual-message-:formId', function(req, res) {
         onManualMessage(req.params.formId, req, res);
     });
-    app.get('/manual-command-:formId/:subject', function(req, res) {
-        onManualCommand(req.params.formId, req, res);
+    app.post('/manual-command-:formId', function(req, res) {
+        onPostManualCommand(req.params.formId, req, res);
+    });
+    app.get('/manual-command-:formId/:pageName', function(req, res) {
+        onGetManualCommand(req.params.formId, req, res);
     });
     app.post('/manual-view', function(req, res) {
         onManualView(req, res);
     });
     app.get('/manual-edit-log', function(req, res) {
-        editManualLog(req, res);
+        onGetManualEditLog(req, res);
     });
     app.post('/manual-edit-log', function(req, res) {
-        postManualLog(req, res);
+        onPostManualEditLog(req, res);
     });
     app.get('/manual-log', function(req, res) {
-        getManualLog(res);
+        onGetManualLog(res);
     });
     app.get('/pdf/\*.pdf', express.static('.', {setHeaders: function(res, path, stat) {
         res.set('Content-Type', 'application/pdf');
@@ -1353,27 +1350,6 @@ function noCache(res) {
              'Expires': '0'}); // proxies
 }
 
-function onPutMessage(formId, req, res) {
-    requireForm(formId).then(function(form) {
-        var charset = CHARSET;
-        const contentType = req.headers['content-type'];
-        if (contentType) {
-            const found = /; *charset=([^ ;]+)/i.exec(contentType);
-            if (found) {
-                charset = found[1];
-            }
-        }
-        req.pipe(concat_stream(function(buffer) {
-            form.message = buffer.toString(charset);
-            log(`onPutMessage ${formId} ${form.message.length}`);
-            res.end();
-        }));
-    }).catch(function(err) {
-        log(err);
-        res.sendStatus(NOT_FOUND); // probably
-    });
-}
-
 function onEmail(formId, reqBody, res) {
     const message = reqBody.formtext;
     var form = null;
@@ -1410,6 +1386,9 @@ function saveForm(form, req) {
 }
 
 function isUrgent(message, environment) {
+    if (!message) {
+        return false;
+    }
     const parsed = parseMessage(message, environment);
     const handling = parsed.fields['5.'] || '';
     return (['IMMEDIATE', 'I'].indexOf(handling) >= 0);
@@ -1619,16 +1598,60 @@ function onManualGet(pageId, req, res) {
     });
 }
 
+var manualConfiguration = {
+    nextMessageNumber: 1,
+};
+
+function padStart(s, len, pad) {
+    var result = '' + s;
+    while (result.length < len) {
+        result = pad + result;
+    }
+    return result;
+}
+
+function nextManualMessageNumber(req) {
+    const callSign = req.body.tactical_call_sign || req.body.operator_call_sign;
+    if (callSign) {
+        manualConfiguration.messageNumberPrefix =
+            (callSign.length <= 3) ? callSign : callSign.substring(callSign.length - 3);
+    }
+    const number = padStart('' + (manualConfiguration.nextMessageNumber++), 3, '0');
+    return (manualConfiguration.messageNumberPrefix || '') + `-${number}M`;
+}
+
 function onManualCreate(req, res) {
     const formId = '' + nextFormId++;
+    const plainText = (req.body.ADDON_MSG_TYPE == "/plainText");
     return Promise.resolve().then(function() {
-        const args = ['--message_status-manual'];
-        for (var name in req.body) {
-            args.push('--' + name + '-' + req.body[name]);
+        const msgNumber = nextManualMessageNumber(req);
+        const fromCallSign = req.body.tactical_call_sign || req.body.operator_call_sign;
+        if (plainText) {
+            openForms[formId] = {
+                args: [],
+                environment: {
+                    readOnly: false,
+                    message_status: 'manual',
+                    MSG_NUMBER: msgNumber,
+                    subject: `${msgNumber}_R_`,
+                    fromCallSign: fromCallSign,
+                },
+                message: '',
+                quietTime: 0,
+            };
+        } else {
+            const args = [
+                '--message_status-manual',
+                `--MSG_NUMBER-${msgNumber}`,
+                `--fromCallSign-${fromCallSign}`,
+            ];
+            for (var name in req.body) {
+                args.push('--' + name + '-' + req.body[name]);
+            }
+            return onOpen(formId, args);
         }
-        return onOpen(formId, args);
     }).then(function() {
-        res.redirect('/form-' + formId);
+        res.redirect((plainText ? '/manual-message-' : '/form-') + formId);
     }, function openFailed(err) {
         res.set({'Content-Type': TEXT_HTML});
         res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
@@ -1639,6 +1662,7 @@ function onManualView(req, res) {
     const formId = '' + nextFormId++;
     return Promise.resolve().then(function() {
         var input = {};
+        input.MSG_LOCAL_ID = nextManualMessageNumber(req);
         for (var name in req.body) {
             input[name] = req.body[name];
         }
@@ -1660,7 +1684,7 @@ function onManualView(req, res) {
         for (var name in input) {
             args.push('--' + name + '-' + input[name]);
         }
-        logManualView(req, args);
+        logManualView(req, args, input.MSG_LOCAL_ID);
         return onOpen(formId, args);
     }).then(function() {
         res.redirect('/form-' + formId);
@@ -1674,8 +1698,8 @@ function onManualSubmit(formId, req, res) {
     var form = null;
     return requireForm(formId).then(function(foundForm) {
         form = foundForm;
+        form.environment.readOnly = true;
         saveForm(form, req);
-        logManualSubmit(form);
         res.redirect('/manual-message-' + formId);
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
@@ -1688,16 +1712,17 @@ function onManualMessage(formId, req, res) {
     res.set({'Content-Type': TEXT_HTML});
     return requireForm(formId).then(function(foundForm) {
         form = foundForm;
+        log('onManualMessage ' + JSON.stringify(form));
         const templateFile = path.join('bin', 'message.html');
         return fsp.readFile(templateFile, {encoding: ENCODING});
     }).then(function(template) {
         res.end(expandVariables(template, {
+            readOnly: `${!!form.environment.readOnly}`,
             pingURL: `'/ping-${formId}'`, // a javascript expression
-            Urgent: JSON.stringify(isUrgent(form.message, form.environment)),
-            Subject: encodeHTML(form.environment.subject),
-            Message: encodeHTML(form.message),
-            CommandURL: '/manual-command-' + formId
-                + '/' + encodeURIComponent(form.environment.subject) + '.txt'
+            Urgent: `${isUrgent(form.message, form.environment)}`,
+            Subject: encodeHTML(form.environment.subject || ''),
+            Message: encodeHTML(form.message || ''),
+            CommandURL: `/manual-command-${formId}`,
         }), CHARSET);
     }).catch(function(err) {
         res.end(errorToHTML(err, form && form.environment), CHARSET);
@@ -1755,7 +1780,24 @@ function getSubject(message) {
     return subject;
 }
 
-function logManualView(req, args) {
+function getMessageNumberFromSubject(subject) {
+    var found = /^(([A-Z0-9]{1,3}-)?\d+[A-Z]?)_/i.exec(subject);
+    return found && found[1];
+}
+
+function trimSubject(fromSubject, msgNo) {
+    var subject = fromSubject;
+    const found = new RegExp('^' + enquoteRegex(msgNo || '') + '_[IPR]_').exec(subject);
+    if (found) { // Remove msgNo from subject.
+        subject = subject.substring(found[0].length);
+    }
+    if (subject.length > 40) {
+        subject = subject.substring(0, 37) + '...';
+    }
+    return subject;
+}
+
+function logManualView(req, args, MSG_LOCAL_ID) {
     readManualLog().then(function(data) {
         const message = parseMessage(req.body.message);
         log('logManualView message ' + JSON.stringify(message));
@@ -1770,34 +1812,17 @@ function logManualView(req, args) {
                 fromCall = from.substring(0, atSign);
             }
         }
-        if (!fromNumber) { // Extract fromNumber out of the subject.
-            var found = /^(([A-Z0-9]{1,3}-)?\d+[A-Z]?)_/i.exec(subject);
-            if (found) {
-                fromNumber = found[1];
-                subject = subject.substring(found[0].length);
-            }
-        } else { // Remove fromNumber from the subject.
-            var found =new RegExp(
-                '^' + enquoteRegex(fromNumber) + '_', 'i')
-                .exec(subject);
-            if (found) {
-                subject = subject.substring(found[0].length);
-            }
+        if (!fromNumber) {
+            fromNumber = getMessageNumberFromSubject(subject);
         }
-        var found = /^[IPR]_/.exec(subject);
-        if (found) {
-            subject = subject.substring(found[0].length);
-        }
-        if (subject.length > 40) {
-            subject = subject.substring(0, 37) + '...';
-        }
+        const toCall = req.body.tactical_call_sign || req.body.operator_call_sign || '';
         const logEntry = {
             time: req.body.OpTime || '',
             fromCall: fromCall,
             fromNumber: fromNumber,
-            toCall: req.body.operator_call_sign || '',
-            toNumber: req.body.MSG_LOCAL_ID || '',
-            subject: subject,
+            toCall: toCall,
+            toNumber: MSG_LOCAL_ID || '',
+            subject: trimSubject(subject, fromNumber),
         };
         if (data.messages == null) {
             data.messages = [];
@@ -1809,33 +1834,50 @@ function logManualView(req, args) {
     }).catch(log);
 }
 
-function logManualSubmit(form) {
+function logManualSend(req, form) {
+    log('logManualSend ' + JSON.stringify(form));
     readManualLog().then(function(data) {
-        const message = parseMessage(form.message);
-        log('logManualSubmit message ' + JSON.stringify(message));
-        const fields = message.fields;
-        var fromNumber = fields.MsgNo || '';
-        var subject = form.environment.subject || getSubject(message);
-        const found = new RegExp(
-            '^' + enquoteRegex(fromNumber) + '_[IPR]_')
-              .exec(subject);
-        if (found) { // Remove fromNumber from subject.
-            subject = subject.substring(found[0].length);
+        var time = null;
+        var fromNumber = null;
+        var subject = form.environment.subject;
+        try {
+            const message = parseMessage(form.message);
+            time = message.fields.OpTime;
+            fromNumber = message.fields.MsgNo;
+            if (!subject) {
+                subject = getSubject(message);
+            }
+        } catch(err) {
+            log(err);
         }
-        if (subject.length > 40) {
-            subject = subject.substring(0, 37) + '...';
+        if (!time) {
+            var now = new Date();
+            time = padStart(now.getHours(), 2, '0')
+                + ":"
+                + padStart(now.getMinutes(), 2, '0');
+        }
+        if (!fromNumber) {
+            fromNumber = getMessageNumberFromSubject(subject);
+            if (!fromNumber) {
+                fromNumber = nextManualMessageNumber(req);
+            }
         }
         const logEntry = {
-            time: fields.OpTime,
-            fromCall: 'TODO',
+            time: time,
+            fromCall: form.environment.fromCallSign,
             fromNumber: fromNumber,
-            toCall: 'TODO',
-            subject: subject,
+            toCall: form.environment.toCallSign,
+            subject: trimSubject(subject, fromNumber),
         };
         if (data.messages == null) {
             data.messages = [];
         }
         data.messages.push(logEntry);
+        var found = /^([A-Z0-9]{1,3})?-(\d+)/i.exec(fromNumber);
+        if (found) {
+            manualConfiguration.messageNumberPrefix = found[1];
+            manualConfiguration.nextMessageNumber = parseInt(found[2], 10) + 1;
+        }
         return data;
     }).then(function(data) {
         return fsp.writeFile(
@@ -1844,9 +1886,9 @@ function logManualSubmit(form) {
     }).catch(log);
 }
 
-function editManualLog(req, res, data) {
+function onGetManualEditLog(req, res, data) {
     return (data ? Promise.resolve(data) : readManualLog()).then(function(data) {
-        log('editManualLog data ' + JSON.stringify(data));
+        log('onGetManualEditLog data ' + JSON.stringify(data));
         manualLogFieldNames.forEach(function(field) {
             var clazz = manualLogFieldClasses[field];
             var attrs = '';
@@ -1908,7 +1950,7 @@ function getManualLogMessage(req, m, message) {
     return !empty;
 }
 
-function postManualLog(req, res) {
+function onPostManualEditLog(req, res) {
     return readManualLog().then(function(data) {
         // TODO: update the data with values from req
         manualLogFieldNames.forEach(function(field) {
@@ -1934,7 +1976,7 @@ function postManualLog(req, res) {
             data.messages.splice(parseInt(req.body.deleteIndex), 1);
         }
         const newData = JSON.stringify(data);
-        log(`postManualLog data ${newData}`);
+        log(`onPostManualEditLog data ${newData}`);
         return fsp.writeFile(
             MANUAL_LOG_FILE, newData, {encoding: ENCODING}
         ).then(function() {
@@ -1951,9 +1993,9 @@ function postManualLog(req, res) {
     });
 }
 
-function getManualLog(res) {
+function onGetManualLog(res) {
     return readManualLog().then(function(data) {
-        log(`getManualLog data ${data}`);
+        log(`onGetManualLog data ${data}`);
         manualLogFieldNames.forEach(function(field) {
             data[field] = data[field] ? encodeHTML(data[field]) : '&nbsp;';
         });
@@ -1997,18 +2039,56 @@ function readManualLog() {
     }); 
 }
 
-function onManualCommand(formId, req, res) {
-    var form = null;
-    noCache(res);
-    return requireForm(formId).then(function(foundForm) {
-        form = foundForm;
-        const result = req.query.prefix + form.message + req.query.suffix;
-        // The user can send this string to JNOS to send the message.
-        res.set({'Content-Type': TEXT_PLAIN});
-        res.end(result, CHARSET);
+function onPostManualCommand(formId, req, res) {
+    return requireForm(formId).then(function(form) {
+        log('onPostManualCommand ' + JSON.stringify(req.body));
+        const urgent = (req.body.urgent == "true");
+        const bulletin = (req.body.bulletin == "true");
+        const message = req.body.message || '';
+        const suffix = (message.endsWith('\n') ? '' : EOL) + `/EX${EOL}`;
+        const addresses = [];
+        req.body.to.split(/[,;]/).forEach(function(item) {
+            var address = item.trim();
+            if (address) {
+                addresses.push(address);
+            }
+        });
+        var prefix = '';
+        switch(addresses.length) {
+        case 0:
+        case 1:
+            prefix = (bulletin ? 'SB ' : 'SP ') + (addresses[0] || '<address>');
+            break;
+        default:
+            prefix = 'SC ' + addresses[0] + EOL + addresses.slice(1).join(',');
+            break;
+        }
+        prefix += `${EOL}${req.body.subject}${EOL}` + (urgent ? '!URG!' : '');
+        form.environment.subject = req.body.subject;
+        if (addresses.length) {
+            form.environment.toCallSign = /^[^@]*/.exec(addresses[0])[0];
+        }
+        form.message = message;
+        form.command = prefix + message + suffix;
+        logManualSend(req, form);
+        res.redirect(SEE_OTHER, `http://${LOCALHOST}:${myServerPort}`
+                     + `/manual-command-${formId}/`
+                     + encodeURIComponent(req.body.subject)
+                     + '.txt');
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
-        res.end(errorToHTML(err, form), CHARSET);
+        res.end(errorToHTML(err), CHARSET);
+    });
+}
+
+function onGetManualCommand(formId, req, res) {
+    return requireForm(formId).then(function(form) {
+        log('onGetManualCommand ' + JSON.stringify(req.body));
+        res.set({'Content-Type': TEXT_PLAIN});
+        res.end(form.command, CHARSET);
+    }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err), CHARSET);
     });
 }
 
