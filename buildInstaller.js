@@ -44,11 +44,14 @@ Promise.all(
         buildFile(
             {PROGRAM_PATH: programPath.replace(/\\/g, "\\\\"), DisplayName: displayName},
             path.join('bin', 'launch.js')),
-        buildFile(
-            {addon_version: addonVersion, addon_name: addonName},
-            path.join('bin', 'manual.html'),
-            path.join('bin', 'manual-log.html')),
     ].concat(
+        ['manual.html', 'manual-id.html', 'manual-log.html'
+        ].map(function(fileName) {
+            return buildFile(
+                {addon_version: addonVersion, addon_name: addonName},
+                path.join('bin', fileName));
+        })
+    ).concat(
         ['manual.cmd', path.join('bin', 'launch-v.cmd'), 'UserGuide.html'
         ].map(function(fileName) {
             return buildFile(
