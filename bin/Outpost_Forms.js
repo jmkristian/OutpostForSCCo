@@ -1943,13 +1943,13 @@ function logManualView(req, id, MSG_LOCAL_ID) {
     }).catch(log);
 }
 
-function logManualSend(req, form) {
+function logManualSend(form, addresses) {
     log('logManualSend ' + JSON.stringify(form));
     readManualLog().then(function(data) {
         var fromNumber = '';
         var subject = form.environment.subject;
         try {
-            const message = parseMessage(form.message);
+            var message = parseMessage(form.message);
             time = message.fields.OpTime;
             fromNumber = message.fields.MsgNo;
             if (!subject) {
@@ -1961,21 +1961,29 @@ function logManualSend(req, form) {
         if (!fromNumber) {
             fromNumber = getMessageNumberFromSubject(subject);
         }
-        const now = new Date();
-        const time = padStart(now.getHours(), 2, '0')
-              + ":"
-              + padStart(now.getMinutes(), 2, '0');
-        const logEntry = {
-            time: time,
-            fromCall: form.environment.active_call_sign,
-            fromNumber: fromNumber,
-            toCall: form.environment.toCallSign,
-            subject: trimSubject(subject, fromNumber),
-        };
         if (data.messages == null) {
             data.messages = [];
         }
-        data.messages.push(logEntry);
+        for (a in addresses) {
+            var item = {
+                toCall: /^[^@]*/.exec(addresses[a])[0]
+            };
+            if (a > 0) {
+                item.time = '"'; // ditto
+                item.fromCall = '"';
+                item.fromNumber = '"';
+            } else {
+                var now = new Date();
+                var time = padStart(now.getHours(), 2, '0')
+                    + ":"
+                    + padStart(now.getMinutes(), 2, '0');
+                item.time = time;
+                item.fromCall = form.environment.active_call_sign;
+                item.fromNumber = fromNumber;
+                item.subject = trimSubject(subject, fromNumber);
+            }
+            data.messages.push(item);
+        }
         try {
             var found = /^[A-Z0-9]{1,3}?-(\d+)/i.exec(fromNumber);
             if (found) {
@@ -2192,12 +2200,9 @@ function onPostManualCommand(formId, req, res) {
         }
         prefix += `${EOL}${req.body.subject}${EOL}` + (urgent ? '!URG!' : '');
         form.environment.subject = req.body.subject;
-        if (addresses.length) {
-            form.environment.toCallSign = /^[^@]*/.exec(addresses[0])[0];
-        }
         form.message = message;
         form.command = prefix + message + suffix;
-        logManualSend(req, form);
+        logManualSend(form, addresses);
         res.redirect(SEE_OTHER, `http://${LOCALHOST}:${myServerPort}`
                      + `/manual-command-${formId}/`
                      + encodeURIComponent(req.body.subject)
