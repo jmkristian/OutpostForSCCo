@@ -72,6 +72,9 @@
           document.getElementById("the-form").submit();
       }
       function onLoad() {
+          if (/\?goBack/.exec(window.location)) {
+              history.back();
+          }
           setTimeout(function afterLoad() {
               {{afterLoad}}
               for (clazz in inputPatterns) {

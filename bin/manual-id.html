@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <link rel="stylesheet" type="text/css" href="resources/css/pack-it-forms.css"/>
+    <style>
+      form {
+          max-width: 4in;
+      }
+      form table.same-line-label-layout th {
+          padding-left: 1ex;
+          text-align: right;
+          vertical-align: center;
+          width: 1px;
+      }
+      form table.same-line-label-layout td>input[type="text"] {
+          display: inline-block;
+          margin-bottom: 1ex;
+      }
+      form input[type="submit"] {
+          background-color: #ffffff;
+      }
+      form input[type="text"]:read-only {
+          background-color: #dddddd;
+      }
+    </style>
+    <title>Station ID</title>
+    <script type="text/javascript">
+      function changeValue(inputID, newValue) {
+          var input = document.getElementById(inputID);
+          if (input.value != newValue) {
+              input.value = newValue;
+              fireEvent(input, 'change');
+          }
+      }
+      function onChangeCallSign(role, call) {
+          var prefix = (call.length <= 3 ? call : call.substring(call.length - 3));
+          changeValue(role + 'Prefix', prefix.toUpperCase());
+      }
+      function require(id, required) {
+          var element = document.getElementById(id);
+          if (required) {
+              element.setAttribute('required', '');
+          } else {
+              element.removeAttribute('required');
+          }
+          element.readOnly = !required;
+      }
+      function onChangeTactical(tactical) {
+          require('tacName', tactical);
+          require('tacCall', tactical);
+          require('tacPrefix', tactical);
+      }
+      window.onload = function onLoad() {
+          document.getElementById('useTac').checked = {{useTac}};
+          onChangeTactical({{useTac}});
+      };
+    </script>
+  </head>
+  <body style="padding-top:1em;background-color:#d0d0d0;">
+    <span style="font-size:125%;font-weight:bold;">Santa Clara County ARES/RACES PackItForms</span>
+    <span style="float:right;">PIF: 2.1</span>
+    <form method="POST" action="/manual-id">
+      <table>
+        <tr>
+          <td style="padding-bottom:2ex;">
+            <table class="same-line-label-layout" style="margin-top:1em;">
+              <tr>
+                <th>
+                  User Call Sign:
+                </th><td>
+                  <input type="text" id="opCall" name="opCall" value="{{opCall}}" class="call-sign" required
+                         onchange="onChangeCallSign('op', this.value)"/>
+                </td>
+              </tr><tr>
+                <th>
+                  User Name:
+                </th><td>
+                  <input type="text" id="opName" name="opName" value="{{opName}}" required
+                         placeholder="for example Herman Munster"
+                         title="for example Herman Munster"/>
+                </td>
+              </tr><tr>
+                <th>
+                  Message ID Prefix:
+                </th><td>
+                  <input type="text" id="opPrefix" name="opPrefix" value="{{opPrefix}}" required
+                         style="width:3em;" maxlength="3"/>
+                  &nbsp;(3 characters max)
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr><tr>
+          <td>
+            <table class="same-line-label-layout" style="margin-top:1em;">
+              <tr>
+                <td colspan="2" style="padding-bottom:2ex;">
+                  <label style="font-weight:normal;">
+                    <input type="checkbox" id="useTac" name="useTac" value="true"
+                           onchange="onChangeTactical(this.checked)"/>
+                    Use Tactical Call for all BBS interaction
+                  </label>
+                </td>
+              </tr><tr>
+                <th>
+                  Tactical Call Sign:
+                </th><td>
+                  <input type="text" id="tacCall" name="tacCall" value="{{tacCall}}" class="call-sign" readonly
+                         onchange="onChangeCallSign('tac', this.value)"/>
+                </td>
+              </tr><tr>
+                <th>
+                  Tactical Name:
+                </th><td>
+                  <input type="text" id="tacName" name="tacName" value="{{tacName}}" readonly
+                         placeholder="for example Xanadu EOC"
+                         title="for example Xanadu EOC"/>
+                </td>
+              </tr><tr>
+                <th>
+                  Message ID Prefix:
+                </th><td>
+                  <input type="text" id="tacPrefix" name="tacPrefix" value="{{tacPrefix}}" readonly
+                         style="width:3em;" maxlength="3"/>
+                  &nbsp;(3 characters max)
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr><tr>
+          <td style="padding-top:1ex;text-align:right;">
+            <input type="submit" value="OK"/>
+            <button onclick="window.close()">Cancel</button>
+          </td>
+        </tr>
+      </table>
+    </form>
+  </body>
+</html>

@@ -56,8 +56,6 @@
     </script>
   </head>
   <body style="padding-top:1em;" onload="onLoad();">
-    Send the message using the following information:
-    <span style="float:right;">PIF: 2.0</span>
     <form id="Form" method="POST" action="{{CommandURL}}">
       <table>
         <tr>
@@ -68,6 +66,7 @@
               Bulletin:
               <input id="Bulletin" name="bulletin" type="checkbox" value="true" tabindex="2"/>
             </label>
+            <span style="float:right;">PIF: 2.0</span>
           </td>
         </tr><tr>
           <th>To:</th>

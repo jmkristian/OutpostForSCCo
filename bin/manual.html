@@ -17,22 +17,30 @@
       }
       table.block {
           background-color: #f8f8f8;
-      }
-      table.block-caption {
-          background-color: #bbeeff;
           border-top: 1px solid #aaaaaa;
           margin-top: 2em;
+      }
+      table.block tr.block-caption {
+          background-color: #bbeeff;
       }
       table.block-caption td {
           padding: 4pt 4pt;
       }
-      td.label-sameline{
+      form table.same-line-label-layout th {
           font-weight: bold;
+          padding-left: 1ex;
+          text-align: right;
           width: 1px;
       }
     </style>
     <title>SCCo PackItForms</title>
     <script type="text/javascript">
+      function openCommLog() {
+          window.open('/manual-edit-log', 'PackItFormsCommLog');
+      }
+      function openIdDialog() {
+          window.open('/manual-id', 'PackItFormsStationID');
+      }
       setInterval(function() {
           var img = new Image();
           // To discourage caching, use a new query string for each ping.
@@ -58,8 +66,8 @@
               fireEvent(input, 'change');
           }
       }
-      function setEnabled(button, enabled) {
-          button.disabled = !enabled;
+      function setEnabled(id, enabled) {
+          document.getElementById(id).disabled = !enabled;
       }
       function onInput() {
           // Form validity doesn't get updated immediately.
@@ -67,10 +75,10 @@
           setTimeout(function checkFormsValid() {
               var valid = document.getElementById("create-form").checkValidity();
               var value = document.getElementById("create-type").value;
-              setEnabled(document.getElementById("create-button"), valid && value);
+              setEnabled("create-button", valid && value);
               valid = document.getElementById("view-form").checkValidity();
               value = document.getElementById("message").value;
-              setEnabled(document.getElementById("view-button"), valid && value && value.trim());
+              setEnabled("view-button", valid && value && value.trim());
           }, 10);
       }
       function onMessageInput() {
@@ -147,45 +155,29 @@
   <body style="padding-top:1em;background-color:#d0d0d0;">
     <span style="font-size:125%;font-weight:bold;">Santa Clara County ARES/RACES PackItForms</span>
     <span style="float:right;">PIF: 2.1</span>
+    <br/><br/>
+    <button onclick="openIdDialog()">Setup Station ID</button>
+    <button onclick="openCommLog()">Edit ICS-213 Log</button>
     <form id="create-form" action="/manual-create" method="POST" target="_blank">
       <input type="text" style="display:none;" name="addon_name" value="{{addon_name}}"/>
       <input type="text" style="display:none;" name="addon_version" value="{{addon_version}}"/>
-      <table class="same-line-label-layout" style="margin-top:1em;">
-        <tr>
-          <th style="text-align:right;">
-            Operator name:
-          </th><td style="padding-bottom:1em;">
-            <input type="text" id="op-name" name="operator_name" required
-                   oninput="changeValue('op-name-copy', this.value)"
-                   placeholder="for example Herman Munster"
-                   title="for example Herman Munster"/>
-          </td>
-        </tr><tr>
-          <th style="text-align:right;width:1px;">
-            Operator call sign:
-          </th><td class="label-sameline">
-            <input type="text" class="call-sign" id="op-call" name="operator_call_sign" required
-                   oninput="changeValue('op-call-copy', this.value)"
-                   style="margin-right:1em;"/>
-            Tactical call sign:
-            <input type="text" class="call-sign" id="tac-call" name="tactical_call_sign"
-                   oninput="changeValue('tac-call-copy', this.value)"/>
-          </td>
-        </tr>
-      </table>
-      <table class="block-caption">
-        <tr>
-          <td>Create a message to send</td>
-        </tr>
-      </table>
       <table class="block">
-        <tr>
-          <td class="label-sameline">
-            Message type:
-            <select id="create-type" name="ADDON_MSG_TYPE" required onchange="onInput()">
-              <option value="" selected disabled></option>
-              <option value="/plainText">Plain Text Message</option>{{form_options}}
-            </select>
+        <tr class="block-caption">
+          <td>Create a message to send</td>
+        </tr><tr>
+          <td>
+            <table class="same-line-label-layout">
+              <tr>
+                <th style="vertical-align:center;">
+                  Message type:
+                </th><td>
+                  <select id="create-type" name="ADDON_MSG_TYPE" required onchange="onInput()">
+                    <option value="" selected disabled></option>
+                    <option value="/plainText">plain text</option>{{form_options}}
+                  </select>
+                </td>
+              </tr>
+            </table>
           </td>
         </tr><tr>
           <td>
@@ -197,24 +189,18 @@
     <form id="view-form" action="/manual-view" method="POST" target="_blank">
       <input type="text" style="display:none;" name="addon_name" value="{{addon_name}}"/>
       <input type="text" style="display:none;" name="addon_version" value="{{addon_version}}"/>
-      <input type="text" style="display:none;" required id="op-name-copy" name="operator_name"/>
-      <input type="text" style="display:none;" required id="op-call-copy" name="operator_call_sign"/>
-      <input type="text" style="display:none;" id="tac-call-copy" name="tactical_call_sign"/>
-      <table class="block-caption">
-        <tr>
-          <td>View a received message</td>
-        </tr>
-      </table>
       <table class="block">
-        <tr>
-          <td colspan="4">
+        <tr class="block-caption">
+          <td>View a received message</td>
+        </tr><tr>
+          <td>
+            <table class="same-line-label-layout">
+              <tr>
+          <td colspan="2" style="padding-bottom:1em;">
             Enter the received message, including the Subject and other headers.
             You can paste, drag and drop or upload a file.
           </td>
-        </tr><tr>
-          <td colspan="4">
-            <table class="same-line-label-layout">
-              <tr>
+              </tr><tr>
                 <th>
                   Message:
                   <br/><br/>
@@ -225,7 +211,7 @@
                   <span id="message-file-name" style="display:none;"></span>
                 </th><td>
                   <textarea name="message" id="message" rows="12" style="font-weight:normal;" required
-                            placeholder="Date: ...&#10;From: ...&#10;Subject: ...&#10;&#10;!SCCoPIFO!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
+                            placeholder="Date: ...&#10;From: ...&#10;Subject: ...&#10;&#10;!{{addon_name}}!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"
                             onfocus="selectAll(this)" ondrop="return onMessageDrop(event)"
                             ></textarea>
                 </td>
@@ -233,20 +219,27 @@
             </table>
           </td>
         </tr><tr>
-          <td class="label-sameline">
-            Received Date:
-            <input type="text" id="message-date" name="OpDate" required class="date"
-                   pattern="(0[1-9]|1[012])/(0[1-9]|1[0-9]|2[0-9]|3[01])/[1-2][0-9][0-9][0-9]"
-                   placeholder="mm/dd/yyyy"/>
-          </td><td class="label-sameline">
-            Time:
-            <input type="text" id="message-time" name="OpTime" required class="time"
-                   pattern="([01][0-9]|2[0-3]):?[0-5][0-9]|2400|24:00"
-                   placeholder="hh:mm"/>
-          </td><td>
+          <td>
+            <table class="same-line-label-layout">
+              <tr>
+                <th>
+                  Received Date:
+                </th><td style="width:1px;">
+                  <input type="text" id="message-date" name="OpDate" required class="date"
+                         pattern="(0[1-9]|1[012])/(0[1-9]|1[0-9]|2[0-9]|3[01])/[1-2][0-9][0-9][0-9]"
+                         placeholder="mm/dd/yyyy"/>
+                </td><th>
+                  Time:
+                </th><td>
+                  <input type="text" id="message-time" name="OpTime" required class="time"
+                         pattern="([01][0-9]|2[0-3]):?[0-5][0-9]|2400|24:00"
+                         placeholder="hh:mm"/>
+                </td>
+              </tr>
+            </table>
           </td>
         </tr><tr>
-          <td colspan="4">
+          <td>
             <input type="submit" id="view-button" value="View Form" disabled/>
             <input type="reset" value="Reset Fields" style="margin-left:2em;"
                    onclick="onMessageClear(event)"/>
@@ -254,6 +247,5 @@
         </tr>
       </table>
     </form>
-    <br/> <b><a href="/manual-edit-log" target="_blank">ICS-309 log</a></b>
   </body>
 </html>
