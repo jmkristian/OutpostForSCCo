@@ -1864,6 +1864,14 @@ const manualLogMessageFieldClasses = {
     toNumber: 'message-number',
 };
 
+const manualLogMessageFieldWidths = {
+    time: '6ex',
+    fromCall: '8ex',
+    toCall: '8ex',
+    fromNumber: '10ex',
+    toNumber: '10ex',
+};
+
 function getSubject(message) {
     var subject = message.headers.subject;
     if (!subject) {
@@ -1885,7 +1893,7 @@ function getMessageNumberFromSubject(subject) {
 
 function trimSubject(fromSubject, msgNo) {
     var subject = fromSubject;
-    const found = new RegExp('^' + enquoteRegex(msgNo || '') + '_[IPR]_').exec(subject);
+    const found = new RegExp('^' + enquoteRegex(msgNo || '') + '_').exec(subject);
     if (found) { // Remove msgNo from subject.
         subject = subject.substring(found[0].length);
     }
@@ -2115,9 +2123,14 @@ function onGetManualLog(res) {
         });
         var messageRows = '';
         (data.messages || []).forEach(function(message) {
+            var firstRow = !messageRows;
             messageRows += `</tr><tr class="message-data">${EOL}`;
             manualLogMessageFieldNames.forEach(function(field) {
                 var attrs = (field == 'subject') ? ' colspan="2"' : '';
+                var width = manualLogMessageFieldWidths[field];
+                if (width && firstRow) {
+                    attrs += ` style="width:${width};"`;
+                }
                 messageRows += `<td${attrs}>`
                     + (message[field] ? encodeHTML(message[field]) : '&nbsp;')
                     + `</td>${EOL}`;
