@@ -2198,14 +2198,15 @@ function onPostManualCommand(formId, req, res) {
             prefix = 'SC ' + addresses[0] + EOL + addresses.slice(1).join(',');
             break;
         }
-        prefix += `${EOL}${req.body.subject}${EOL}` + (urgent ? '!URG!' : '');
-        form.environment.subject = req.body.subject;
+        const subject = req.body.subject.replace(/\r?\n/g, ' ');
+        prefix += `${EOL}${subject}${EOL}` + (urgent ? '!URG!' : '');
+        form.environment.subject = subject;
         form.message = message;
         form.command = prefix + message + suffix;
         logManualSend(form, addresses);
         res.redirect(SEE_OTHER, `http://${LOCALHOST}:${myServerPort}`
                      + `/manual-command-${formId}/`
-                     + encodeURIComponent(req.body.subject)
+                     + encodeURIComponent(subject)
                      + '.txt');
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});

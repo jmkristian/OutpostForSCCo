@@ -48,10 +48,12 @@
           updateCheckboxes();
       }
       function selectAll(element) {
-          element.select();
-          setTimeout(function() {
-              element.scrollTop = 0;
-          }, 5);
+          if ({{readOnly}}) {
+              element.select();
+              setTimeout(function() {
+                  element.scrollTop = 0;
+              }, 5);
+          }
       }
     </script>
   </head>
