@@ -1774,9 +1774,31 @@ function onManualView(req, res) {
         for (var name in req.body) {
             input[name] = req.body[name];
         }
+        if (input.OpDate && input.OpTime) {
+            input.MSG_DATETIME_OP_RCVD = `${input.OpDate} ${input.OpTime}`;
+        }
+        if (input.message) {
+            var parsed = parseEmail(input.message);
+            input.MSG_SUBJECT = parsed.headers.subject;
+            var from = parsed.headers.from;
+            if (from) {
+                var found = /<([^>]*)>/.exec(from);
+                if (found) {
+                    from = found[1];
+                }
+                input.MSG_FROM_HEADER = from;
+                var atSign = from.indexOf('@');
+                if (atSign < 0) {
+                    input.MSG_FROM_LOCAL = from;
+                } else {
+                    input.MSG_FROM_LOCAL = from.substring(0, atSign);
+                    input.MSG_FROM_FQDN = from.substring(atSign + 1);
+                }
+            }
+        }
         if (input.message && input.addon_name) {
-            // Perhaps the user entered some extra text preceding the message,
-            // for example email headers like To or Subject.
+            // Perhaps there's extra text at the beginning of the message,
+            // for example email headers like From or Subject.
             var start = enquoteRegex('!' + input.addon_name + '!') + '[\r\n]';
             var pattern = new RegExp(start);
             var foundIt = pattern.exec(input.message);
@@ -1785,14 +1807,11 @@ function onManualView(req, res) {
                 input.message = input.message.substring(foundIt.index);
             }
         }
-        if (input.OpDate && input.OpTime) {
-            input.MSG_DATETIME_OP_RCVD = (input.OpDate + " " + input.OpTime);
-        }
+        logManualView(cfg.id, input);
         var args = ['--message_status-received', '--mode-readonly'];
         for (var name in input) {
             args.push('--' + name + '-' + input[name]);
         }
-        logManualView(req, cfg.id, input.MSG_LOCAL_ID);
         return onOpen(formId, args);
     }).then(function() {
         res.redirect('/form-' + formId);
@@ -1913,32 +1932,21 @@ function trimSubject(fromSubject, msgNo) {
     return subject;
 }
 
-function logManualView(req, id, MSG_LOCAL_ID) {
-    const reqBody = req.body;
+function logManualView(id, input) {
     var logEntry = null;
     Promise.resolve().then(function() {
-        const message = parseEmail(reqBody.message);
-        log('logManualView message ' + JSON.stringify(message));
+        log('logManualView ' + JSON.stringify(input));
+        const message = parseEmail(input.message);
         const fields = message.fields;
-        var subject = subjectFromEmail(message);
-        var fromCall = fields.OpCall || '';
-        var fromNumber = fields.MsgNo || '';
-        if (!fromCall) { // Find fromCall in the From header.
-            var from = message.headers.from || '';
-            var atSign = from.indexOf('@');
-            if (atSign > 0) {
-                fromCall = from.substring(0, atSign);
-            }
-        }
-        if (!fromNumber) {
-            fromNumber = getMessageNumberFromSubject(subject);
-        }
+        const subject = input.MSG_SUBJECT || subjectFromEmail(message) || '';
+        const fromCall = input.MSG_FROM_LOCAL || fields.OpCall || '';
+        const fromNumber = fields.MsgNo || getMessageNumberFromSubject(subject) || '';
         logEntry = {
-            time: reqBody.OpTime || '',
+            time: input.OpTime || '',
             fromCall: fromCall,
             fromNumber: fromNumber,
             toCall: id.call,
-            toNumber: MSG_LOCAL_ID || '',
+            toNumber: input.MSG_LOCAL_ID || '',
             subject: trimSubject(subject, fromNumber),
         };
         return readManualLog();
@@ -2035,25 +2043,29 @@ function onGetManualEditLog(req, res, data) {
                     + encodeHTML((message && message[field]) || '')
                     + `"/>` ;
                 attrs = (clazz && m == 0) ? ` style="width:1px;"` : '';
-                messageRows += `    <td${attrs}>${input}</td>${EOL}`;
+                messageRows += `  <td${attrs}>${input}</td>${EOL}`;
             });
-            messageRows += `  <td style="width:72px;">${EOL}    `
-                + `<button onclick="insertMessage(${m})"><img alt="+" src="icon-insert.png"/></button>${EOL}`;
+            messageRows += `  <td style="width:1px;">`
+                + EOL + `    <button onclick="insertMessage(${m})"><img alt="+" src="icon-insert.png"/></button>`
+                + EOL + `  </td><td style="width:1px;">`
+                + EOL;
             if (message != null) {
-                messageRows += '  '
+                messageRows += '    '
                     + `<button onclick="deleteMessage(${m})" style="background-color:#ffcccc;">`
                     + `<img alt="-" src="icon-delete.png"/>`
-                    + `</button>${EOL}  </td>${EOL}`;
+                    + `</button>${EOL}`;
             }
+            messageRows += '  </td>';
         }
         data.messages = messageRows;
         data.afterLoad = '';
-        data.submitButtons =
-            '<input type="submit" name="resetButton" value="Erase All" style="background-color:#ffcccc;"/>'
+        data.submitButtons = '<td style="width:1px;">'
+            + EOL + '<input type="submit" name="resetButton" value="Erase All" style="background-color:#ffcccc;"/>'
             + EOL + '</td><td style="width:1px;">'
             + EOL + '<input type="submit" name="printButton" value="Print"/>'
             + EOL + '</td><td style="width:1px;">'
-            + '<input type="submit" name="saveButton" value="Save"/>';
+            + EOL + '<input type="submit" name="saveButton" value="Save"/>'
+            + EOL + '</td>';
         return sendManualLog(res, data);
     }).catch(function(err) {
         res.end(errorToHTML(err), CHARSET);
@@ -2135,7 +2147,7 @@ function onGetManualLog(res) {
             var firstRow = !messageRows;
             messageRows += `</tr><tr class="message-data">${EOL}`;
             manualLogMessageFieldNames.forEach(function(field) {
-                var attrs = (field == 'subject') ? ' colspan="2"' : '';
+                var attrs = (field == 'subject') ? ' colspan="3"' : '';
                 var width = manualLogMessageFieldWidths[field];
                 if (width && firstRow) {
                     attrs += ` style="width:${width};"`;
