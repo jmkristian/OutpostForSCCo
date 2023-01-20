@@ -1635,6 +1635,15 @@ function onGetManualId(req, res) {
     });
 }
 
+function sendWindowClose(res) {
+    res.end('<!DOCTYPE html>'
+            + EOL + '<html><head>'
+            + EOL + '<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
+            + EOL + '<script type="text/javascript">window.close();</script>'
+            + EOL + '</head></html>',
+            CHARSET);
+}
+
 function onPostManualId(req, res) {
     res.set({'Content-Type': TEXT_HTML});
     const id = {};
@@ -1654,12 +1663,7 @@ function onPostManualId(req, res) {
         }
         cfg.id = id;
         setManualConfiguration(cfg);
-        res.end('<!DOCTYPE html>'
-                + EOL + '<html><head>'
-                + EOL + '<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
-                + EOL + '<script type="text/javascript">window.close();</script>'
-                + EOL + '</head></html>',
-                CHARSET);
+        sendWindowClose(res);
     }).catch(function(err) {
         res.end(errorToHTML(err, id), CHARSET);
     });
@@ -2053,7 +2057,7 @@ function onGetManualEditLog(req, res, data) {
         data.afterLoad = '';
         data.submitButtons =
             '<input type="submit" name="printButton" value="Print"/>'
-            + '</td><td style="width:1px;">'
+            + EOL + '</td><td style="width:1px;">'
             + '<input type="submit" name="saveButton" value="Save"/>';
         return sendManualLog(res, data);
     }).catch(function(err) {
@@ -2105,6 +2109,8 @@ function onPostManualEditLog(req, res) {
     }).then(function(data) {
         if (req.body.printButton) {
             res.redirect(SEE_OTHER, '/manual-log');
+        } else if (req.body.saveButton) {
+            sendWindowClose(res);
         } else {
             res.redirect(SEE_OTHER, req.headers.referer);
         }
