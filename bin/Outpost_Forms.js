@@ -2351,7 +2351,7 @@ function parseEmail(message) {
 }
 
 function parseMessage(message, environment) {
-    var result = parseManuallMessage(message);
+    var result = parseEmail(message);
     if (!result.formType && !(environment && environment.ADDON_MSG_TYPE)) {
         throw "I don't know what form to display, since the message doesn't"
             + ' contain a line that starts with "#T:" or "#FORMFILENAME:".\n'
