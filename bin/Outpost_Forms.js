@@ -1943,9 +1943,6 @@ function logManualView(req, id, MSG_LOCAL_ID) {
         };
         return readManualLog();
     }).then(function(theLog) {
-        if (theLog.messages == null) {
-            theLog.messages = [];
-        }
         theLog.messages.push(logEntry);
         return fsp.writeFile(
             MANUAL_LOG_FILE, JSON.stringify(theLog), {encoding: ENCODING}
@@ -1965,9 +1962,6 @@ function logManualSend(form, addresses) {
         }
         if (!fromNumber) {
             fromNumber = getMessageNumberFromSubject(subject);
-        }
-        if (data.messages == null) {
-            data.messages = [];
         }
         for (a in addresses) {
             var item = {
@@ -2055,7 +2049,9 @@ function onGetManualEditLog(req, res, data) {
         data.messages = messageRows;
         data.afterLoad = '';
         data.submitButtons =
-            '<input type="submit" name="printButton" value="Print"/>'
+            '<input type="submit" name="resetButton" value="Erase All" style="background-color:#ffcccc;"/>'
+            + EOL + '</td><td style="width:1px;">'
+            + EOL + '<input type="submit" name="printButton" value="Print"/>'
             + EOL + '</td><td style="width:1px;">'
             + '<input type="submit" name="saveButton" value="Save"/>';
         return sendManualLog(res, data);
@@ -2074,38 +2070,38 @@ function getManualLogMessage(req, m, message) {
 }
 
 function onPostManualEditLog(req, res) {
-    return readManualLog().then(function(data) {
-        // TODO: update the data with values from req
-        manualLogFieldNames.forEach(function(field) {
-            data[field] = req.body[field];
-        });
-        for (m in data.messages) {
-            getManualLogMessage(req, m, data.messages[m]);
+    return Promise.resolve().then(function() {
+        if (req.body.resetButton) {
+            return fsp.writeFile(MANUAL_LOG_FILE, '{}', {encoding: ENCODING});
         }
-        var newMessage = {};
-        var addedMessage = getManualLogMessage(req, data.messages.length, newMessage);
-        if (addedMessage) {
-            data.messages.push(newMessage);
-        }
-        if (req.body.insertIndex) {
-            var i = parseInt(req.body.insertIndex);
-            // If we just added a message and inserted at the new message index,
-            // don't insert another item into data.messages.
-            if (i < data.messages.length + (addedMessage ? -1 : 1)) {
-                data.messages.splice(i, 0, {});
+        return readManualLog().then(function(data) {
+            manualLogFieldNames.forEach(function(field) {
+                data[field] = req.body[field];
+            });
+            for (m in data.messages) {
+                getManualLogMessage(req, m, data.messages[m]);
             }
-        }
-        if (req.body.deleteIndex) {
-            data.messages.splice(parseInt(req.body.deleteIndex), 1);
-        }
-        const newData = JSON.stringify(data);
-        log(`onPostManualEditLog data ${newData}`);
-        return fsp.writeFile(
-            MANUAL_LOG_FILE, newData, {encoding: ENCODING}
-        ).then(function() {
-            return data;
+            var newMessage = {};
+            var addedMessage = getManualLogMessage(req, data.messages.length, newMessage);
+            if (addedMessage) {
+                data.messages.push(newMessage);
+            }
+            if (req.body.insertIndex) {
+                var i = parseInt(req.body.insertIndex);
+                // If we just added a message and inserted at the new message index,
+                // don't insert another item into data.messages.
+                if (i < data.messages.length + (addedMessage ? -1 : 1)) {
+                    data.messages.splice(i, 0, {});
+                }
+            }
+            if (req.body.deleteIndex) {
+                data.messages.splice(parseInt(req.body.deleteIndex), 1);
+            }
+            const newData = JSON.stringify(data);
+            log(`onPostManualEditLog data ${newData}`);
+            return fsp.writeFile(MANUAL_LOG_FILE, newData, {encoding: ENCODING});
         });
-    }).then(function(data) {
+    }).then(function() {
         if (req.body.printButton) {
             res.redirect(SEE_OTHER, '/manual-log');
         } else if (req.body.saveButton) {
@@ -2135,7 +2131,7 @@ function onGetManualLog(res) {
             data[field] = data[field] ? encodeHTML(data[field]) : '&nbsp;';
         });
         var messageRows = '';
-        (data.messages || []).forEach(function(message) {
+        data.messages.forEach(function(message) {
             var firstRow = !messageRows;
             messageRows += `</tr><tr class="message-data">${EOL}`;
             manualLogMessageFieldNames.forEach(function(field) {
@@ -2172,10 +2168,14 @@ function readManualLog() {
     return fsp.readFile(
         MANUAL_LOG_FILE, {encoding: ENCODING}
     ).then(function(data) {
-        return JSON.parse(data);
+        var theLog = JSON.parse(data);
+        if (!theLog.messages) {
+            theLog.messages = [];
+        }
+        return theLog;
     }, function readFailed(err) {
         log(err);
-        return {};
+        return {messages: []};
     }); 
 }
 
