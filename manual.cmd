@@ -6,7 +6,7 @@ set /P serverPort=<logs\server-port.txt
 @if not %ERRORLEVEL%==0 goto wrapup
 @if [%serverPort%]==[] cmd /C exit 15
 @if not %ERRORLEVEL%==0 goto wrapup
-start http://127.0.0.1:%serverPort%/manual
+start http://127.0.0.1:%serverPort%/manual-id?nextPage=/manual
 :wrapup
 @popd
 @if not %ERRORLEVEL%==0 (

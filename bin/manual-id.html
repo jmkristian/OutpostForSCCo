@@ -56,6 +56,12 @@
       window.onload = function onLoad() {
           document.getElementById('useTac').checked = {{useTac}};
           onChangeTactical({{useTac}});
+          var nextPage = /[?&]nextPage=([^&]*)/.exec(window.location.search);
+          if (nextPage) {
+              nextPage = decodeURIComponent(nextPage[1]);
+              document.getElementById('nextPage').value = nextPage;
+              document.getElementById('cancelButton').style.display = 'none';
+          }
       };
     </script>
   </head>
@@ -63,6 +69,7 @@
     <span style="font-size:125%;font-weight:bold;">Santa Clara County ARES/RACES PackItForms</span>
     <span style="float:right;">PIF: 2.1</span>
     <form method="POST" action="/manual-id">
+      <input type="text" id="nextPage" name="nextPage" style="display:none" value=""/>
       <table>
         <tr>
           <td style="padding-bottom:2ex;">
@@ -133,7 +140,7 @@
         </tr><tr>
           <td style="padding-top:1ex;text-align:right;">
             <input type="submit" value="OK"/>
-            <button onclick="window.close()">Cancel</button>
+            <button id="cancelButton" onclick="window.close()">Cancel</button>
           </td>
         </tr>
       </table>

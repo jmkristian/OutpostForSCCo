@@ -118,7 +118,6 @@ function promiseTimeout(msec) {
 }
 
 const HTTP_OK = 200;
-const FOUND = 302;
 const SEE_OTHER = 303;
 const FORBIDDEN = 403;
 const NOT_FOUND = 404;
@@ -1663,7 +1662,11 @@ function onPostManualId(req, res) {
         }
         cfg.id = id;
         setManualConfiguration(cfg);
-        sendWindowClose(res);
+        if (req.body.nextPage) {
+            res.redirect(SEE_OTHER, req.body.nextPage);
+        } else {
+            sendWindowClose(res);
+        }
     }).catch(function(err) {
         res.end(errorToHTML(err, id), CHARSET);
     });
