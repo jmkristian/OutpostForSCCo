@@ -115,6 +115,14 @@
           };
           reader.readAsText(file);
       }
+      var downloadDocument;
+      function downloadMessage() {
+          var doc = downloadDocument;
+          var form = doc.getElementById("download-form");
+          var text = doc.getElementById("download-text");
+          text.value = document.getElementById("message").value;
+          form.submit();
+      }
       function onMessageFile(input) {
           document.getElementById("message-file-name").innerText = "";
           if (input.value) {
@@ -132,6 +140,10 @@
           onInput();
       }
       function onLoad() {
+          // Wait for field values to be initialized (e.g. when navigating back).
+          setTimeout(function() {
+              onInput();
+          }, 10);
           var message = document.getElementById("message");
           message.addEventListener('change', onMessageInput);
           message.addEventListener('input', onMessageInput);
@@ -140,14 +152,17 @@
                   input.addEventListener('change', onInput);
                   input.addEventListener('input', onInput);
               });
-          // Wait for field values to be initialized (e.g. when navigating back).
-          setTimeout(function() {
-              onInput();
-              var opName = document.getElementById("op-name");
-              if (!opName.value) {
-                  opName.focus();
-              }
-          }, 10);
+          var frame = document.getElementById("download-frame");
+          doc = frame.contentDocument || frame.contentWindow.document;
+          doc.open();
+          doc.write('<html><body>'
+                    + '<form id="download-form" method="POST" action="/text" target="_blank">'
+                    + '<textarea id="download-text" name="text"></textarea>'
+                    + '</form>'
+                    + '</body></html>'
+                   );
+          doc.close()
+          downloadDocument = doc;
       }
       window.onload = onLoad;
     </script>
@@ -186,6 +201,7 @@
         </tr>
       </table>
     </form>
+    <iframe id="download-frame" style="display:none;"></iframe>
     <form id="view-form" action="/manual-view" method="POST" target="_blank">
       <input type="text" style="display:none;" name="addon_name" value="{{addon_name}}"/>
       <input type="text" style="display:none;" name="addon_version" value="{{addon_version}}"/>
@@ -209,6 +225,8 @@
                   <input type="file" id="message-file" style="display:none;"
                          onchange="onMessageFile(this)"/>
                   <span id="message-file-name" style="display:none;"></span>
+                  <br/><br/>
+                  <input type="button" value="Download" onclick="downloadMessage()"/>
                 </th><td>
                   <textarea name="message" id="message" rows="12" style="font-weight:normal;" required
                             placeholder="Date: ...&#10;From: ...&#10;Subject: ...&#10;&#10;!{{addon_name}}!&#10;#T: ...&#10;MsgNo: [XYZ-123P]&#10;...&#10;!/ADDON!"

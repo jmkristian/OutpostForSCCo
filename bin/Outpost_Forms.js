@@ -784,7 +784,7 @@ function serve() {
             onOpen(
                 formId, args
             ).then(function() {
-                res.redirect(SEE_OTHER, 'http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId);
+                res.redirect(SEE_OTHER, `/form-${formId}`);
             }, function openFailed(err) {
                 log(err);
                 req.socket.end(); // abort the HTTP connection
@@ -850,8 +850,11 @@ function serve() {
     app.post('/manual-command-:formId', function(req, res) {
         onPostManualCommand(req.params.formId, req, res);
     });
-    app.get('/manual-command-:formId/:pageName', function(req, res) {
-        onGetManualCommand(req.params.formId, req, res);
+    app.post('/text', function(req, res) {
+        onPostReceivedEmail(req, res);
+    });
+    app.get('/text-:formId/:pageName', function(req, res) {
+        onGetPlainText(req.params.formId, req, res);
     });
     app.post('/manual-view', function(req, res) {
         onManualView(req, res);
@@ -1393,11 +1396,11 @@ function saveForm(form, req) {
     log(`saveForm ${form.message.length}`);
 }
 
-function isUrgent(message, environment) {
+function isUrgent(message) {
     if (!message) {
         return false;
     }
-    const parsed = parseMessage(message, environment);
+    const parsed = parseEmail(message);
     const handling = parsed.fields['5.'] || '';
     return (['IMMEDIATE', 'I'].indexOf(handling) >= 0);
 }
@@ -1879,7 +1882,7 @@ const manualLogMessageFieldWidths = {
     toNumber: '10ex',
 };
 
-function getSubject(message) {
+function subjectFromEmail(message) {
     var subject = message.headers.subject;
     if (!subject) {
         subject = message.formType || '';
@@ -1914,10 +1917,10 @@ function logManualView(req, id, MSG_LOCAL_ID) {
     const reqBody = req.body;
     var logEntry = null;
     Promise.resolve().then(function() {
-        const message = parseMessage(reqBody.message);
+        const message = parseEmail(reqBody.message);
         log('logManualView message ' + JSON.stringify(message));
         const fields = message.fields;
-        var subject = getSubject(message);
+        var subject = subjectFromEmail(message);
         var fromCall = fields.OpCall || '';
         var fromNumber = fields.MsgNo || '';
         if (!fromCall) { // Find fromCall in the From header.
@@ -1955,15 +1958,10 @@ function logManualSend(form, addresses) {
     readManualLog().then(function(data) {
         var fromNumber = '';
         var subject = form.environment.subject;
-        try {
-            var message = parseMessage(form.message);
-            time = message.fields.OpTime;
-            fromNumber = message.fields.MsgNo;
-            if (!subject) {
-                subject = getSubject(message);
-            }
-        } catch(err) {
-            log(err);
+        var message = parseEmail(form.message);
+        fromNumber = message.fields.MsgNo;
+        if (!subject) {
+            subject = subjectFromEmail(message);
         }
         if (!fromNumber) {
             fromNumber = getMessageNumberFromSubject(subject);
@@ -1981,10 +1979,8 @@ function logManualSend(form, addresses) {
                 item.fromNumber = '"';
             } else {
                 var now = new Date();
-                var time = padStart(now.getHours(), 2, '0')
-                    + ":"
-                    + padStart(now.getMinutes(), 2, '0');
-                item.time = time;
+                item.time = padStart(now.getHours(), 2, '0')
+                    + ":" + padStart(now.getMinutes(), 2, '0');
                 item.fromCall = form.environment.active_call_sign;
                 item.fromNumber = fromNumber;
                 item.subject = trimSubject(subject, fromNumber);
@@ -2211,10 +2207,9 @@ function onPostManualCommand(formId, req, res) {
         prefix += `${EOL}${subject}${EOL}` + (urgent ? '!URG!' : '');
         form.environment.subject = subject;
         form.message = message;
-        form.command = prefix + message + suffix;
+        form.plainText = prefix + message + suffix;
         logManualSend(form, addresses);
-        res.redirect(SEE_OTHER, `http://${LOCALHOST}:${myServerPort}`
-                     + `/manual-command-${formId}/`
+        res.redirect(SEE_OTHER, `/text-${formId}/`
                      + encodeURIComponent(subject)
                      + '.txt');
     }).catch(function(err) {
@@ -2223,11 +2218,30 @@ function onPostManualCommand(formId, req, res) {
     });
 }
 
-function onGetManualCommand(formId, req, res) {
+function onPostReceivedEmail(req, res) {
+    return Promise.resolve().then(function() {
+        log('onPostReceivedEmail ' + JSON.stringify(req.body));
+        const form = {
+            quietTime: 0,
+            plainText: req.body.text || '',
+        };
+        const message = parseEmail(form.plainText);
+        const subject = encodeURIComponent(subjectFromEmail(message) || 'message');
+        const formId = '' + nextFormId++;
+        openForms[formId] = form;
+        res.redirect(SEE_OTHER, `/text-${formId}/${subject}.txt`);
+        // redirects to onGetPlainText
+    }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err), CHARSET);
+    });
+}
+
+function onGetPlainText(formId, req, res) {
     return requireForm(formId).then(function(form) {
-        log('onGetManualCommand ' + JSON.stringify(req.body));
+        log('onGetPlainText ' + JSON.stringify(req.body));
         res.set({'Content-Type': TEXT_PLAIN});
-        res.end(form.command, CHARSET);
+        res.end(form.plainText, CHARSET);
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
         res.end(errorToHTML(err), CHARSET);
@@ -2270,25 +2284,26 @@ function toShortName(fieldName) {
     return fieldName;
 }
 
-function parseMessage(message, environment) {
+/** Parse an email message. Don't check to see if it contains form data. */
+function parseEmail(message) {
     var result = {headers: {}, fields: {}};
     var fields = result.headers;
     var fieldName = null;
     var fieldValue = "";
     message.split(/\r?\n/).every(function(line) {
-        if (!line) {
+        if (!line) { // A blank line separates the headers from the body.
             fields = result.fields;
             return true; // continue parsing
         }
         if (fieldName == null) {
             switch(line.charAt(0)) {
             case '!':
-                fields = result.fields;
+                fields = result.fields; // this isn't an email header
                 if (line == '!/ADDON!') return false; // ignore subsequent lines
                 if (!result.addonName) result.addonName = line.match(/^!([^!]*)/)[1];
                 break;
             case '#':
-                fields = result.fields;
+                fields = result.fields; // this isn't an email header
                 var found = /^#\s*(T|FORMFILENAME):(.*)/.exec(line);
                 if (found) {
                     result.formType = found[2].trim();
@@ -2332,6 +2347,11 @@ function parseMessage(message, environment) {
         }
         return true; // continue parsing
     });
+    return result;
+}
+
+function parseMessage(message, environment) {
+    var result = parseManuallMessage(message);
     if (!result.formType && !(environment && environment.ADDON_MSG_TYPE)) {
         throw "I don't know what form to display, since the message doesn't"
             + ' contain a line that starts with "#T:" or "#FORMFILENAME:".\n'
