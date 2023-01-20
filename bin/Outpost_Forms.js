@@ -129,7 +129,35 @@ const htmlEntities = new AllHtmlEntities();
 const INI = { // patterns that match lines from a .ini file.
     comment: /^\s*;/,
     section: /^\s*\[\s*([^\]]*)\s*\]\s*$/,
-    property: /^\s*([\w\.\-\_]+)\s*=(.*)$/
+    property: /^\s*([\w\.\-\_]+)\s*=(.*)$/,
+    readFile: function readFile(fileName) {
+        log(`INI.readFile ${fileName}`);
+        return fsp.readFile(
+            fileName, {encoding: ENCODING}
+        ).then(function(data) {
+            const result = {};
+            var section = null;
+            data.split(/[\r\n]+/).forEach(function(line) {
+                if (INI.comment.test(line)) {
+                    return;
+                } else if (INI.section.test(line)) {
+                    var match = line.match(INI.section);
+                    section = match[1];
+                    if (result[section] == null) {
+                        result[section] = {};
+                    }
+                } else if (INI.property.test(line)) {
+                    var match = line.match(INI.property);
+                    if (section) {
+                        result[section][match[1]] = match[2];
+                    } else {
+                        result[match[1]] = match[2];
+                    }
+                };
+            });
+            return result;
+        });
+    },
 };
 const JSON_TYPE = 'application/json';
 const LOCALHOST = '127.0.0.1';
@@ -1252,30 +1280,10 @@ function updateSettings() {
         if (fileTime == settingsUpdatedTime) {
             return settings; // no change
         }
-        return fsp.readFile(
-            SETTINGS_FILE, {encoding: ENCODING}
-        ).then(function(data) {
+        return INI.readFile(
+            SETTINGS_FILE
+        ).then(function(fileSettings) {
             settingsUpdatedTime = fileTime;
-            var fileSettings = {};
-            var section = null;
-            data.split(/[\r\n]+/).forEach(function(line) {
-                if (INI.comment.test(line)) {
-                    return;
-                } else if (INI.section.test(line)) {
-                    var match = line.match(INI.section);
-                    section = match[1];
-                    if (fileSettings[section] == null) {
-                        fileSettings[section] = {};
-                    }
-                } else if (INI.property.test(line)) {
-                    var match = line.match(INI.property);
-                    if (section) {
-                        fileSettings[section][match[1]] = match[2];
-                    } else {
-                        fileSettings[match[1]] = match[2];
-                    }
-                };
-            });
             newSettings = merge(DEFAULT_SETTINGS, fileSettings);
             ['port', 'timeout'].forEach(function(name) {
                 if ((typeof newSettings.Opdirect[name]) == 'string') {
@@ -1576,24 +1584,10 @@ function onManual(res) {
 }
 
 const MANUAL_CONFIGURATION_FILE = path.join(LOG_FOLDER, 'manual-configuration.json');
-const DEFAULT_CONFIGURATION = {
-    nextMessageNumber: 1,
-    id: {
-        name: '',
-        call: '',
-        prefix: '',
-        opName: '',
-        opCall: '',
-        opPrefix: '',
-        tacName: '',
-        tacCall: '',
-        tacPrefix: '',
-        useTac: false,
-    },
-};
 
 function setManualConfiguration(configuration) {
     try {
+        log(`setManualConfiguration ${JSON.stringify(configuration)}`);
         fsp.writeFile(
             MANUAL_CONFIGURATION_FILE,
             JSON.stringify(configuration),
@@ -1605,13 +1599,78 @@ function setManualConfiguration(configuration) {
 }
 
 function getManualConfiguration() {
+    var mustSet = false;
     return fsp.readFile(
         MANUAL_CONFIGURATION_FILE, {encoding: ENCODING}
-    ).then(function(data) {
-        return JSON.parse(data);
+    ).then(
+        JSON.parse
+    ).catch(function(err) {
+        log(err);
+        mustSet = true;
+        return {nextMessageNumber: 1};
+    }).then(function(cfg) {
+        if (cfg.id) {
+            return cfg;
+        }
+        mustSet = true;
+        return getInitialManualId().then(function(id) {
+            cfg.id = id;
+            return cfg;
+        });
+    }).then(function(cfg) {
+        if (mustSet) {
+            setManualConfiguration(cfg);
+        }
+        const id = cfg.id;
+        if (id) {
+            if (id.useTac) {
+                id.call = id.tacCall;
+                id.name = id.tacName;
+                id.prefix = id.tacPrefix;
+            } else {
+                id.call = id.opCall;
+                id.name = id.opName;
+                id.prefix = id.opPrefix;
+            }
+        }
+        return cfg;
+    });
+}
+
+function getInitialManualId() {
+    const id = {
+        opName: '',
+        opCall: '',
+        opPrefix: '',
+        tacName: '',
+        tacCall: '',
+        tacPrefix: '',
+        useTac: false,
+    };
+    return INI.readFile(
+        'C:/Program Files (x86)/SCCo Packet/Outpost.conf'
+    ).then(function(conf) {
+        return INI.readFile(path.join(conf.DataDirectory.DataDir, 'Outpost.profile'));
+    }).then(function(profile) {
+        const ini = profile.IDENTIFICATION;
+        if (ini) {
+            id.opName = ini.UsrName || '';
+            id.opCall = ini.UsrCall || '';
+            id.opPrefix = ini.UsrID || '';
+            id.tacName = ini.TacName || '';
+            id.tacCall = ini.TacCall || '';
+            id.tacPrefix = ini.TacID || '';
+            id.useTac = (
+                ini.ActMyCall
+                    && ini.ActMyCall == ini.TacCall
+                    && ini.ActMyName
+                    && ini.ActMyName == ini.TacName
+            );
+        }
+        return id;
     }).catch(function(err) {
-        setManualConfiguration(DEFAULT_CONFIGURATION);
-        return DEFAULT_CONFIGURATION;
+        log(err);
+        return id;
     });
 }
 
@@ -1654,15 +1713,6 @@ function onPostManualId(req, res) {
             id[field] = req.body[field];
         }
         id.useTac = !!req.body.useTac; // coerce to boolean
-        if (id.useTac) {
-            id.call = id.tacCall;
-            id.name = id.tacName;
-            id.prefix = id.tacPrefix;
-        } else {
-            id.call = id.opCall;
-            id.name = id.opName;
-            id.prefix = id.opPrefix;
-        }
         cfg.id = id;
         setManualConfiguration(cfg);
         if (req.body.nextPage) {
