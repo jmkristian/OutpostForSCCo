@@ -1587,14 +1587,17 @@ const MANUAL_CONFIGURATION_FILE = path.join(LOG_FOLDER, 'manual-configuration.js
 
 function setManualConfiguration(configuration) {
     try {
-        log(`setManualConfiguration ${JSON.stringify(configuration)}`);
         fsp.writeFile(
             MANUAL_CONFIGURATION_FILE,
             JSON.stringify(configuration),
             {encoding: ENCODING}
-        ).catch(log);
+        ).catch(function(err) {
+            log(err);
+            log(`... in setManualConfiguration ${JSON.stringify(configuration)}`);
+        });
     } catch(err) {
         log(err);
+        log(`... in setManualConfiguration ${JSON.stringify(configuration)}`);
     }
 }
 
@@ -1827,8 +1830,8 @@ function onManualView(req, res) {
         if (input.OpDate && input.OpTime) {
             input.MSG_DATETIME_OP_RCVD = `${input.OpDate} ${input.OpTime}`;
         }
-        if (input.message) {
-            var parsed = parseEmail(input.message);
+        const parsed = (input.message == null) ? null : parseEmail(input.message);
+        if (parsed) {
             input.MSG_SUBJECT = parsed.headers.subject;
             var from = parsed.headers.from;
             if (from) {
@@ -1846,26 +1849,36 @@ function onManualView(req, res) {
                 }
             }
         }
-        if (input.message && input.addon_name) {
-            // Perhaps there's extra text at the beginning of the message,
-            // for example email headers like From or Subject.
-            var start = enquoteRegex('!' + input.addon_name + '!') + '[\r\n]';
-            var pattern = new RegExp(start);
-            var foundIt = pattern.exec(input.message);
-            if (foundIt) {
-                // Ignore the surplus text preceding start:
-                input.message = input.message.substring(foundIt.index);
-            }
-        }
         logManualView(cfg.id, input);
-        var args = ['--message_status-received', '--mode-readonly'];
-        for (var name in input) {
-            args.push('--' + name + '-' + input[name]);
+        if (messageContainsAForm(parsed, input)) {
+            if (input.addon_name) {
+                // Perhaps there's extra text at the beginning of the message,
+                // for example email headers like From or Subject.
+                var start = enquoteRegex('!' + input.addon_name + '!') + '[\r\n]';
+                var pattern = new RegExp(start);
+                var foundIt = pattern.exec(input.message);
+                if (foundIt) {
+                    // Ignore the surplus text preceding start:
+                    input.message = input.message.substring(foundIt.index);
+                }
+            }
+            var args = ['--message_status-received', '--mode-readonly'];
+            for (var name in input) {
+                args.push('--' + name + '-' + input[name]);
+            }
+            return onOpen(formId, args).then(function() {
+                res.redirect('/form-' + formId);
+            });
+        } else { // message does not contain a form
+            openForms[formId] = {
+                quietTime: 0,
+                plainText: input.message || '',
+            };
+            const subject = encodeURIComponent(subjectFromEmail(parsed) || 'message');
+            res.redirect(SEE_OTHER, `/text-${formId}/${subject}.txt`);
+            // redirects to onGetPlainText
         }
-        return onOpen(formId, args);
-    }).then(function() {
-        res.redirect('/form-' + formId);
-    }, function openFailed(err) {
+    }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
         res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
     });
@@ -1952,6 +1965,9 @@ const manualLogMessageFieldWidths = {
 };
 
 function subjectFromEmail(message) {
+    if (!message) {
+        return null;
+    }
     var subject = message.headers.subject;
     if (!subject) {
         subject = message.formType || '';
@@ -2412,12 +2428,16 @@ function parseEmail(message) {
     return result;
 }
 
-function parseMessage(message, environment) {
-    var result = parseEmail(message);
-    if (!result.formType && !(environment && environment.ADDON_MSG_TYPE)) {
+function messageContainsAForm(message, environment) {
+    return (message && message.formType) || (environment && environment.ADDON_MSG_TYPE);
+}
+
+function parseMessage(email, environment) {
+    var result = parseEmail(email);
+    if (!messageContainsAForm(result, environment)) {
         throw "I don't know what form to display, since the message doesn't"
             + ' contain a line that starts with "#T:" or "#FORMFILENAME:".\n'
-            + 'message: ' + JSON.stringify(message) + '\n';
+            + 'message: ' + JSON.stringify(email) + '\n';
     }
     return result;
 }
