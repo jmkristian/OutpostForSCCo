@@ -1947,8 +1947,8 @@ const manualLogMessageFieldWidths = {
     time: '6ex',
     fromCall: '8ex',
     toCall: '8ex',
-    fromNumber: '10ex',
-    toNumber: '10ex',
+    fromNumber: '11ex',
+    toNumber: '11ex',
 };
 
 function subjectFromEmail(message) {
