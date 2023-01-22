@@ -2059,21 +2059,28 @@ function logManualSend(form, addresses) {
     }).catch(log);
 }
 
-function onGetManualEditLog(req, res, data) {
-    return (data ? Promise.resolve(data) : readManualLog()).then(function(data) {
-        log('onGetManualEditLog data ' + JSON.stringify(data));
-        manualLogFieldNames.forEach(function(field) {
-            var clazz = manualLogFieldClasses[field];
-            var attrs = '';
-            if (clazz) {
-                attrs += ` class="${clazz}" placeholder="${clazz}"`;
-            }
-            data[field] = `<input type="text" name="`
-                + encodeHTML(field)
-                + `"${attrs} value="`
-                + encodeHTML(data[field] || '')
-                + `" required/>` ;
+function onGetManualEditLog(req, res) {
+    return readManualLog().then(function(data) {
+        return getManualSettings().then(function(settings) {
+            manualLogFieldNames.forEach(function(field) {
+                var clazz = manualLogFieldClasses[field];
+                var attrs = '';
+                if (clazz) {
+                    attrs += ` class="${clazz}" placeholder="${clazz}"`;
+                }
+                if (field == 'radioOperator' && !data[field]
+                    && settings.opName && settings.opCall) {
+                    data[field] = `${settings.opName}, ${settings.opCall}`;
+                }
+                data[field] = `<input type="text" name="`
+                    + encodeHTML(field)
+                    + `"${attrs} value="`
+                    + encodeHTML(data[field] || '')
+                    + `" required/>` ;
+            });
+            return data;
         });
+    }).then(function(data) {
         data.messages.push(null); // enable adding a row at the end
         var messageRows = '';
         for (m in data.messages) {
