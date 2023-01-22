@@ -857,11 +857,11 @@ function serve() {
     app.get('/manual', function(req, res) {
         onManual(res);
     });
-    app.get('/manual-id', function(req, res) {
-        onGetManualId(req, res);
+    app.get('/manual-setup', function(req, res) {
+        onGetManualSetup(req, res);
     });
-    app.post('/manual-id', function(req, res) {
-        onPostManualId(req, res);
+    app.post('/manual-setup', function(req, res) {
+        onPostManualSetup(req, res);
     });
     app.get('/manual-get-:pageId/:subject', function(req, res) {
         onManualGet(req.params.pageId, req, res);
@@ -1583,65 +1583,57 @@ function onManual(res) {
     });
 }
 
-const MANUAL_CONFIGURATION_FILE = path.join(LOG_FOLDER, 'manual-configuration.json');
+const MANUAL_SETTINGS_FILE = path.join(LOG_FOLDER, 'manual-settings.json');
 
-function setManualConfiguration(configuration) {
+function setManualSettings(settings) {
     try {
         fsp.writeFile(
-            MANUAL_CONFIGURATION_FILE,
-            JSON.stringify(configuration),
+            MANUAL_SETTINGS_FILE,
+            JSON.stringify(settings),
             {encoding: ENCODING}
         ).catch(function(err) {
             log(err);
-            log(`... in setManualConfiguration ${JSON.stringify(configuration)}`);
+            log(`... in setManualSettings ${JSON.stringify(settings)}`);
         });
     } catch(err) {
         log(err);
-        log(`... in setManualConfiguration ${JSON.stringify(configuration)}`);
+        log(`... in setManualSettings ${JSON.stringify(settings)}`);
     }
 }
 
-function getManualConfiguration() {
-    var mustSet = false;
+function getManualSettings() {
     return fsp.readFile(
-        MANUAL_CONFIGURATION_FILE, {encoding: ENCODING}
+        MANUAL_SETTINGS_FILE, {encoding: ENCODING}
     ).then(
         JSON.parse
     ).catch(function(err) {
         log(err);
-        mustSet = true;
-        return {nextMessageNumber: 1};
-    }).then(function(cfg) {
-        if (cfg.id) {
-            return cfg;
+        return null;
+    }).then(function(settings) {
+        if (settings) {
+            return settings;
         }
-        mustSet = true;
-        return getInitialManualId().then(function(id) {
-            cfg.id = id;
-            return cfg;
+        return getInitialManualSettings(function(settings) {
+            setManualSettings(settings);
+            return setinngs;
         });
-    }).then(function(cfg) {
-        if (mustSet) {
-            setManualConfiguration(cfg);
+    }).then(function(settings) {
+        if (settings.useTac) {
+            settings.call = settings.tacCall;
+            settings.name = settings.tacName;
+            settings.prefix = settings.tacPrefix;
+        } else {
+            settings.call = settings.opCall;
+            settings.name = settings.opName;
+            settings.prefix = settings.opPrefix;
         }
-        const id = cfg.id;
-        if (id) {
-            if (id.useTac) {
-                id.call = id.tacCall;
-                id.name = id.tacName;
-                id.prefix = id.tacPrefix;
-            } else {
-                id.call = id.opCall;
-                id.name = id.opName;
-                id.prefix = id.opPrefix;
-            }
-        }
-        return cfg;
+        return settings;
     });
 }
 
-function getInitialManualId() {
-    const id = {
+function getInitialManualSettings() {
+    const settings = {
+        nextMessageNumber: 1,
         opName: '',
         opCall: '',
         opPrefix: '',
@@ -1657,43 +1649,34 @@ function getInitialManualId() {
     }).then(function(profile) {
         const ini = profile.IDENTIFICATION;
         if (ini) {
-            id.opName = ini.UsrName || '';
-            id.opCall = ini.UsrCall || '';
-            id.opPrefix = ini.UsrID || '';
-            id.tacName = ini.TacName || '';
-            id.tacCall = ini.TacCall || '';
-            id.tacPrefix = ini.TacID || '';
-            id.useTac = (
+            settings.opName = ini.UsrName || '';
+            settings.opCall = ini.UsrCall || '';
+            settings.opPrefix = ini.UsrID || '';
+            settings.tacName = ini.TacName || '';
+            settings.tacCall = ini.TacCall || '';
+            settings.tacPrefix = ini.TacID || '';
+            settings.useTac = (
                 ini.ActMyCall
                     && ini.ActMyCall == ini.TacCall
                     && ini.ActMyName
                     && ini.ActMyName == ini.TacName
             );
         }
-        return id;
+        return settings;
     }).catch(function(err) {
         log(err);
-        return id;
+        return settings;
     });
 }
 
-function getManualId() {
-    return getManualConfiguration().then(function(cfg) {
-        return cfg.id;
-    });
-}
-
-function onGetManualId(req, res) {
+function onGetManualSetup(req, res) {
     res.set({'Content-Type': TEXT_HTML});
-    const templateFile = path.join('bin', 'manual-id.html');
-    var template = '';
-    return fsp.readFile(
-        templateFile, {encoding: ENCODING}
-    ).then(function(data) {
-        template = data;
-        return getManualId();
-    }).then(function(id) {
-        res.end(expandVariables(template, id), CHARSET);
+    return getManualSettings().then(function(settings) {
+        return fsp.readFile(
+            path.join('bin', 'manual-setup.html'), {encoding: ENCODING}
+        ).then(function(template) {
+            res.end(expandVariables(template, settings), CHARSET);
+        });
     }).catch(function(err) {
         res.end(errorToHTML(err, templateFile), CHARSET);
     });
@@ -1708,16 +1691,16 @@ function sendWindowClose(res) {
             CHARSET);
 }
 
-function onPostManualId(req, res) {
+function onPostManualSetup(req, res) {
     res.set({'Content-Type': TEXT_HTML});
     const id = {};
-    return getManualConfiguration().then(function(cfg) {
+    return getManualSettings().then(function(settings) {
         for (field in req.body) {
-            id[field] = req.body[field];
+            settings[field] = req.body[field];
         }
-        id.useTac = !!req.body.useTac; // coerce to boolean
-        cfg.id = id;
-        setManualConfiguration(cfg);
+        settings.useTac = !!req.body.useTac; // coerce to boolean
+        setManualSettings(settings);
+        log('onPostManualSetup ' + JSON.stringify(settings));
         if (req.body.nextPage) {
             res.redirect(SEE_OTHER, req.body.nextPage);
         } else {
@@ -1770,28 +1753,27 @@ function padStart(s, len, pad) {
     return result;
 }
 
-function nextManualMessageNumber(cfg) {
-    const number = padStart('' + (cfg.nextMessageNumber++), 3, '0');
-    setManualConfiguration(cfg);
-    return `${cfg.id.prefix}-${number}M`;
+function nextManualMessageNumber(settings) {
+    const number = padStart('' + (settings.nextMessageNumber++), 3, '0');
+    setManualSettings(settings);
+    return `${settings.prefix}-${number}M`;
 }
 
 function onManualCreate(req, res) {
     const formId = '' + nextFormId++;
     const plainText = (req.body.ADDON_MSG_TYPE == "/plainText");
-    return getManualConfiguration().then(function(cfg) {
-        const msgNumber = nextManualMessageNumber(cfg);
-        const id = cfg.id;
+    return getManualSettings().then(function(settings) {
+        const msgNumber = nextManualMessageNumber(settings);
         const environment = {
             message_status: 'manual',
             MSG_NUMBER: msgNumber,
             subject: `${msgNumber}_R_`,
-            active_name: id.name,
-            active_call_sign: id.call,
-            operator_name: id.opName,
-            operator_call_sign: id.opCall,
-            tactical_name: id.tacName,
-            tactical_call_sign: id.tacCall,
+            active_name: settings.name,
+            active_call_sign: settings.call,
+            operator_name: settings.opName,
+            operator_call_sign: settings.opCall,
+            tactical_name: settings.tacName,
+            tactical_call_sign: settings.tacCall,
         };
         for (var field in req.body) {
             environment[field] = req.body[field];
@@ -1820,9 +1802,9 @@ function onManualCreate(req, res) {
 
 function onManualView(req, res) {
     const formId = '' + nextFormId++;
-    return getManualConfiguration().then(function(cfg) {
+    return getManualSettings().then(function(settings) {
         const input = {
-            MSG_LOCAL_ID: nextManualMessageNumber(cfg)
+            MSG_LOCAL_ID: nextManualMessageNumber(settings)
         };
         for (var name in req.body) {
             input[name] = req.body[name];
@@ -1849,7 +1831,7 @@ function onManualView(req, res) {
                 }
             }
         }
-        logManualView(cfg.id, input);
+        logManualView(settings, input);
         if (messageContainsAForm(parsed, input)) {
             if (input.addon_name) {
                 // Perhaps there's extra text at the beginning of the message,
@@ -1998,7 +1980,7 @@ function trimSubject(fromSubject, msgNo) {
     return subject;
 }
 
-function logManualView(id, input) {
+function logManualView(settings, input) {
     var logEntry = null;
     Promise.resolve().then(function() {
         log('logManualView ' + JSON.stringify(input));
@@ -2011,7 +1993,7 @@ function logManualView(id, input) {
             time: input.OpTime || '',
             fromCall: fromCall,
             fromNumber: fromNumber,
-            toCall: id.call,
+            toCall: settings.call,
             toNumber: input.MSG_LOCAL_ID || '',
             subject: trimSubject(subject, fromNumber),
         };
@@ -2059,10 +2041,10 @@ function logManualSend(form, addresses) {
             var found = /^[A-Z0-9]{1,3}?-(\d+)/i.exec(fromNumber);
             if (found) {
                 nextNumber = parseInt(found[1], 10) + 1;
-                getManualConfiguration().then(function(cfg) {
-                    if (cfg.nextMessageNumber != nextNumber) {
-                        cfg.nextMessageNumber = nextNumber;
-                        setManualConfiguration(cfg);
+                getManualSettings().then(function(settings) {
+                    if (settings.nextMessageNumber != nextNumber) {
+                        settings.nextMessageNumber = nextNumber;
+                        setManualSettings(settings);
                     }
                 });
             }

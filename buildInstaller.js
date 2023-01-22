@@ -45,7 +45,7 @@ Promise.all(
             {PROGRAM_PATH: programPath.replace(/\\/g, "\\\\"), DisplayName: displayName},
             path.join('bin', 'launch.js')),
     ].concat(
-        ['manual.html', 'manual-id.html', 'manual-log.html'
+        ['manual.html', 'manual-setup.html', 'manual-log.html'
         ].map(function(fileName) {
             return buildFile(
                 {addon_version: addonVersion, addon_name: addonName},

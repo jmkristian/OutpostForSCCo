@@ -38,8 +38,8 @@
       function openCommLog() {
           window.open('/manual-edit-log', 'PackItFormsCommLog');
       }
-      function openIdDialog() {
-          window.open('/manual-id', 'PackItFormsStationID');
+      function openSetupDialog() {
+          window.open('/manual-setup', 'PackItFormsSetup');
       }
       setInterval(function() {
           var img = new Image();
@@ -171,7 +171,7 @@
     <span style="font-size:125%;font-weight:bold;">Santa Clara County ARES/RACES PackItForms</span>
     <span style="float:right;">PIF: 2.1</span>
     <br/><br/>
-    <button onclick="openIdDialog()">Setup Station ID</button>
+    <button onclick="openSetupDialog()">Setup</button>
     <button onclick="openCommLog()">Edit ICS-213 Log</button>
     <form id="create-form" action="/manual-create" method="POST" target="_blank">
       <input type="text" style="display:none;" name="addon_name" value="{{addon_name}}"/>

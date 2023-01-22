@@ -5,7 +5,7 @@
     <link rel="stylesheet" type="text/css" href="resources/css/pack-it-forms.css"/>
     <style>
       form {
-          max-width: 4in;
+          max-width: 4.5in;
       }
       form table.same-line-label-layout th {
           padding-left: 1ex;
@@ -26,7 +26,7 @@
           background-color: #dddddd;
       }
     </style>
-    <title>Station ID</title>
+    <title>Setup PackItForms</title>
     <script type="text/javascript">
       function changeValue(inputID, newValue) {
           var input = document.getElementById(inputID);
@@ -68,11 +68,11 @@
   <body style="padding-top:1em;background-color:#d0d0d0;">
     <span style="font-size:125%;font-weight:bold;">Santa Clara County ARES/RACES PackItForms</span>
     <span style="float:right;">PIF: 2.1</span>
-    <form method="POST" action="/manual-id">
+    <form method="POST">
       <input type="text" id="nextPage" name="nextPage" style="display:none" value=""/>
       <table>
         <tr>
-          <td style="padding-bottom:2ex;">
+          <td colspan="2" style="padding-bottom:2ex;">
             <table class="same-line-label-layout" style="margin-top:1em;">
               <tr>
                 <th>
@@ -101,14 +101,14 @@
             </table>
           </td>
         </tr><tr>
-          <td>
+          <td colspan="2" style="padding-bottom:2ex;">
             <table class="same-line-label-layout" style="margin-top:1em;">
               <tr>
                 <td colspan="2" style="padding-bottom:2ex;">
                   <label style="font-weight:normal;">
                     <input type="checkbox" id="useTac" name="useTac" value="true"
                            onchange="onChangeTactical(this.checked)"/>
-                    Use Tactical Call for all BBS interaction
+                    Use Tactical Call Sign
                   </label>
                 </td>
               </tr><tr>
@@ -138,9 +138,20 @@
             </table>
           </td>
         </tr><tr>
-          <td style="padding-top:1ex;text-align:right;">
-            <input type="submit" value="OK"/>
-            <button id="cancelButton" onclick="window.close()">Cancel</button>
+          <td style="padding-top:0.75em;">
+            <table class="same-line-label-layout">
+              <tr>
+                <th>
+                  Next Message Number:
+                </th><td>
+                  <input type="text" name="nextMessageNumber" value="{{nextMessageNumber}}"
+                         style="width:4em;" pattern="\d+" required/>
+                </td><td style="text-align:right;">
+                  <input type="submit" value="OK"/>
+                  <button id="cancelButton" onclick="window.close()">Cancel</button>
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>
       </table>
