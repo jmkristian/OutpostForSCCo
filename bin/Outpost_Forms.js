@@ -2090,17 +2090,19 @@ function onGetManualEditLog(req, res, data) {
                 + encodeHTML(field)
                 + `"${attrs} value="`
                 + encodeHTML(data[field] || '')
-                + `" required/>${EOL}` ;
+                + `" required/>` ;
         });
         data.messages.push(null); // enable adding a row at the end
         var messageRows = '';
         for (m in data.messages) {
             var message = data.messages[m];
-            messageRows += `</tr><tr class="message-edit">${EOL}`;
+            messageRows += `</tr><tr class="`
+                + (message == null ? "message-blank" : "message-edit")
+                + `">${EOL}`;
             manualLogMessageFieldNames.forEach(function(field) {
                 var clazz = manualLogMessageFieldClasses[field];
                 var attrs = clazz ? ` class="${clazz}"` : '';
-                if (message && clazz == 'time') {
+                if (clazz == 'time' && message != null) {
                     attrs += ' required';
                 }
                 var input = `<input type="text" name="`
@@ -2111,26 +2113,28 @@ function onGetManualEditLog(req, res, data) {
                 attrs = (clazz && m == 0) ? ` style="width:1px;"` : '';
                 messageRows += `  <td${attrs}>${input}</td>${EOL}`;
             });
-            messageRows += `  <td style="width:1px;">`
-                + EOL + `    <button onclick="insertMessage(${m})"><img alt="+" src="icon-insert.png"/></button>`
-                + EOL + `  </td><td style="width:1px;">`
-                + EOL;
+            messageRows += '  <td style="width:1px;">'
             if (message != null) {
-                messageRows += '    '
-                    + `<button onclick="deleteMessage(${m})" style="background-color:#ffcccc;">`
+                messageRows +=
+                    `<button onclick="deleteMessage(${m})" style="background-color:#ffcccc;">`
                     + `<img alt="-" src="icon-delete.png"/>`
-                    + `</button>${EOL}`;
+                    + `</button>`;
             }
-            messageRows += '  </td>';
+            messageRows += `</td>${EOL}`
+                + `  <td style="width:1px;">`
+                + `<button onclick="insertMessage(${m})"><img alt="+" src="icon-insert.png"/></button>`
+                + `</td>${EOL}`;
         }
         data.messages = messageRows;
         data.afterLoad = '';
         data.submitButtons = '<td style="width:1px;">'
-            + EOL + '<input type="submit" name="resetButton" value="Erase All" style="background-color:#ffcccc;"/>'
+            + EOL + '  <button onclick="eraseAll()" style="background-color:#ffcccc;"'
+            + ' title="Every field and every message!"'
+            + '>Erase All</button>'
             + EOL + '</td><td style="width:1px;">'
-            + EOL + '<input type="submit" name="printButton" value="Print"/>'
+            + EOL + '  <input type="submit" name="printButton" value="Print"/>'
             + EOL + '</td><td style="width:1px;">'
-            + EOL + '<input type="submit" name="saveButton" value="Save"/>'
+            + EOL + '  <input type="submit" name="saveButton" value="Save"/>'
             + EOL + '</td>';
         return sendManualLog(res, data);
     }).catch(function(err) {
@@ -2138,47 +2142,51 @@ function onGetManualEditLog(req, res, data) {
     });
 }
 
-function getManualLogMessage(req, m, message) {
-    var empty = true;
-    manualLogMessageFieldNames.forEach(function(field) {
-        message[field] = req.body[`${m}.${field}`];
-        empty = empty && !(message[field]);
-    });
-    return !empty;
-}
-
 function onPostManualEditLog(req, res) {
-    return Promise.resolve().then(function() {
-        if (req.body.resetButton) {
-            return fsp.writeFile(MANUAL_LOG_FILE, '{}', {encoding: ENCODING});
-        }
-        return readManualLog().then(function(data) {
-            manualLogFieldNames.forEach(function(field) {
-                data[field] = req.body[field];
-            });
-            for (m in data.messages) {
-                getManualLogMessage(req, m, data.messages[m]);
-            }
-            var newMessage = {};
-            var addedMessage = getManualLogMessage(req, data.messages.length, newMessage);
-            if (addedMessage) {
-                data.messages.push(newMessage);
-            }
-            if (req.body.insertIndex) {
-                var i = parseInt(req.body.insertIndex);
-                // If we just added a message and inserted at the new message index,
-                // don't insert another item into data.messages.
-                if (i < data.messages.length + (addedMessage ? -1 : 1)) {
-                    data.messages.splice(i, 0, {});
-                }
-            }
-            if (req.body.deleteIndex) {
-                data.messages.splice(parseInt(req.body.deleteIndex), 1);
-            }
-            const newData = JSON.stringify(data);
-            log(`onPostManualEditLog data ${newData}`);
-            return fsp.writeFile(MANUAL_LOG_FILE, newData, {encoding: ENCODING});
+    function getManualLogMessage(req, m, message) {
+        var empty = true;
+        manualLogMessageFieldNames.forEach(function(field) {
+            message[field] = req.body[`${m}.${field}`];
+            empty = empty && !(message[field]);
         });
+        return !empty;
+    }
+    return readManualLog().then(function(data) {
+        manualLogFieldNames.forEach(function(field) {
+            data[field] = req.body[field];
+        });
+        // Have messages been deleted, e.g. by the 'Erase All' button?
+        var m;
+        for (m = data.messages.length; m > 0; --m) {
+            if (req.body[`${m - 1}.time`] != null) {
+                break;
+            }
+        }
+        if (m < data.messages.length) { // messages were deleted
+            data.messages = data.messages.slice(0, m);
+        }
+        for (m in data.messages) {
+            getManualLogMessage(req, m, data.messages[m]);
+        }
+        var newMessage = {};
+        var addedMessage = getManualLogMessage(req, data.messages.length, newMessage);
+        if (addedMessage) {
+            data.messages.push(newMessage);
+        }
+        if (req.body.insertIndex) {
+            var i = parseInt(req.body.insertIndex);
+            // If we just added a message and inserted at the new message index,
+            // don't insert another item into data.messages.
+            if (i < data.messages.length + (addedMessage ? -1 : 1)) {
+                data.messages.splice(i, 0, {});
+            }
+        }
+        if (req.body.deleteIndex) {
+            data.messages.splice(parseInt(req.body.deleteIndex), 1);
+        }
+        const newData = JSON.stringify(data);
+        log(`onPostManualEditLog data ${newData}`);
+        return fsp.writeFile(MANUAL_LOG_FILE, newData, {encoding: ENCODING});
     }).then(function() {
         if (req.body.printButton) {
             res.redirect(SEE_OTHER, '/manual-log');
