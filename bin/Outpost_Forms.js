@@ -2129,7 +2129,7 @@ function onGetManualEditLog(req, res, data) {
         data.afterLoad = '';
         data.submitButtons = '<td style="width:1px;">'
             + EOL + '  <button onclick="eraseAll()" style="background-color:#ffcccc;"'
-            + ' title="Every field and every message!"'
+            + ' title="Clear all fields and delete all log entries!"'
             + '>Erase All</button>'
             + EOL + '</td><td style="width:1px;">'
             + EOL + '  <input type="submit" name="printButton" value="Print"/>'

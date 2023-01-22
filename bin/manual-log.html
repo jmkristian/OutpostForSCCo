@@ -83,7 +83,9 @@
               function(input) {
                   input.value = "";
               });
-          document.getElementById("the-form").submit();
+          var form = document.getElementById("the-form");
+          form.noValidate = true;
+          form.submit();
       }
       function onLoad() {
           if (/\?goBack/.exec(window.location)) {
