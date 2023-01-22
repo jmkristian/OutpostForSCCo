@@ -2098,13 +2098,15 @@ function onGetManualEditLog(req, res, data) {
             messageRows += '  <td style="width:1px;">'
             if (message != null) {
                 messageRows +=
-                    `<button onclick="deleteMessage(${m})" style="background-color:#ffcccc;">`
-                    + `<img alt="-" src="icon-delete.png"/>`
-                    + `</button>`;
+                    `<button onclick="deleteMessage(${m})" title="Delete this row"`
+                    + ' style="background-color:#ffcccc;">'
+                    + '<img alt="-" src="icon-delete.png"/>'
+                    + '</button>';
             }
             messageRows += `</td>${EOL}`
-                + `  <td style="width:1px;">`
-                + `<button onclick="insertMessage(${m})"><img alt="+" src="icon-insert.png"/></button>`
+                + '  <td style="width:1px;">'
+                + `<button onclick="insertMessage(${m})" title="Insert a row">`
+                + '<img alt="+" src="icon-insert.png"/></button>'
                 + `</td>${EOL}`;
         }
         data.messages = messageRows;
