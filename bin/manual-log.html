@@ -60,9 +60,19 @@
     </style>
     <title>ICS-309</title>
     <script type="text/javascript">
-      var inputPatterns = {
-          date: "[01]?[1-9]/([0123]?[0-9])/[12][0-9][0-9][0-9]",
-          time: '([01][0-9]|2[0-3]):?[0-5][0-9]|2400|24:00|"' // ditto for multiple recipients
+      var inputTypes = {
+          date: {
+              pattern: "[01]?[1-9]/([0123]?[0-9])/[12][0-9][0-9][0-9]",
+              placeholder: "m/d/yyyy"
+          },
+          time: {
+              pattern: '([01][0-9]|2[0-3]):?[0-5][0-9]|2400|24:00|"',
+              /* When a message is sent to multiple destinations,
+                 the log entries for the second and subsequent
+                 destinations have a ditto '"' in the time field.
+               */
+              placeholder: "hh:mm"
+          }
       };
       function insertMessage(index) {
           document.getElementById("insert-index").value = index + '';
@@ -93,11 +103,14 @@
           }
           setTimeout(function afterLoad() {
               {{afterLoad}}
-              for (clazz in inputPatterns) {
+              for (clazz in inputTypes) {
+                  var type = inputTypes[clazz];
                   Array.prototype.forEach.call(
                       document.querySelectorAll('input[type="text"].' + clazz),
                       function(input) {
-                          input.pattern = inputPatterns[clazz];
+                          input.pattern = type.pattern;
+                          input.placeholder = type.placeholder;
+                          input.title = type.placeholder;
                       });
               }
           }, 10);
