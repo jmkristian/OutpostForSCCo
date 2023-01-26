@@ -812,7 +812,7 @@ function serve() {
             onOpen(
                 formId, args
             ).then(function() {
-                res.redirect(SEE_OTHER, `/form-${formId}`);
+                res.redirect(SEE_OTHER, 'http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId);
             }, function openFailed(err) {
                 log(err);
                 req.socket.end(); // abort the HTTP connection
