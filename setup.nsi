@@ -366,7 +366,7 @@ Section "Install"
   FileWrite $R0 "$OUTPOST_DATA"
   FileClose $R0
   FileOpen $R0 "version.txt" w
-  FileWrite $R0 "${VersionMajor}.${VersionMinor}d"
+  FileWrite $R0 "${VersionMajor}.${VersionMinor}e"
   FileClose $R0
 
   CreateDirectory "$INSTDIR\addons"
