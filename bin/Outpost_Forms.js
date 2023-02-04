@@ -813,6 +813,10 @@ function serve() {
                 formId, args
             ).then(function() {
                 res.redirect(SEE_OTHER, 'http://' + LOCALHOST + ':' + myServerPort + '/form-' + formId);
+                // This URL must be fully qualified (not relative), because
+                // the client isn't a browser; it's function browseMessage,
+                // which will simply pass the URL to Windows' "start" command
+                // (which will open a browser).
             }, function openFailed(err) {
                 log(err);
                 req.socket.end(); // abort the HTTP connection
@@ -1583,28 +1587,69 @@ function onManual(res) {
     });
 }
 
-const MANUAL_SETTINGS_FILE = path.join(LOG_FOLDER, 'manual-settings.json');
+var manualDataFolder = null;
+
+function findManualDataFolder() {
+    if (manualDataFolder != null) {
+        return Promise.resolve(manualDataFolder);
+    }
+    var appData = process.env.APPDATA;
+    if (!appData) {
+        manualDataFolder = LOG_FOLDER;
+        log(`manualDataFolder = ${manualDataFolder}; %APPDATA% = ${appData}`);
+        return Promise.resolve(manualDataFolder);
+    }
+    appData = path.join(appData, 'PackItForms');
+    var testFile = path.join(appData, 'test.txt');
+    return fsp.checkFolder(
+        appData
+    ).then(function() {
+        return fsp.writeFile(testFile, 'test', {encoding: ENCODING});
+    }).then(function(OK) {
+        fsp.unlink(testFile); // asynchronously
+        manualDataFolder = appData;
+        log(`manualDataFolder = ${manualDataFolder}`);
+        return manualDataFolder;
+    }).catch(function(err) {
+        log(err);
+        log(`... in findManualDataFolder`);
+        manualDataFolder = LOG_FOLDER;
+        log(`manualDataFolder = ${manualDataFolder}`);
+        return manualDataFolder;
+    });
+}
+
+function findManualLogFile() {
+    return findManualDataFolder().then(function(folder) {
+        return path.join(folder, 'manual-log.json');
+    });
+}
+
+function findManualSettingsFile() {
+    return findManualDataFolder().then(function(folder) {
+        return path.join(folder, 'manual-settings.json');
+    });
+}
 
 function setManualSettings(settings) {
+    const json = JSON.stringify(settings);
     try {
-        fsp.writeFile(
-            MANUAL_SETTINGS_FILE,
-            JSON.stringify(settings),
-            {encoding: ENCODING}
-        ).catch(function(err) {
+        findManualSettingsFile().then(function(file) {
+            return fsp.writeFile(file, json, {encoding: ENCODING});
+        }).catch(function(err) {
             log(err);
-            log(`... in setManualSettings ${JSON.stringify(settings)}`);
+            log(`... in setManualSettings ${json}`);
         });
     } catch(err) {
         log(err);
-        log(`... in setManualSettings ${JSON.stringify(settings)}`);
+        log(`... in setManualSettings ${json}`);
     }
 }
 
 function getManualSettings() {
-    return fsp.readFile(
-        MANUAL_SETTINGS_FILE, {encoding: ENCODING}
-    ).then(
+    return findManualSettingsFile().then(function(file) {
+        return fsp.readFile(file, {encoding: ENCODING});
+    }).then(
         JSON.parse
     ).catch(function(err) {
         log(err);
@@ -1831,7 +1876,7 @@ function onManualView(req, res) {
                 }
             }
         }
-        logManualView(settings, input);
+        logManualView(settings, input); // asynchronously
         if (messageContainsAForm(parsed, input)) {
             if (input.addon_name) {
                 // Perhaps there's extra text at the beginning of the message,
@@ -1900,8 +1945,6 @@ function onManualMessage(formId, req, res) {
         res.end(errorToHTML(err, form && form.environment), CHARSET);
     });
 }
-
-const MANUAL_LOG_FILE = path.join(LOG_FOLDER, 'manual-log.json');
 
 const manualLogFieldNames = [
     'incidentName',
@@ -1982,7 +2025,7 @@ function trimSubject(fromSubject, msgNo) {
 
 function logManualView(settings, input) {
     var logEntry = null;
-    Promise.resolve().then(function() {
+    return Promise.resolve().then(function() {
         log('logManualView ' + JSON.stringify(input));
         const message = parseEmail(input.message);
         const fields = message.fields;
@@ -2000,15 +2043,17 @@ function logManualView(settings, input) {
         return readManualLog();
     }).then(function(theLog) {
         theLog.messages.push(logEntry);
-        return fsp.writeFile(
-            MANUAL_LOG_FILE, JSON.stringify(theLog), {encoding: ENCODING}
-        );
+        return findManualLogFile().then(function(logFile) {
+            return fsp.writeFile(
+                logFile, JSON.stringify(theLog), {encoding: ENCODING}
+            );
+        });
     }).catch(log);
 }
 
 function logManualSend(form, addresses) {
     log('logManualSend ' + JSON.stringify(form));
-    readManualLog().then(function(data) {
+    return readManualLog().then(function(data) {
         var fromNumber = '';
         var subject = form.environment.subject;
         var message = parseEmail(form.message);
@@ -2053,9 +2098,11 @@ function logManualSend(form, addresses) {
         }
         return data;
     }).then(function(data) {
-        return fsp.writeFile(
-            MANUAL_LOG_FILE, JSON.stringify(data), {encoding: ENCODING}
-        );
+        return findManualLogFile().then(function(logFile) {
+            return fsp.writeFile(
+                logFile, JSON.stringify(data), {encoding: ENCODING}
+            );
+        });
     }).catch(log);
 }
 
@@ -2177,7 +2224,9 @@ function onPostManualEditLog(req, res) {
         }
         const newData = JSON.stringify(data);
         log(`onPostManualEditLog data ${newData}`);
-        return fsp.writeFile(MANUAL_LOG_FILE, newData, {encoding: ENCODING});
+        return findManualLogFile().then(function(logFile) {
+            return fsp.writeFile(logFile, newData, {encoding: ENCODING});
+        });
     }).then(function() {
         if (req.body.printButton) {
             res.redirect(SEE_OTHER, '/manual-log');
@@ -2242,9 +2291,9 @@ function sendManualLog(res, data) {
 }
 
 function readManualLog() {
-    return fsp.readFile(
-        MANUAL_LOG_FILE, {encoding: ENCODING}
-    ).then(function(data) {
+    return findManualLogFile().then(function(logFile) {
+        return fsp.readFile(logFile, {encoding: ENCODING});
+    }).then(function(data) {
         var theLog = JSON.parse(data);
         if (!theLog.messages) {
             theLog.messages = [];
