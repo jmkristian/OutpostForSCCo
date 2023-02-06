@@ -1,0 +1,13 @@
+ICS 309 COMMUNICATIONS LOG
+Task #,{{activationNumber}}
+Prepared Date:,{{datePrepared}}  {{timePrepared}}
+Operational Period:,{{fromDate}} {{fromTime}}  to  {{toDate}} {{toTime}}
+Task Name:,{{incidentName}}
+Radio Operator Name:,{{opName}}
+Station ID:,{{opCall}}
+
+Includes:,"Sent, Received, Private, NTS, Bulletin messages"
+Excludes:,No exclusions
+
+Date/Time,From,To,Msg ID,LMI,Subject
+{{messages}}*** END OF REPORT ***

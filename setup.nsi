@@ -374,6 +374,7 @@ Section "Install"
   # Files to install:
   SetOutPath "$INSTDIR\bin"
   File bin\fsp.js
+  File bin\manual-log.csv
   File bin\message.html
   File bin\Outpost_Forms.js
   File bin\server.ini

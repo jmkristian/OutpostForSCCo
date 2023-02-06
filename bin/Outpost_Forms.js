@@ -903,6 +903,9 @@ function serve() {
     app.get('/manual-log', function(req, res) {
         onGetManualLog(res);
     });
+    app.get('/ICS-309.csv', function(req, res) {
+        onGetManualCSV(res);
+    });
     app.get('/pdf/\*.pdf', express.static('.', {setHeaders: function(res, path, stat) {
         res.set('Content-Type', 'application/pdf');
     }}));
@@ -1954,7 +1957,8 @@ const manualLogFieldNames = [
     'toDate',
     'toTime',
     'netName',
-    'radioOperator',
+    'opName',
+    'opCall',
     'preparedBy',
     'datePrepared',
     'timePrepared',
@@ -1965,6 +1969,7 @@ const manualLogFieldClasses = {
     fromTime: 'time',
     toDate: 'date',
     toTime: 'time',
+    opCall: 'call-sign',
     datePrepared: 'date',
     timePrepared: 'time',
 };
@@ -1974,6 +1979,7 @@ const manualLogMessageFieldNames = [
 ];
 
 const manualLogMessageFieldClasses = {
+    date: 'date',
     time: 'time',
     fromCall: 'call-sign',
     toCall: 'call-sign',
@@ -2013,7 +2019,7 @@ function getMessageNumberFromSubject(subject) {
 
 function trimSubject(fromSubject, msgNo) {
     var subject = fromSubject;
-    const found = new RegExp('^' + enquoteRegex(msgNo || '') + '_').exec(subject);
+    const found = /^[A-Z0-9]{1,3}-\d+[A-Z]?_/i.exec(subject);
     if (found) { // Remove msgNo from subject.
         subject = subject.substring(found[0].length);
     }
@@ -2023,25 +2029,34 @@ function trimSubject(fromSubject, msgNo) {
     return subject;
 }
 
+function dateFromDate(when) {
+    return padStart(when.getMonth() + 1, 2, '0')
+        + '/' + padStart(when.getDate(), 2, '0')
+        + '/' + when.getFullYear();
+}
+
+function timeFromDate(when) {
+    return padStart(when.getHours(), 2, '0')
+        + ':' + padStart(when.getMinutes(), 2, '0');
+}
+
 function logManualView(settings, input) {
-    var logEntry = null;
-    return Promise.resolve().then(function() {
-        log('logManualView ' + JSON.stringify(input));
+    log('logManualView ' + JSON.stringify(input));
+    return readManualLog().then(function(theLog) {
         const message = parseEmail(input.message);
         const fields = message.fields;
-        const subject = input.MSG_SUBJECT || subjectFromEmail(message) || '';
         const fromCall = input.MSG_FROM_LOCAL || fields.OpCall || '';
         const fromNumber = fields.MsgNo || getMessageNumberFromSubject(subject) || '';
-        logEntry = {
-            time: input.OpTime || '',
+        const now = new Date();
+        const logEntry = {
+            date: input.OpDate || dateFromDate(now),
+            time: input.OpTime || timeFromDate(now),
             fromCall: fromCall,
             fromNumber: fromNumber,
             toCall: settings.call,
             toNumber: input.MSG_LOCAL_ID || '',
-            subject: trimSubject(subject, fromNumber),
+            subject: input.MSG_SUBJECT || subjectFromEmail(message) || '',
         };
-        return readManualLog();
-    }).then(function(theLog) {
         theLog.messages.push(logEntry);
         return findManualLogFile().then(function(logFile) {
             return fsp.writeFile(
@@ -2065,20 +2080,18 @@ function logManualSend(form, addresses) {
             fromNumber = getMessageNumberFromSubject(subject);
         }
         for (a in addresses) {
-            var item = {
-                toCall: /^[^@]*/.exec(addresses[a])[0]
-            };
+            var item = {toCall: addresses[a]};
             if (a > 0) {
                 item.time = '"'; // ditto
                 item.fromCall = '"';
                 item.fromNumber = '"';
             } else {
                 var now = new Date();
-                item.time = padStart(now.getHours(), 2, '0')
-                    + ":" + padStart(now.getMinutes(), 2, '0');
+                item.date = dateFromDate(now);
+                item.time = timeFromDate(now);
                 item.fromCall = form.environment.active_call_sign;
                 item.fromNumber = fromNumber;
-                item.subject = trimSubject(subject, fromNumber);
+                item.subject = subject;
             }
             data.messages.push(item);
         }
@@ -2096,8 +2109,6 @@ function logManualSend(form, addresses) {
         } catch(err) {
             log(err);
         }
-        return data;
-    }).then(function(data) {
         return findManualLogFile().then(function(logFile) {
             return fsp.writeFile(
                 logFile, JSON.stringify(data), {encoding: ENCODING}
@@ -2115,9 +2126,8 @@ function onGetManualEditLog(req, res) {
                 if (clazz) {
                     attrs += ` class="${clazz}" placeholder="${clazz}"`;
                 }
-                if (field == 'radioOperator' && !data[field]
-                    && settings.opName && settings.opCall) {
-                    data[field] = `${settings.opName}, ${settings.opCall}`;
+                if (field == 'opName') {
+                    attrs += ' style="width:15em;"';
                 }
                 data[field] = `<input type="text" name="`
                     + encodeHTML(field)
@@ -2125,6 +2135,12 @@ function onGetManualEditLog(req, res) {
                     + encodeHTML(data[field] || '')
                     + `" required/>` ;
             });
+            data.radioOperator =
+                '<table class="same-line-label-layout"><tr>'
+                + `${EOL} <td style="width:1px;">${data.opName}</td>`
+                + `${EOL} <td style="width:1px;padding-left:0px;">,</td>`
+                + `${EOL} <td>${data.opCall}</td>`
+                + `${EOL}</tr></table>`;
             return data;
         });
     }).then(function(data) {
@@ -2170,12 +2186,15 @@ function onGetManualEditLog(req, res) {
             + ' title="Clear all fields and delete all log entries!"'
             + '>Erase All</button>'
             + EOL + '</td><td style="width:1px;">'
+            + EOL + '  <input type="submit" name="csvButton" value="Download CSV File"/>'
+            + EOL + '</td><td style="width:1px;">'
             + EOL + '  <input type="submit" name="printButton" value="Print"/>'
             + EOL + '</td><td style="width:1px;">'
             + EOL + '  <input type="submit" name="saveButton" value="Save"/>'
             + EOL + '</td>';
         return sendManualLog(res, data);
     }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
         res.end(errorToHTML(err), CHARSET);
     });
 }
@@ -2187,6 +2206,9 @@ function onPostManualEditLog(req, res) {
             message[field] = req.body[`${m}.${field}`];
             empty = empty && !(message[field]);
         });
+        if (!message.date && message.time != '"') {
+            message.date = dateFromDate(new Date());
+        }
         return !empty;
     }
     return readManualLog().then(function(data) {
@@ -2230,6 +2252,8 @@ function onPostManualEditLog(req, res) {
     }).then(function() {
         if (req.body.printButton) {
             res.redirect(SEE_OTHER, '/manual-log');
+        } else if (req.body.csvButton) {
+            res.redirect(SEE_OTHER, '/ICS-309.csv');
         } else if (req.body.saveButton) {
             sendWindowClose(res);
         } else {
@@ -2251,17 +2275,25 @@ function onGoBack(req, res) {
 }
 
 function onGetManualLog(res) {
+    const elideCall = /^[^@]*(@[^.]*)?/;
     return readManualLog().then(function(data) {
-        log(`onGetManualLog data ${data}`);
+        log(`onGetManualLog data ${JSON.stringify(data)}`);
+        data.radioOperator = encodeHTML((data.opName || '') + ', ' + (data.opCall || ''));
         manualLogFieldNames.forEach(function(field) {
             data[field] = data[field] ? encodeHTML(data[field]) : '&nbsp;';
         });
         var messageRows = '';
         data.messages.forEach(function(message) {
             var firstRow = !messageRows;
+            message.fromCall = elideCall.exec(message.fromCall)[0];
+            message.toCall = elideCall.exec(message.toCall)[0];
+            message.subject = trimSubject(message.subject),
             messageRows += `</tr><tr class="message-data">${EOL}`;
             manualLogMessageFieldNames.forEach(function(field) {
-                var attrs = (field == 'subject') ? ' colspan="3"' : '';
+                var attrs = '';
+                if (field == 'subject') {
+                    attrs += ' colspan="3"';
+                }
                 var width = manualLogMessageFieldWidths[field];
                 if (width && firstRow) {
                     attrs += ` style="width:${width};"`;
@@ -2276,13 +2308,54 @@ function onGetManualLog(res) {
         data.submitButtons = '';
         return sendManualLog(res, data);
     }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
         res.end(errorToHTML(err), CHARSET);
     });
 }
 
+function onGetManualCSV(res) {
+    return readManualLog().then(function(data) {
+        log(`onGetManualLog data ${data}`);
+        manualLogFieldNames.forEach(function(field) {
+            data[field] = enquoteCSV(data[field]);
+        });
+        var messageRows = '';
+        data.messages.forEach(function(message) {
+            message.time = (message.date || '') + ' ' + message.time;
+            manualLogMessageFieldNames.forEach(function(field) {
+                message[field] = enquoteCSV(message[field]);
+            });
+            messageRows += message.time
+                + ',' + message.fromCall
+                + ',' + message.toCall
+                + ',' + message.fromNumber
+                + ',' + message.toNumber
+                + ',' + message.subject + EOL;
+        });
+        data.messages = messageRows;
+        return fsp.readFile(
+            path.join('bin', 'manual-log.csv'), {encoding: ENCODING}
+        ).then(function(template) {
+            const csv = expandVariables(template, data);
+            res.set({'Content-Type': TEXT_PLAIN});
+            res.end(csv, CHARSET);
+        });
+    }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err), CHARSET);
+    });
+}
+
+function enquoteCSV(value) {
+    if (value && value.match(/[,"]/)) {
+        return '"' + value.replace(/"/g, '""') + '"';
+    } else {
+        return value || '';
+    }
+}
+
 function sendManualLog(res, data) {
     res.set({'Content-Type': TEXT_HTML});
-    var template = null;
     return fsp.readFile(
         path.join('bin', 'manual-log.html'), {encoding: ENCODING}
     ).then(function(template) {
@@ -2595,7 +2668,7 @@ function errorToHTML(err, state) {
 
 function deleteOldFiles(directoryName, fileNamePattern, ageLimitMs) {
     return fsp.readdir(directoryName).then(function(fileNames) {
-        const deadline = (new Date).getTime() - ageLimitMs;
+        const deadline = (new Date()).getTime() - ageLimitMs;
         return Promise.all(
             fileNames.filter(function(fileName) {
                 return fileNamePattern.test(fileName);
