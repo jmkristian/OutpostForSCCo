@@ -1879,7 +1879,7 @@ function onManualView(req, res) {
                     input.MSG_FROM_FQDN = from.substring(atSign + 1);
                 }
             }
-            // MSG_DATETIME_HEADER and MSG_DATETIME_OP_SENT could be copied from parsed.headers.
+            // MSG_DATETIME_HEADER could be copied from parsed.headers.date.
             // But it's unnecessary.
         }
         logManualView(settings, input); // asynchronously
@@ -2047,6 +2047,7 @@ function logManualView(settings, input) {
     log('logManualView ' + JSON.stringify(input));
     return readManualLog().then(function(theLog) {
         const message = parseEmail(input.message);
+        const subject = input.subject || subjectFromEmail(message) || '';
         const fields = message.fields;
         const fromCall = input.MSG_FROM_LOCAL || fields.OpCall || '';
         const fromNumber = fields.MsgNo || getMessageNumberFromSubject(subject) || '';
@@ -2058,7 +2059,7 @@ function logManualView(settings, input) {
             fromNumber: fromNumber,
             toCall: settings.call,
             toNumber: input.MSG_LOCAL_ID || '',
-            subject: input.MSG_SUBJECT || subjectFromEmail(message) || '',
+            subject: trimSubject(subject, fromNumber),
         };
         theLog.messages.push(logEntry);
         return findManualLogFile().then(function(logFile) {
