@@ -1852,7 +1852,9 @@ function onManualView(req, res) {
     const formId = '' + nextFormId++;
     return getManualSettings().then(function(settings) {
         const input = {
-            MSG_LOCAL_ID: nextManualMessageNumber(settings)
+            MSG_LOCAL_ID: nextManualMessageNumber(settings),
+            operator_name: settings.opName,
+            operator_call_sign: settings.opCall,
         };
         for (var name in req.body) {
             input[name] = req.body[name];
@@ -1862,14 +1864,13 @@ function onManualView(req, res) {
         }
         const parsed = (input.message == null) ? null : parseEmail(input.message);
         if (parsed) {
-            input.MSG_SUBJECT = parsed.headers.subject;
+            input.subject = parsed.headers.subject;
             var from = parsed.headers.from;
             if (from) {
                 var found = /<([^>]*)>/.exec(from);
                 if (found) {
                     from = found[1];
                 }
-                input.MSG_FROM_HEADER = from;
                 var atSign = from.indexOf('@');
                 if (atSign < 0) {
                     input.MSG_FROM_LOCAL = from;
@@ -1878,6 +1879,8 @@ function onManualView(req, res) {
                     input.MSG_FROM_FQDN = from.substring(atSign + 1);
                 }
             }
+            // MSG_DATETIME_HEADER and MSG_DATETIME_OP_SENT could be copied from parsed.headers.
+            // But it's unnecessary.
         }
         logManualView(settings, input); // asynchronously
         if (messageContainsAForm(parsed, input)) {
