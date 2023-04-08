@@ -123,6 +123,7 @@ const FORBIDDEN = 403;
 const NOT_FOUND = 404;
 
 const CHARSET = 'utf-8'; // for HTTP
+const ElideCallSign = /^[^@]*(@[^.]*)?/;
 const ENCODING = CHARSET; // for files
 const EOL = '\r\n';
 const htmlEntities = new AllHtmlEntities();
@@ -2029,6 +2030,7 @@ function trimSubject(fromSubject, msgNo) {
     if (subject.length > 40) {
         subject = subject.substring(0, 37) + '...';
     }
+    // log(`trimSubject(${fromSubject}, ${msgNo}) = ${subject}`);
     return subject;
 }
 
@@ -2043,6 +2045,10 @@ function timeFromDate(when) {
         + ':' + padStart(when.getMinutes(), 2, '0');
 }
 
+function elideCallSign(c) {
+    return ElideCallSign.exec(c)[0] || c;
+}
+
 function logManualView(settings, input) {
     log('logManualView ' + JSON.stringify(input));
     return readManualLog().then(function(theLog) {
@@ -2055,9 +2061,9 @@ function logManualView(settings, input) {
         const logEntry = {
             date: input.OpDate || dateFromDate(now),
             time: input.OpTime || timeFromDate(now),
-            fromCall: fromCall,
+            fromCall: elideCallSign(fromCall),
             fromNumber: fromNumber,
-            toCall: settings.call,
+            toCall: elideCallSign(settings.call),
             toNumber: input.MSG_LOCAL_ID || '',
             subject: trimSubject(subject, fromNumber),
         };
@@ -2071,7 +2077,7 @@ function logManualView(settings, input) {
 }
 
 function logManualSend(form, addresses) {
-    log('logManualSend ' + JSON.stringify(form));
+    log('logManualSend(' + JSON.stringify(form) + ', ' + JSON.stringify(addresses) + ')');
     return readManualLog().then(function(data) {
         var fromNumber = '';
         var subject = form.environment.subject;
@@ -2093,9 +2099,9 @@ function logManualSend(form, addresses) {
                 var now = new Date();
                 item.date = dateFromDate(now);
                 item.time = timeFromDate(now);
-                item.fromCall = form.environment.active_call_sign;
+                item.fromCall = elideCallSign(form.environment.active_call_sign);
                 item.fromNumber = fromNumber;
-                item.subject = subject;
+                item.subject = trimSubject(subject, fromNumber);
             }
             data.messages.push(item);
         }
@@ -2279,7 +2285,6 @@ function onGoBack(req, res) {
 }
 
 function onGetManualLog(res) {
-    const elideCall = /^[^@]*(@[^.]*)?/;
     return readManualLog().then(function(data) {
         log(`onGetManualLog data ${JSON.stringify(data)}`);
         data.radioOperator = encodeHTML((data.opName || '') + ', ' + (data.opCall || ''));
@@ -2289,9 +2294,6 @@ function onGetManualLog(res) {
         var messageRows = '';
         data.messages.forEach(function(message) {
             var firstRow = !messageRows;
-            message.fromCall = elideCall.exec(message.fromCall)[0];
-            message.toCall = elideCall.exec(message.toCall)[0];
-            message.subject = trimSubject(message.subject),
             messageRows += `</tr><tr class="message-data">${EOL}`;
             manualLogMessageFieldNames.forEach(function(field) {
                 var attrs = '';
