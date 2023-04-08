@@ -123,7 +123,7 @@ const FORBIDDEN = 403;
 const NOT_FOUND = 404;
 
 const CHARSET = 'utf-8'; // for HTTP
-const ElideCallSign = /^[^@]*(@[^.]*)?/;
+const TrimAddress = /^[^@]*(@[^.]*)?/;
 const ENCODING = CHARSET; // for files
 const EOL = '\r\n';
 const htmlEntities = new AllHtmlEntities();
@@ -2045,8 +2045,17 @@ function timeFromDate(when) {
         + ':' + padStart(when.getMinutes(), 2, '0');
 }
 
-function elideCallSign(c) {
-    return ElideCallSign.exec(c)[0] || c;
+function trimAddress(c) {
+    const found = TrimAddress.exec(c);
+    return found ? found[0].trim() : c;
+}
+
+function firstAddress(x) {
+    if (!x) return x;
+    const found = x.split(/[,;]/)
+          .map(function(y) {return y.trim();})
+          .filter(function(y) {return !!y;});
+    return (found.length > 0) ? found[0] : '';
 }
 
 function logManualView(settings, input) {
@@ -2055,15 +2064,16 @@ function logManualView(settings, input) {
         const message = parseEmail(input.message);
         const subject = input.subject || subjectFromEmail(message) || '';
         const fields = message.fields;
-        const fromCall = input.MSG_FROM_LOCAL || fields.OpCall || '';
+        const fromCall = fields.OpCall || trimAddress(message.headers.from) || '';
         const fromNumber = fields.MsgNo || getMessageNumberFromSubject(subject) || '';
+        const toCall = settings.call || trimAddress(firstAddress(message.headers.to)) || '';
         const now = new Date();
         const logEntry = {
             date: input.OpDate || dateFromDate(now),
             time: input.OpTime || timeFromDate(now),
-            fromCall: elideCallSign(fromCall),
+            fromCall: fromCall,
             fromNumber: fromNumber,
-            toCall: elideCallSign(settings.call),
+            toCall: toCall,
             toNumber: input.MSG_LOCAL_ID || '',
             subject: trimSubject(subject, fromNumber),
         };
@@ -2079,18 +2089,11 @@ function logManualView(settings, input) {
 function logManualSend(form, addresses) {
     log('logManualSend(' + JSON.stringify(form) + ', ' + JSON.stringify(addresses) + ')');
     return readManualLog().then(function(data) {
-        var fromNumber = '';
-        var subject = form.environment.subject;
-        var message = parseEmail(form.message);
-        fromNumber = message.fields.MsgNo;
-        if (!subject) {
-            subject = subjectFromEmail(message);
-        }
-        if (!fromNumber) {
-            fromNumber = getMessageNumberFromSubject(subject);
-        }
+        const message = parseEmail(form.message);
+        const subject = form.environment.subject || subjectFromEmail(message);
+        const fromNumber = message.fields.MsgNo || getMessageNumberFromSubject(subject);
         for (a in addresses) {
-            var item = {toCall: addresses[a]};
+            var item = {toCall: trimAddress(addresses[a])};
             if (a > 0) {
                 item.time = '"'; // ditto
                 item.fromCall = '"';
@@ -2099,7 +2102,7 @@ function logManualSend(form, addresses) {
                 var now = new Date();
                 item.date = dateFromDate(now);
                 item.time = timeFromDate(now);
-                item.fromCall = elideCallSign(form.environment.active_call_sign);
+                item.fromCall = form.environment.active_call_sign;
                 item.fromNumber = fromNumber;
                 item.subject = trimSubject(subject, fromNumber);
             }
