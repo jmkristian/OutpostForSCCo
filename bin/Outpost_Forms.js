@@ -2384,7 +2384,7 @@ function readManualLog() {
     }, function readFailed(err) {
         log(err);
         return {messages: []};
-    }); 
+    });
 }
 
 function onPostManualCommand(formId, req, res) {
