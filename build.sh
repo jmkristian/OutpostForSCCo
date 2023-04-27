@@ -1,8 +1,8 @@
 #!/bin/bash
 # This script can be executed by the bash that's packaged with git for Windows.
 cd `dirname "$0"` || exit $?
-export VersionMajor=3
-export VersionMinor=10
+export VersionMajor=0
+export VersionMinor=1
 export VersionBeta=
 rm -rf built logs
 mkdir -p built/bin built/webToPDF
