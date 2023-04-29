@@ -64,6 +64,7 @@ const fsp = require('./fsp.js');
 const http = require('http');
 const makeTemp = require('tmp');
 const morgan = require('morgan');
+const mustache = require('mustache');
 const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
@@ -76,6 +77,8 @@ const expandVariables = utilities.expandVariables;
 const expandVariablesInFile = utilities.expandVariablesInFile;
 const log = utilities.log;
 const toLogMessage = utilities.toLogMessage;
+
+mustache.tags = ['<%', '%>'];
 
 function promiseSpawn(exe, args, options) {
     return new Promise(function spawnChild(resolve, reject) {
@@ -937,7 +940,7 @@ function serve() {
         PortFileName, myServerPort + '', {encoding: ENCODING}
     ).catch(log);
     const deleteMySaveFiles = function deleteMySaveFiles() {
-        deleteOldFiles(SAVE_FOLDER, new RegExp('^form-' + myServerPort + '-\\d*.json$'), -seconds);
+        deleteOldFiles(SAVE_FOLDER, new RegExp('^form-' + myServerPort + '-\\d+.json$'), -seconds);
     };
     var idleTime = 0;
     const checkInterval = 5 * seconds;
@@ -991,7 +994,7 @@ function serve() {
             log(err);
         }
     }, checkInterval);
-    deleteOldFiles(SAVE_FOLDER, /^[^\.].*$/, 60 * seconds);
+    deleteOldFiles(SAVE_FOLDER, /^form-\d+-\d+\.json$/, 60 * seconds);
 }
 
 function onOpen(formId, args) {
@@ -1212,6 +1215,79 @@ function loadForm(formId, form) {
     });
 }
 
+const saveReport911 = path.join(SAVE_FOLDER, 'form-report-911.json');
+
+function readJSON(fileName, defaultValue) {
+    return fsp.readFile(
+        fileName, ENCODING
+    ).then(function OK(json) {
+        return JSON.parse(json);
+    }).catch(function failed(err) {
+        if (defaultValue) {
+            log(err);
+            return defaultValue;
+        } else {
+            throw err;
+        }
+    });
+}
+
+function saveSubmitted(form, parsedMessage) {
+//log('saveSubmitted ' + form.environment.ADDON_MSG_TYPE);
+    if (form.environment.ADDON_MSG_TYPE == 'form-report-911.html') {
+        const newValue = parsedMessage.fields['1b.'];
+//log('saveSubmitted 1b. ' + newValue);
+        if (newValue) {
+            // Update the saved data, asynchronously:
+            readJSON(saveReport911, {}).then(function(data) {
+                const recent = JSON.parse(data.recentReportingLocations || '[]')
+                      .filter(function(oldValue) {return oldValue != newValue;});
+                recent.unshift(newValue);
+                if (recent.length > 3) recent.length = 3;
+                data.recentReportingLocations = JSON.stringify(recent);
+                return JSON.stringify(data);
+            }).then(function(newData) {
+//log('saveSubmitted newData ' + newData);
+                fsp.writeFile(saveReport911, newData, {encoding: ENCODING});
+            }).catch(log);
+//        } else {
+//log('saveSubmitted parsedMessage ' + JSON.stringify(parsedMessage));
+        }
+    }
+}
+
+function getHTML(form, formType) {
+    const readHTML = fsp.readFile(
+        path.join(PackItForms, formType), ENCODING
+    ).then(function OK(html) {
+        return html;
+    }, function failed(err) {
+        throw "I don't know about a form named "
+            + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
+            + " Perhaps the message came from a newer version of the "
+            + form.environment.addon_name + " add-on, "
+            + 'so it might help to install the latest version.'
+            + '\n\n' + err;
+    });
+    var template = '';
+    if (formType == 'form-report-911.html') {
+//log('911');
+        return Promise.all([
+            readHTML,
+            readJSON(saveReport911, {
+                recentReportingLocations: JSON.stringify([]),
+            }),
+        ]).then(function(results) {
+            const template = results[0];
+            const data = results[1];
+//log('911 data ' + JSON.stringify(data));
+            return mustache.render(template, data);
+        });
+    } else {
+        return readHTML;
+    }
+}
+
 function getForm(form, res) {
     log('getForm ' + JSON.stringify(form.environment));
     if (!form.environment.addon_name) {
@@ -1234,9 +1310,7 @@ function getForm(form, res) {
             formType = readOnlyFileName;
         }
     }
-    return fsp.readFile(
-        path.join(PackItForms, formType), ENCODING
-    ).then(function(data) {
+    return getHTML(form, formType).then(function(data) {
         const template = data.replace(
             /<\s*script\b[^>]*\bsrc\s*=\s*"resources\/integration\/integration.js"/,
             '<script type="text/javascript">'
@@ -1248,13 +1322,6 @@ function getForm(form, res) {
         // So changes would be ignored by the browser, for example
         // the change to message_status after emailing a message.
         return expandDataIncludes(template, form);
-    }, function readFileFailed(err) {
-        throw "I don't know about a form named "
-            + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
-            + " Perhaps the message came from a newer version of the "
-            + form.environment.addon_name + " add-on, "
-            + 'so it might help to install the latest version.'
-            + '\n\n' + err;
     }).then(function(html) {
         if (form.environment.emailing) {
             form.environment.message_status = 'sent';
@@ -1384,8 +1451,10 @@ function onEmail(formId, reqBody, res) {
         form = foundForm;
         form.message = message;
         form.environment.emailing = true;
+        const parsed = parseMessage(message, form.environment);
         form.environment.subject =
-            reqBody.subject || subjectFromMessage(parseMessage(message, form.environment));
+            reqBody.subject || subjectFromMessage(parsed);
+        saveSubmitted(form, parsed);
         form.environment.mode = 'readonly';
         res.redirect('/form-' + formId);
     }).catch(function(err) {
@@ -1405,8 +1474,9 @@ function toEOL(from) {
 function saveForm(form, req) {
     const reqBody = req.body;
     const message = reqBody.formtext;
-    form.environment.subject = reqBody.subject
-        || subjectFromMessage(parseMessage(message, form.environment));
+    const parsed = parseMessage(message, form.environment);
+    form.environment.subject = reqBody.subject || subjectFromMessage(parsed);
+    saveSubmitted(form, parsed);
     // Outpost requires Windows-style line breaks:
     form.message = toEOL(message);
     log(`saveForm ${form.message.length}`);
