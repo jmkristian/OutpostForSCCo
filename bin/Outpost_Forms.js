@@ -1883,7 +1883,7 @@ function onManualView(req, res) {
             // MSG_DATETIME_HEADER could be copied from parsed.headers.date.
             // But it's unnecessary.
         }
-        logManualView(settings, input); // asynchronously
+        logManualView(settings, input, parsed); // asynchronously
         if (messageContainsAForm(parsed, input)) {
             if (input.addon_name) {
                 // Perhaps there's extra text at the beginning of the message,
@@ -2046,6 +2046,7 @@ function timeFromDate(when) {
 }
 
 function trimAddress(c) {
+    if (c == null) return c;
     const found = TrimAddress.exec(c);
     return found ? found[0].trim() : c;
 }
@@ -2058,22 +2059,19 @@ function firstAddress(x) {
     return (found.length > 0) ? found[0] : '';
 }
 
-function logManualView(settings, input) {
-    log('logManualView ' + JSON.stringify(input));
+function logManualView(settings, input, message) {
+    log('logManualView ' + JSON.stringify(message));
     return readManualLog().then(function(theLog) {
-        const message = parseEmail(input.message);
         const subject = input.subject || subjectFromEmail(message) || '';
         const fields = message.fields;
-        const fromCall = fields.OpCall || trimAddress(message.headers.from) || '';
         const fromNumber = fields.MsgNo || getMessageNumberFromSubject(subject) || '';
-        const toCall = settings.call || trimAddress(firstAddress(message.headers.to)) || '';
         const now = new Date();
         const logEntry = {
             date: input.OpDate || dateFromDate(now),
             time: input.OpTime || timeFromDate(now),
-            fromCall: fromCall,
+            fromCall: trimAddress(message.headers.from) || fields.OpCall || '',
             fromNumber: fromNumber,
-            toCall: toCall,
+            toCall: settings.call || trimAddress(firstAddress(message.headers.to)) || '',
             toNumber: input.MSG_LOCAL_ID || '',
             subject: trimSubject(subject, fromNumber),
         };
@@ -2555,6 +2553,7 @@ function parseEmail(message) {
         }
         return true; // continue parsing
     });
+    // log('parseEmail(' + JSON.stringify(message) + ') = ' + JSON.stringify(result));
     return result;
 }
 
