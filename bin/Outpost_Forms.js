@@ -1215,8 +1215,6 @@ function loadForm(formId, form) {
     });
 }
 
-const saveReport911 = path.join(SAVE_FOLDER, 'form-report-911.json');
-
 function readJSON(fileName, defaultValue) {
     return fsp.readFile(
         fileName, ENCODING
@@ -1232,27 +1230,68 @@ function readJSON(fileName, defaultValue) {
     });
 }
 
-function saveSubmitted(form, parsedMessage) {
-//log('saveSubmitted ' + form.environment.ADDON_MSG_TYPE);
-    if (form.environment.ADDON_MSG_TYPE == 'form-report-911.html') {
-        const newValue = parsedMessage.fields['1b.'];
-//log('saveSubmitted 1b. ' + newValue);
-        if (newValue) {
-            // Update the saved data, asynchronously:
-            readJSON(saveReport911, {}).then(function(data) {
-                const recent = JSON.parse(data.recentReportingLocations || '[]')
-                      .filter(function(oldValue) {return oldValue != newValue;});
-                recent.unshift(newValue);
-                if (recent.length > 3) recent.length = 3;
-                data.recentReportingLocations = JSON.stringify(recent);
-                return JSON.stringify(data);
-            }).then(function(newData) {
-//log('saveSubmitted newData ' + newData);
-                fsp.writeFile(saveReport911, newData, {encoding: ENCODING});
-            }).catch(log);
-//        } else {
-//log('saveSubmitted parsedMessage ' + JSON.stringify(parsedMessage));
-        }
+/** A description of data that are stored in files for future use. */
+const savedData = {
+    'form-report-911.html': [ // data submitted from this form
+        {
+            fieldName: '33.',
+            savedName: 'recentReportingLocations',
+            recent: 8,
+        },
+        {
+            fieldName: '34.',
+            savedName: 'recentReportTakers',
+            recent: 8,
+        },
+    ],
+};
+
+function savedDataFileName(formType) {
+    return path.join(SAVE_FOLDER, formType.replace(/\.html$/, '.json'));
+}
+
+function readSavedData(formType, save) {
+    return readJSON(
+        savedDataFileName(formType), {}
+    ).then(function(data) {
+        save.forEach(function(spec) {
+            if (spec.recent) {
+                // This item should be an array of the most recently used values.
+                if (data[spec.savedName] == null) {
+                    data[spec.savedName] = [];
+                } else if ((typeof data[spec.savedName]) == 'string') {
+                    // Previous versions of this code stored stringified arrays.
+                    data[spec.savedName] = JSON.parse(data[spec.savedName]);
+                }
+            }
+        });
+        return data;
+    });
+}
+
+function saveSubmitted(formType, parsedMessage) {
+    const save = savedData[formType];
+    if (save) {
+        // log('saveSubmitted ' + formType);
+        // Update the saved data, asynchronously:
+        readSavedData(formType, save).then(function(data) {
+            save.forEach(function(spec) {
+                const newValue = parsedMessage.fields[spec.fieldName];
+                //log('saveSubmitted ' + spec.fieldName + ' ' + newValue);
+                if (newValue) {
+                    var recent = data[spec.savedName].filter(function(oldValue) {
+                        return oldValue != newValue;
+                    });
+                    recent.unshift(newValue);
+                    if (recent.length > spec.recent) recent.length = spec.recent;
+                    data[spec.savedName] = recent;
+                }
+            });
+            return JSON.stringify(data);
+        }).then(function(newData) {
+            //log('saveSubmitted newData ' + newData);
+            fsp.writeFile(savedDataFileName(formType), newData, {encoding: ENCODING});
+        }).catch(log);
     }
 }
 
@@ -1268,24 +1307,23 @@ function getHTML(form, formType) {
             + form.environment.addon_name + " add-on, "
             + 'so it might help to install the latest version.'
             + '\n\n' + err;
-    });
-    var template = '';
-    if (formType == 'form-report-911.html') {
-//log('911');
-        return Promise.all([
-            readHTML,
-            readJSON(saveReport911, {
-                recentReportingLocations: JSON.stringify([]),
-            }),
-        ]).then(function(results) {
-            const template = results[0];
-            const data = results[1];
-//log('911 data ' + JSON.stringify(data));
-            return mustache.render(template, data);
-        });
-    } else {
+    }); 
+    const saved = savedData[formType];
+    if (!saved) {
         return readHTML;
     }
+    return Promise.all([
+        readHTML,
+        readSavedData(formType, saved),
+    ]).then(function(results) {
+        const template = results[0];
+        const data = results[1];
+        //log('saved data ' + JSON.stringify(data));
+        for (key in data) {
+            data[key] = JSON.stringify(data[key]);
+        }
+        return mustache.render(template, data);
+    });
 }
 
 function getForm(form, res) {
@@ -1454,7 +1492,7 @@ function onEmail(formId, reqBody, res) {
         const parsed = parseMessage(message, form.environment);
         form.environment.subject =
             reqBody.subject || subjectFromMessage(parsed);
-        saveSubmitted(form, parsed);
+        saveSubmitted(form.environment.ADDON_MSG_TYPE, parsed);
         form.environment.mode = 'readonly';
         res.redirect('/form-' + formId);
     }).catch(function(err) {
@@ -1476,7 +1514,7 @@ function saveForm(form, req) {
     const message = reqBody.formtext;
     const parsed = parseMessage(message, form.environment);
     form.environment.subject = reqBody.subject || subjectFromMessage(parsed);
-    saveSubmitted(form, parsed);
+    saveSubmitted(form.environment.ADDON_MSG_TYPE, parsed);
     // Outpost requires Windows-style line breaks:
     form.message = toEOL(message);
     log(`saveForm ${form.message.length}`);
