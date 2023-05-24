@@ -48,7 +48,7 @@ Promise.all(
         ['manual.html', 'manual-setup.html', 'manual-log.html'
         ].map(function(fileName) {
             return buildFile(
-                {addon_version: addonVersion, addon_name: addonName},
+                {addon_version: addonVersion, addon_name: addonName, DisplayName: displayName},
                 path.join('bin', fileName));
         })
     ).concat(
