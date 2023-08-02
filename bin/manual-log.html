@@ -61,6 +61,12 @@
       form tr.message-edit button {
           display: inline-block;
       }
+      @font-face {
+          font-family: 'Pacifico';
+          font-style: normal;
+          font-weight: normal;
+          src: url('/bin/pacifico-webfont.ttf') format('truetype');
+      }
     </style>
     <title>ICS-309</title>
     <script type="text/javascript">
@@ -226,7 +232,10 @@
             <div class="caption">6. Prepared By (Name, Call Sign)</div>
             {{preparedBy}}
           </td>
-          <td colspan="2" class="caption" style="border-right:2px solid;">6A. Signature</td>
+          <td colspan="2" style="border-right:2px solid;">
+            <div class="caption" style="padding-bottom:0px;">6A. Signature</div>
+            {{signature}}
+          </td>
           <td colspan="3">
             <div class="caption">7. Date &amp; Time Prepared</div>
             {{datePrepared}}&nbsp;&nbsp;{{timePrepared}}

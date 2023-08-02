@@ -380,6 +380,7 @@ Section "Install"
   File bin\server.ini
   File bin\subject.cmd
   File bin\utilities.js
+  File bin\*.ttf
   File /r built\bin\*.*
   ${IfNot} ${IsWinXP}
      File /r built\webToPDF\*.*

@@ -902,13 +902,16 @@ function serve() {
         onGoBack(req, res);
     });
     app.get('/manual-log', function(req, res) {
-        onGetManualLog(res);
+        onGetManualLog(req, res);
     });
     app.get('/ICS-309.csv', function(req, res) {
         onGetManualCSV(res);
     });
     app.get('/pdf/\*.pdf', express.static('.', {setHeaders: function(res, path, stat) {
         res.set('Content-Type', 'application/pdf');
+    }}));
+    app.get('/bin/\*.ttf', express.static('.', {setHeaders: function(res, path, stat) {
+        res.set('Content-Type', 'font/ttf');
     }}));
     app.get(/^\/.*/, express.static(PackItForms, {setHeaders: function(res, path, stat) {
         if (path) {
@@ -1963,7 +1966,8 @@ const manualLogFieldNames = [
     'netName',
     'opName',
     'opCall',
-    'preparedBy',
+    'preparerName',
+    'preparerCall',
     'datePrepared',
     'timePrepared',
 ];
@@ -1974,6 +1978,7 @@ const manualLogFieldClasses = {
     toDate: 'date',
     toTime: 'time',
     opCall: 'call-sign',
+    preparerCall: 'call-sign',
     datePrepared: 'date',
     timePrepared: 'time',
 };
@@ -2138,7 +2143,10 @@ function onGetManualEditLog(req, res) {
                     attrs += ` class="${clazz}" placeholder="${clazz}"`;
                 }
                 if (field == 'opName') {
-                    attrs += ' style="width:15em;"';
+                    attrs += ' style="width:15em;" placeholder="name"';
+                }
+                if (field == 'preparerName') {
+                    attrs += ' style="width:10em;" placeholder="name"';
                 }
                 data[field] = `<input type="text" name="`
                     + encodeHTML(field)
@@ -2152,6 +2160,15 @@ function onGetManualEditLog(req, res) {
                 + `${EOL} <td style="width:1px;padding-left:0px;">,</td>`
                 + `${EOL} <td>${data.opCall}</td>`
                 + `${EOL}</tr></table>`;
+            data.preparedBy =
+                '<table class="same-line-label-layout"><tr>'
+                + `${EOL} <td style="width:1px;">${data.preparerName}</td>`
+                + `${EOL} <td style="width:1px;padding-left:0px;">,</td>`
+                + `${EOL} <td>${data.preparerCall}</td>`
+                + `${EOL}</tr></table>`;
+            data.signature = '<div style="padding-top:0.5em;"><label style="font-weight:normal;">'
+                + '<input type="checkbox" name="withSignature" value="true"/>'
+                + 'print signature</label></div>';
             return data;
         });
     }).then(function(data) {
@@ -2262,7 +2279,7 @@ function onPostManualEditLog(req, res) {
         });
     }).then(function() {
         if (req.body.printButton) {
-            res.redirect(SEE_OTHER, '/manual-log');
+            res.redirect(SEE_OTHER, '/manual-log' + (req.body.withSignature ? '?withSignature=true' : ''));
         } else if (req.body.csvButton) {
             res.redirect(SEE_OTHER, '/ICS-309.csv');
         } else if (req.body.saveButton) {
@@ -2285,10 +2302,16 @@ function onGoBack(req, res) {
             CHARSET);
 }
 
-function onGetManualLog(res) {
+function onGetManualLog(req, res) {
     return readManualLog().then(function(data) {
         log(`onGetManualLog data ${JSON.stringify(data)}`);
         data.radioOperator = encodeHTML((data.opName || '') + ', ' + (data.opCall || ''));
+        data.preparedBy = encodeHTML((data.preparerName || '') + ', ' + (data.preparerCall || ''));
+        data.signature = (req.query.withSignature && data.preparerName)
+            ? (`<div style="font-family:'Pacifico','Brush Script MT',cursive;padding-top:0.25em;">`
+               + encodeHTML(data.preparerName || '')
+               + '</div>')
+            : '';
         manualLogFieldNames.forEach(function(field) {
             data[field] = data[field] ? encodeHTML(data[field]) : '&nbsp;';
         });
@@ -2322,7 +2345,7 @@ function onGetManualLog(res) {
 
 function onGetManualCSV(res) {
     return readManualLog().then(function(data) {
-        log(`onGetManualLog data ${data}`);
+        log(`onGetManualCSV data ${data}`);
         manualLogFieldNames.forEach(function(field) {
             data[field] = enquoteCSV(data[field]);
         });
