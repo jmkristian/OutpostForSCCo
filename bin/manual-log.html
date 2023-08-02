@@ -61,11 +61,14 @@
       form tr.message-edit button {
           display: inline-block;
       }
+      /* EOT fonts are used by Internet Explorer. Other browsers use TTF fonts. */
       @font-face {
-          font-family: 'Pacifico';
-          font-style: normal;
+          font-family: 'Pacifico'; /* https://www.fontsquirrel.com/fonts/pacifico */
+          src: url('/bin/pacifico-webfont.eot');
+          src: url('/bin/pacifico-webfont.eot?#iefix') format('embedded-opentype'),
+               url('/bin/pacifico-webfont.ttf') format('truetype');
           font-weight: normal;
-          src: url('/bin/pacifico-webfont.ttf') format('truetype');
+          font-style: normal;
       }
     </style>
     <title>ICS-309</title>

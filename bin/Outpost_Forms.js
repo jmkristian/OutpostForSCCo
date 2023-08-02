@@ -910,6 +910,9 @@ function serve() {
     app.get('/pdf/\*.pdf', express.static('.', {setHeaders: function(res, path, stat) {
         res.set('Content-Type', 'application/pdf');
     }}));
+    app.get('/bin/\*.eot', express.static('.', {setHeaders: function(res, path, stat) {
+        res.set('Content-Type', 'application/vnd.ms-fontobject');
+    }}));
     app.get('/bin/\*.ttf', express.static('.', {setHeaders: function(res, path, stat) {
         res.set('Content-Type', 'font/ttf');
     }}));
