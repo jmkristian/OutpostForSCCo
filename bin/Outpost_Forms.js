@@ -2221,8 +2221,9 @@ function onGetManualEditLog(req, res) {
             + EOL + '</td><td style="width:1px;">'
             + EOL + '  <input type="submit" name="printButton" value="Print"/>'
             + EOL + '</td><td style="width:1px;">'
-            + EOL + '  <input type="submit" name="saveButton" value="Save"/>'
-            + EOL + '</td>';
+            + EOL + '  <button onclick="save()">Save</button>'
+            + EOL + '</td>'
+            + EOL + '<input type="text" name="saveButton" id="saveButton" style="display:none;"/>';
         return sendManualLog(res, data);
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
