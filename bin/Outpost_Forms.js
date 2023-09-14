@@ -256,7 +256,64 @@ function install() {
             fsp.checkFolder(SAVE_FOLDER),
             fsp.checkFolder(LOG_FOLDER)
         ]);
-    });
+    }).then(uninstallCoverSheet);
+}
+
+/** Uninstall the deprecated 'Cover_Sheet' form. Don't propagate any exceptions. */
+function uninstallCoverSheet() {
+    /* There my be several copies of the form installed in different folders.
+       And each copy of the form may be configured into several copies of Outpost.
+       Most commonly, the form isn't installed anywhere, or one copy of the form
+       is configured into one copy of Outpost.
+     */
+    try {
+        const outpostFolders = argvSlice(4); // where Outpost is installed
+        log('uninstall Cover_Sheet from ' + outpostFolders.join(', '));
+        const pattern = /^\s*INCLUDE\s+(.*)\\addons\\Cover_Sheet.launch$/;
+        var formFolders = []; // where the form is installed
+        return Promise.all(outpostFolders.map(function(outpostFolder) {
+            const launchLocal = path.join(outpostFolder, 'Launch.local');
+            return fsp.readFile(
+                launchLocal, ENCODING
+            ).then(function(data) {
+                const lines = data.split(/[\r\n]+/);
+                // log('find Cover_Sheet in ' + JSON.stringify(lines));
+                var change = false;
+                var newData = [];
+                lines.forEach(function(line) {
+                    const found = line.match(pattern);
+                    if (found) {
+                        formFolders.push(found[1]);
+                        change = true;
+                    } else {
+                        newData.push(line); // no change
+                    }
+                });
+                if (change) {
+                    return fsp.writeFile(
+                        launchLocal, newData.join(EOL), {encoding: ENCODING}
+                    );
+                }
+            }).catch(log);
+        })).then(function() {
+            if (formFolders.length > 0) {
+                // Remove duplicates:
+                formFolders = formFolders.filter(function(item, index) {
+                    return formFolders.indexOf(item) == index;
+                });
+                log('uninstall ' + formFolders.join(', '));
+                return Promise.all(formFolders.map(function(folder) {
+                    return promiseSpawn(
+                        path.join(folder, 'uninstall.exe'),
+                        ['/S'], // silently
+                        {stdio: ['ignore', 'pipe', 'pipe']}
+                    ).catch(log);
+                }));
+            }
+        }).catch(log);
+    } catch(err) {
+        log(err);
+    }
 }
 
 function installCmdConvert() {
