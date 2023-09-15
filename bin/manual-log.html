@@ -61,6 +61,15 @@
       form tr.message-edit button {
           display: inline-block;
       }
+      /* EOT fonts are used by Internet Explorer. Other browsers use TTF fonts. */
+      @font-face {
+          font-family: 'Pacifico'; /* https://www.fontsquirrel.com/fonts/pacifico */
+          src: url('/bin/pacifico-webfont.eot');
+          src: url('/bin/pacifico-webfont.eot?#iefix') format('embedded-opentype'),
+               url('/bin/pacifico-webfont.ttf') format('truetype');
+          font-weight: normal;
+          font-style: normal;
+      }
     </style>
     <title>ICS-309</title>
     <script type="text/javascript">
@@ -89,6 +98,10 @@
               function(input) {
                   input.value = "";
               });
+          submitFormDamnit();
+      }
+      function save() {
+          document.getElementById("saveButton").value = 'Save';
           submitFormDamnit();
       }
       function onLoad() {
@@ -226,7 +239,10 @@
             <div class="caption">6. Prepared By (Name, Call Sign)</div>
             {{preparedBy}}
           </td>
-          <td colspan="2" class="caption" style="border-right:2px solid;">6A. Signature</td>
+          <td colspan="2" style="border-right:2px solid;">
+            <div class="caption" style="padding-bottom:0px;">6A. Signature</div>
+            {{signature}}
+          </td>
           <td colspan="3">
             <div class="caption">7. Date &amp; Time Prepared</div>
             {{datePrepared}}&nbsp;&nbsp;{{timePrepared}}
