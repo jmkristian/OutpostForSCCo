@@ -2,7 +2,7 @@
 # This script can be executed by the bash that's packaged with git for Windows.
 cd `dirname "$0"` || exit $?
 export VersionMajor=0
-export VersionMinor=5
+export VersionMinor=6
 export VersionBeta=
 rm -rf built logs
 mkdir -p built/bin built/webToPDF
