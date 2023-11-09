@@ -1955,8 +1955,14 @@ function onManualView(req, res) {
                 var pattern = new RegExp(start);
                 var foundIt = pattern.exec(input.message);
                 if (foundIt) {
-                    // Ignore the surplus text preceding start:
+                    // Comment out the text preceding start:
+                    var preamble = input.message.substring(0, foundIt.index);
                     input.message = input.message.substring(foundIt.index);
+                    preamble = preamble.replace(/[\r\n]+$/, '');
+                    if (preamble) {
+                        preamble = ('# ' + preamble).replace(/([^\r]\n|\r\n?)/g, '$1# ');
+                        input.message = preamble + EOL + EOL + input.message;
+                    }
                 }
             }
             var args = ['--message_status-received', '--mode-readonly'];
