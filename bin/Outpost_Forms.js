@@ -513,6 +513,15 @@ function decodeArg(value) {
     }
 }
 
+/** Replace characters that aren't permitted in a file name. */
+function toFileName(s) {
+    return s && s.replace(/[<>:"/\\|?*]/g, '~');
+}
+
+function pageNameFromEmail(email) {
+    return encodeURIComponent(toFileName(subjectFromEmail(email)) || 'message');
+}
+
 function convert() {
     process.chdir(process.argv[4]);
     return fsp.checkFolder(LOG_FOLDER).then(function() {
@@ -559,8 +568,7 @@ function convertMessageToFiles() {
     ).then(function(message) {
         const parsed = parseMessage(message, environment);
         const subject = environment.subject || subjectFromMessage(parsed);
-        const spoolFilePrefix = subject
-              .replace(/[<>:"/\\|?*]/g, '~')
+        const spoolFilePrefix = toFileName(subject)
               .replace(SEQUENCE_REGEX, '~');
         return openMessage(args).then(function(pageURL) {
             const messageID = environment.MSG_NUMBER || parsed.fields.MsgNo;
@@ -1977,8 +1985,8 @@ function onManualView(req, res) {
                 quietTime: 0,
                 plainText: input.message || '',
             };
-            const subject = encodeURIComponent(subjectFromEmail(parsed) || 'message');
-            res.redirect(SEE_OTHER, `/text-${formId}/${subject}.txt`);
+            const pageName = pageNameFromEmail(parsed);
+            res.redirect(SEE_OTHER, `/text-${formId}/${pageName}.txt`);
             // redirects to onGetPlainText
         }
     }).catch(function(err) {
@@ -2506,8 +2514,8 @@ function onPostManualCommand(formId, req, res) {
         form.plainText = prefix + message + suffix;
         logManualSend(form, addresses);
         res.redirect(SEE_OTHER, `/text-${formId}/`
-                     + encodeURIComponent(subject)
-                     + '.txt');
+                     + encodeURIComponent(toFileName(subject))
+                     + '.txt'); // redirects to onGetPlainText
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
         res.end(errorToHTML(err), CHARSET);
@@ -2521,11 +2529,10 @@ function onPostReceivedEmail(req, res) {
             quietTime: 0,
             plainText: req.body.text || '',
         };
-        const message = parseEmail(form.plainText);
-        const subject = encodeURIComponent(subjectFromEmail(message) || 'message');
+        const pageName = pageNameFromEmail(parseEmail(form.plainText));
         const formId = '' + nextFormId++;
         openForms[formId] = form;
-        res.redirect(SEE_OTHER, `/text-${formId}/${subject}.txt`);
+        res.redirect(SEE_OTHER, `/text-${formId}/${pageName}.txt`);
         // redirects to onGetPlainText
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
