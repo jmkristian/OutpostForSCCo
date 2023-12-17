@@ -2240,9 +2240,10 @@ function onGetManualEditLog(req, res) {
                 + `${EOL} <td style="width:1px;padding-left:0px;">,</td>`
                 + `${EOL} <td>${data.preparerCall}</td>`
                 + `${EOL}</tr></table>`;
+            data.signatureCaption = 'Signature';
             data.signature = '<div style="padding-top:0.5em;"><label style="font-weight:normal;">'
                 + '<input type="checkbox" name="withSignature" value="true"/>'
-                + 'print signature</label></div>';
+                + 'print e-signature</label></div>';
             return data;
         });
     }).then(function(data) {
@@ -2382,11 +2383,16 @@ function onGetManualLog(req, res) {
         log(`onGetManualLog data ${JSON.stringify(data)}`);
         data.radioOperator = encodeHTML((data.opName || '') + ', ' + (data.opCall || ''));
         data.preparedBy = encodeHTML((data.preparerName || '') + ', ' + (data.preparerCall || ''));
-        data.signature = (req.query.withSignature && data.preparerName)
-            ? (`<div style="font-family:'Pacifico','Brush Script MT',cursive;padding-top:0.25em;">`
+        if (req.query.withSignature && data.preparerName) {
+            data.signatureCaption = 'e-Signature';
+            data.signature =
+            `<div style="font-family:'Pacifico','Brush Script MT',cursive;padding-top:0.25em;">`
                + encodeHTML(data.preparerName || '')
-               + '</div>')
-            : '';
+                + '</div>';
+        } else {
+            data.signatureCaption = 'Signature';
+            data.signature = '';
+        }
         manualLogFieldNames.forEach(function(field) {
             data[field] = data[field] ? encodeHTML(data[field]) : '&nbsp;';
         });
