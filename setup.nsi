@@ -390,7 +390,6 @@ Section "Install"
   SetOutPath "$INSTDIR\addons"
   File /r built\addons\*.*
   SetOutPath "$INSTDIR"
-  File browse.cmd
   File built\manual.cmd
   File built\UserGuide.html
   Call ChooseAddonFiles
