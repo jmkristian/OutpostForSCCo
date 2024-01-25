@@ -2096,7 +2096,7 @@ function subjectFromEmail(message) {
 }
 
 function getMessageNumberFromSubject(subject) {
-    var found = /^(([A-Z0-9]{1,3}-)?\d+[A-Z]?)_/i.exec(subject);
+    var found = /^(([A-Z0-9]{1,3}-)?\d+[A-Z]?)/i.exec(subject);
     return (found && found[1]) || '';
 }
 
@@ -2140,6 +2140,38 @@ function firstAddress(x) {
 
 function logManualView(settings, input, message) {
     log('logManualView ' + JSON.stringify(message));
+    const sameButCase = function sameButCase(a, b) {
+        return a.trim().toLowerCase() == b.trim().toLowerCase();
+    };
+    const localizeCall = function localizeCall(a) {
+        var result = a.trim().toLowerCase();
+        const local = /^([^@]*@w[1-6]xsc).ampr.org$/.exec(result)
+              || /^([^@]*@w[1-6]xsc).scc-ares-races.org$/.exec(result);
+        if (local) {
+            result = local[1];
+        }
+        return result;
+    };
+    const sameCall = function sameCall(mine, theirs) {
+        if (!mine || !theirs) {
+            //log(`falsy ${mine} or ${theirs}`);
+            return false;
+        } else if (sameButCase(mine, theirs) || localizeCall(mine) == localizeCall(theirs)) {
+            return true;
+        } else if (mine.indexOf('@') < 0) {
+            const atSign = theirs.indexOf('@');
+            //log(`compare ${mine} ${theirs}[0..${atSign}]`);
+            if (atSign > 0 && sameButCase(mine, theirs.substring(0, atSign))) {
+                return true;
+                /* This is sloppy. We don't really know that
+                   mine is implicitly @ the same host as theirs.
+                   But it seems impossible that it's not and also
+                   fromNumber matches deliveredNumber.
+                */
+            }
+        }
+        return false;
+    };
     return readManualLog().then(function(theLog) {
         const subject = input.subject || subjectFromEmail(message) || '';
         const fields = message.fields;
@@ -2155,6 +2187,35 @@ function logManualView(settings, input, message) {
             subject: trimSubject(subject, fromNumber),
         };
         theLog.messages.push(logEntry);
+        var found = /^\s*DELIVERED:\s*(.*)/i.exec(subject);
+        if (found) {
+            const deliveredNumber = getMessageNumberFromSubject(found[1]);
+            input.message.split(/[\r\n]+/).forEach(function(line) {
+                found = /([^\s]+)\s+assigned Msg ID:\s*([^\s]+)/.exec(line);
+                if (found) {
+                    // Normally there's only one such line,
+                    // so we search theLog only once.
+                    const theirCall = found[1];
+                    const theirNumber = found[2];
+                    var myNumber = null;
+                    theLog.messages.findIndex(function(message) {
+                        if (message.fromNumber && !message.toNumber) {
+                            if (message.fromNumber != '"') {
+                                myNumber = message.fromNumber;
+                                // Otherwise continue to use the previous number.
+                            }
+                            //log(`${myNumber} to ${message.toCall} ${theirCall} ${deliveredNumber}`);
+                            if (sameButCase(myNumber, deliveredNumber)
+                                && sameCall(message.toCall, theirCall)) {
+                                message.toNumber = theirNumber;
+                                return true; // look no further
+                            }
+                        }
+                        return false; // keep looking
+                    });
+                }
+            });
+        }
         return findManualLogFile().then(function(logFile) {
             return fsp.writeFile(
                 logFile, JSON.stringify(theLog), {encoding: ENCODING}
