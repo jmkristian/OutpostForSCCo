@@ -26,10 +26,11 @@
       table.block-caption td {
           padding: 4pt 4pt;
       }
-      form table.same-line-label-layout th {
-          font-weight: bold;
+      form table.same-line-label-layout>tr>th,
+      form table.same-line-label-layout>tbody>tr>th {
           padding-left: 1ex;
           text-align: right;
+          vertical-align: middle;
           width: 1px;
       }
     </style>
@@ -113,7 +114,7 @@
               document.getElementById("message-file-name").innerText = file.name;
               onMessageInput();
           };
-          reader.readAsText(file);
+          reader.readAsText(file, 'windows-1252');
       }
       var downloadDocument;
       function downloadMessage() {
@@ -183,7 +184,7 @@
           <td>
             <table class="same-line-label-layout">
               <tr>
-                <th style="vertical-align:center;">
+                <th>
                   Message type:
                 </th><td>
                   <select id="create-type" name="ADDON_MSG_TYPE" required onchange="onInput()">
@@ -217,7 +218,7 @@
             You can paste, drag and drop or upload a file.
           </td>
               </tr><tr>
-                <th>
+                <th style="vertical-align:top;padding-top:0.25em;">
                   Message:
                   <br/><br/>
                   <input type="button" value="Upload"
@@ -246,7 +247,7 @@
                   <input type="text" id="message-date" name="OpDate" required class="date"
                          pattern="(0[1-9]|1[012])/(0[1-9]|[12][0-9]|3[01])/[1-2][0-9][0-9][0-9]"
                          placeholder="mm/dd/yyyy"/>
-                </td><th>
+                </td><th style="width:1px;">
                   Time:
                 </th><td>
                   <input type="text" id="message-time" name="OpTime" required class="time"

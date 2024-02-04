@@ -125,6 +125,24 @@ const NOT_FOUND = 404;
 const CHARSET = 'utf-8'; // for HTTP
 const TrimAddress = /^[^@]*(@[^.]*)?/;
 const ENCODING = CHARSET; // for files
+const ISO_8859_1 = 'ISO 8859-1'; // I mean ISO/IEC 8859-1:1998 <https://en.wikipedia.org/wiki/ISO/IEC_8859-1>
+const WINDOWS_1252 = 'Windows-1252';
+const encodingAliases = {
+    'windows-1252': WINDOWS_1252,
+    'cp1252': WINDOWS_1252,
+    'cp-1252': WINDOWS_1252,
+    // https://www.rfc-editor.org/rfc/rfc1345.html
+    'iso 8859-1': ISO_8859_1,
+    'iso-8859-1': ISO_8859_1,
+    'iso_8859-1': ISO_8859_1,
+    'iso8859-1': ISO_8859_1,
+    'latin-1': ISO_8859_1,
+    'latin1': ISO_8859_1,
+    'cp-819': ISO_8859_1,
+    'cp819': ISO_8859_1,
+    'utf-8': 'UTF-8',
+    'utf8': 'UTF-8',
+};
 const EOL = '\r\n';
 const htmlEntities = new AllHtmlEntities();
 const INI = { // patterns that match lines from a .ini file.
@@ -948,6 +966,9 @@ function serve() {
     app.post('/manual-command-:formId', function(req, res) {
         onPostManualCommand(req.params.formId, req, res);
     });
+    app.get('/manual-command-:formId/:pageName', function(req, res) {
+        onGetManualCommand(req.params.formId, req, res);
+    });
     app.post('/text', function(req, res) {
         onPostReceivedEmail(req, res);
     });
@@ -980,6 +1001,9 @@ function serve() {
     }}));
     app.get('/bin/\*.ttf', express.static('.', {setHeaders: function(res, path, stat) {
         res.set('Content-Type', 'font/ttf');
+    }}));
+    app.get('/bin/\*.html', express.static('.', {setHeaders: function(res, path, stat) {
+        res.set('Content-Type', TEXT_HTML);
     }}));
     app.get(/^\/.*/, express.static(PackItForms, {setHeaders: function(res, path, stat) {
         if (path) {
@@ -1200,27 +1224,90 @@ function parseArgs(args) {
     return environment;
 }
 
+/** Remove line breaks that the BBS inserted into the message. */
+function repairMessage(msg) {
+    //log(`repairMessage(${JSON.stringify(msg)})`);
+    if (!msg) {
+        return msg;
+    }
+    // JNOS inserts a line break after every 127 bytes in a line.
+    // It might insert a break within a multi-byte UTF-8 character.
+    // Remove any line breaks that were inserted into the message:
+    var message = '';
+    var partial = '';
+    // Append lines into partial until a complete line is found;
+    // then append partial to message.
+    msg.split(EOL).every(function(line) {
+        log(`repairMessage line ${JSON.stringify(line)}`);
+        /* Data should have the form name: [value]
+           A ] within the value is escaped as `]
+           The value part may end with any of:
+           ] preceded by neither ` nor ]
+           `]] if the value ends with ]
+           `]]] if the value ends with `
+        */
+        if (partial && /`\]\]\s*$/.test(partial)) {
+            // This is the end of a value.
+            if (!/\s$/.test(partial)) {
+                // Look to see if there's another ] on the next line.
+                if (!/^\]\s*$/.test(line)) {
+                    // The value ended with ] represented as `]]
+                    message += partial + EOL;
+                    partial = '';
+                } // else the value ended with ` represented as `]]]
+            }
+        }
+        if (!partial // this is the first line of a group
+            && (!/:\s*\[/.test(line) // no name:
+                || /^[!#]/.test(line))) { // boundary marker or comment
+            message += line + EOL;
+        } else {
+            partial += line;
+            log(`repairMessage partial ${JSON.stringify(partial)}`);
+            if (/(`\]\]\]|[^`\]]\])\s*$/.test(partial)) { // a complete name: [value]
+                message += partial + EOL;
+                partial = '';
+            }
+        }
+        // JNOS sometimes appends junk to the end of a message.
+        // One observed case was "You have new messages."
+        // So ignore anything after !/ADDON!.
+        return partial || !/^\s*!\/ADDON!\s*$/.test(line);
+    });
+    if (partial) {
+        message += partial + EOL;
+    }
+    log(`repairMessage = ${message}`);
+    return message;
+}
+
+/** Transcode s from the given encoding to ENCODING. */
+function toENCODING(s, encoding) {
+    switch(encoding) {
+    case WINDOWS_1252:
+        return Buffer.from(windowsToLatin1(s), 'binary').toString(ENCODING);
+    case ISO_8859_1:
+        return Buffer.from(s, 'binary').toString(ENCODING);
+    default:
+        // Already ENCODING, we suppose.
+    }
+    return s;
+}
+
 function getMessage(environment) {
-    return Promise.resolve(
-        environment.message
-    ).then(function(message) {
-        if (message) {
-            return message;
-        } else if (environment.MSG_FILENAME) {
-            const msgFileName = path.resolve(PackItMsgs, environment.MSG_FILENAME);
-            return fsp.readFile(
-                msgFileName, {encoding: ENCODING}
-            ).then(function(message) {
-                fs.unlink(msgFileName, function(err) {
-                    log(err ? err : ("Deleted " + msgFileName));
-                });
-                // Outpost sometimes appends junk to the end of message.
-                // One observed case was "You have new messages."
-                return message && message.replace(
-                    /[\r\n]+[ \t]*!\/ADDON![\s\S]*$/,
-                    EOL + '!/ADDON!' + EOL);
-            });
-        } // else don't return anything.
+    if (environment.message) {
+        return Promise.resolve(environment.message);
+    } else if (!environment.MSG_FILENAME) {
+        return Promise.resolve();
+    }
+    const msgFileName = path.resolve(PackItMsgs, environment.MSG_FILENAME);
+    return fsp.readFile(
+        msgFileName, {encoding: 'binary'}
+    ).then(function(msg) {
+        fs.unlink(msgFileName, function(err) {
+            log(err ? err : ("Deleted " + msgFileName));
+        });
+        return toENCODING(repairMessage(msg.replace(/[^\r]\n|\r[^\n]/g, EOL)), ISO_8859_1);
     });
 }
 
@@ -1476,8 +1563,8 @@ function toEOL(from) {
 function saveForm(form, req) {
     const reqBody = req.body;
     const message = reqBody.formtext;
-    form.environment.subject = reqBody.subject
-        || subjectFromMessage(parseMessage(message, form.environment));
+    form.environment.subject =
+        reqBody.subject || subjectFromMessage(parseMessage(message, form.environment));
     // Outpost requires Windows-style line breaks:
     form.message = toEOL(message);
     log(`saveForm ${form.message.length}`);
@@ -1487,7 +1574,7 @@ function isUrgent(message) {
     if (!message) {
         return false;
     }
-    const parsed = parseEmail(message);
+    const parsed = parseEmail({message: message});
     const handling = parsed.fields['5.'] || '';
     return (['IMMEDIATE', 'I'].indexOf(handling) >= 0);
 }
@@ -1735,9 +1822,10 @@ function getManualSettings() {
         }
         return getInitialManualSettings(function(settings) {
             setManualSettings(settings);
-            return setinngs;
+            return settings;
         });
     }).then(function(settings) {
+        settings.encoding = (settings.encoding && encodingAliases[settings.encoding.toLowerCase()]) || WINDOWS_1252;
         if (settings.useTac) {
             settings.call = settings.tacCall;
             settings.name = settings.tacName;
@@ -1753,6 +1841,7 @@ function getManualSettings() {
 
 function getInitialManualSettings() {
     const settings = {
+        encoding: WINDOWS_1252,
         nextMessageNumber: 1,
         opName: '',
         opCall: '',
@@ -1920,6 +2009,62 @@ function onManualCreate(req, res) {
     });
 }
 
+// Windows-1252 is the same as ISO 8859-1, except for:
+const windowsToLatin1Map = {
+    '\u20AC': '\u0080', // EURO SIGN
+    '\u201A': '\u0082', // SINGLE LOW-9 QUOTATION MARK
+    '\u0192': '\u0083', // LATIN SMALL LETTER F WITH HOOK
+    '\u201E': '\u0084', // DOUBLE LOW-9 QUOTATION MARK
+    '\u2026': '\u0085', // HORIZONTAL ELLIPSIS
+    '\u2020': '\u0086', // DAGGER
+    '\u2021': '\u0087', // DOUBLE DAGGER
+    '\u02C6': '\u0088', // MODIFIER LETTER CIRCUMFLEX ACCENT
+    '\u2030': '\u0089', // PER MILLE SIGN
+    '\u0160': '\u008A', // LATIN CAPITAL LETTER S WITH CARON
+    '\u2039': '\u008B', // SINGLE LEFT-POINTING ANGLE QUOTATION MARK
+    '\u0152': '\u008C', // LATIN CAPITAL LIGATURE OE
+    '\u017D': '\u008E', // LATIN CAPITAL LETTER Z WITH CARON
+    '\u2018': '\u0091', // LEFT SINGLE QUOTATION MARK
+    '\u2019': '\u0092', // RIGHT SINGLE QUOTATION MARK
+    '\u201C': '\u0093', // LEFT DOUBLE QUOTATION MARK
+    '\u201D': '\u0094', // RIGHT DOUBLE QUOTATION MARK
+    '\u2022': '\u0095', // BULLET
+    '\u2013': '\u0096', // EN DASH
+    '\u2014': '\u0097', // EM DASH
+    '\u02DC': '\u0098', // SMALL TILDE
+    '\u2122': '\u0099', // TRADE MARK SIGN
+    '\u0161': '\u009A', // LATIN SMALL LETTER S WITH CARON
+    '\u203A': '\u009B', // SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+    '\u0153': '\u009C', // LATIN SMALL LIGATURE OE
+    '\u017E': '\u009E', // LATIN SMALL LETTER Z WITH CARON
+    '\u0178': '\u009F', // LATIN CAPITAL LETTER Y WITH DIAERESIS
+};
+const windowsToLatin1RegEx = new RegExp('[' + enquoteRegex(Object.keys(windowsToLatin1Map).join('')) + ']', 'g');
+const latin1ToWindowsMap = function invert(m) {
+    var result = {};
+    for (var key in m) {
+        result[m[key]] = key;
+    }
+    return result;
+}(windowsToLatin1Map);
+const latin1ToWindowsRegEx = new RegExp('[\u0080-\u009F]', 'g');
+
+/** Convert a Windows-1252 string to an ISO 8859-1 string. */
+function windowsToLatin1(s) {
+    if (!s) return s;
+    return s.replace(windowsToLatin1RegEx, function(c) {
+        return windowsToLatin1Map[c] || c;
+    });
+}
+
+/** Convert an ISO 8859-1 string to a Windows-1252 string. */
+function latin1ToWindows(s) {
+    if (!s) return s;
+    return s.replace(latin1ToWindowsRegEx, function(c) {
+        return latin1ToWindowsMap[c] || c;
+    });
+}
+
 function onManualView(req, res) {
     const formId = '' + nextFormId++;
     return getManualSettings().then(function(settings) {
@@ -1934,7 +2079,7 @@ function onManualView(req, res) {
         if (input.OpDate && input.OpTime) {
             input.MSG_DATETIME_OP_RCVD = `${input.OpDate} ${input.OpTime}`;
         }
-        const parsed = (input.message == null) ? null : parseEmail(input.message);
+        const parsed = parseEmail(input, settings.encoding);
         if (parsed) {
             input.subject = parsed.headers.subject;
             var from = parsed.headers.from;
@@ -2227,7 +2372,7 @@ function logManualView(settings, input, message) {
 function logManualSend(form, addresses) {
     log('logManualSend(' + JSON.stringify(form) + ', ' + JSON.stringify(addresses) + ')');
     return readManualLog().then(function(data) {
-        const message = parseEmail(form.message);
+        const message = parseEmail({message: form.message});
         const subject = form.environment.subject || subjectFromEmail(message);
         const fromNumber = message.fields.MsgNo || getMessageNumberFromSubject(subject);
         for (a in addresses) {
@@ -2580,9 +2725,45 @@ function onPostManualCommand(formId, req, res) {
         form.message = message;
         form.plainText = prefix + message + suffix;
         logManualSend(form, addresses);
-        res.redirect(SEE_OTHER, `/text-${formId}/`
+        res.redirect(SEE_OTHER, `/manual-command-${formId}/`
                      + encodeURIComponent(toFileName(subject))
-                     + '.txt'); // redirects to onGetPlainText
+                     + '.txt'); // redirects to onGetManualCommand
+    }).catch(function(err) {
+        res.set({'Content-Type': TEXT_HTML});
+        res.end(errorToHTML(err), CHARSET);
+    });
+}
+
+function onGetManualCommand(formId, req, res) {
+    return requireForm(formId).then(function(form) {
+        var command = form.plainText;
+        if (!command || !/[^\u0000-\u007F]/.test(command)) {
+            // These characters are the same in any encoding.
+            res.set({'Content-Type': TEXT_PLAIN});
+            res.end(command, CHARSET);
+            return null;
+        }
+        // The most reliable way to make the command copy-n-pastable is to
+        // show it to the user inside a textarea. For one thing, this works
+        // around https://bugzilla.mozilla.org/show_bug.cgi?id=359303
+        return getManualSettings().then(function(settings) {
+            switch(settings.encoding) {
+            case ISO_8859_1:
+                command = Buffer.from(command, ENCODING).toString('binary');
+                break;
+            case WINDOWS_1252:
+                command = latin1ToWindows(Buffer.from(command, ENCODING).toString('binary'));
+                break;
+            default:
+            }
+            return fsp.readFile(
+                path.join('bin', 'manual-command.html'), {encoding: ENCODING}
+            );
+        }).then(function(template) {
+            const page = expandVariables(template, {command: JSON.stringify(command)});
+            res.set({'Content-Type': TEXT_HTML});
+            res.end(page, CHARSET);
+        });
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
         res.end(errorToHTML(err), CHARSET);
@@ -2596,7 +2777,7 @@ function onPostReceivedEmail(req, res) {
             quietTime: 0,
             plainText: req.body.text || '',
         };
-        const pageName = pageNameFromEmail(parseEmail(form.plainText));
+        const pageName = pageNameFromEmail(parseEmail({message: form.plainText}));
         const formId = '' + nextFormId++;
         openForms[formId] = form;
         res.redirect(SEE_OTHER, `/text-${formId}/${pageName}.txt`);
@@ -2655,67 +2836,86 @@ function toShortName(fieldName) {
 }
 
 /** Parse an email message. Don't check to see if it contains form data. */
-function parseEmail(message) {
+function parseEmail(input, encoding) {
+    log(`parseEmail(${JSON.stringify(input)}, ${encoding})`);
     var result = {headers: {}, fields: {}};
-    var fields = result.headers;
+    if (!input.message) return result;
+    var email = input.message.replace(/[^\r]\n|\r[^\n]/g, EOL);
+    //log(`parseEmail email ${JSON.stringify(email)}`);
+    var headers = '';
+    var body = email;
+    var found;
+    if ((found = email.indexOf(EOL + EOL)) >= 0) {
+        // An empty line separates the headers from the body.
+        //log(`parseEmail line empty`);
+        headers = email.substring(0, found);
+        body = email.substring(found + (2 * EOL.length));
+    }
+    if (found = /(^|\r\n)[!#]/.exec(headers)) {
+        // That can't be a header. Maybe there are no headers.
+        //log(`parseEmail line ${JSON.stringify(found[0])}`);
+        headers = email.substring(0, found.index);
+        body = email.substring(found.index + found[1].length);
+    }
+    //log(`parseEmail headers ${JSON.stringify(headers)}`);
+    headers = toENCODING(headers, encoding);
     var fieldName = null;
-    var fieldValue = "";
-    message.split(/\r?\n/).every(function(line) {
-        if (!line) { // A blank line separates the headers from the body.
-            fields = result.fields;
-            return true; // continue parsing
+    var fieldValue = '';
+    headers.split(EOL).forEach(function(line) {
+        if (fieldName != null && /^\s/.test(line)) {
+            // A continuation of the previous line.
+            fieldValue += line;
+        } else {
+            if (found = /^(\S+)\s*:\s*/.exec(line)) {
+                if (fieldName != null) {
+                    result.headers[fieldName] = fieldValue;
+                }
+                fieldName = found[1].toLowerCase();
+                fieldValue = line.substring(found[0].length);
+            }
         }
+    });
+    if (fieldName != null) {
+        result.headers[fieldName] = fieldValue;
+    }
+    //log(`parseEmail body ${JSON.stringify(body)}`);
+    fieldName = null;
+    fieldValue = '';
+    const message = toENCODING(repairMessage(body), encoding);
+    message.split(EOL).forEach(function(line) {
         if (fieldName == null) {
             switch(line.charAt(0)) {
             case '!':
-                fields = result.fields; // this isn't an email header
-                if (line == '!/ADDON!') return false; // ignore subsequent lines
-                if (!result.addonName) result.addonName = line.match(/^!([^!]*)/)[1];
+                if (!result.addonName
+                    && !line.startsWith('!/ADDON!')) {
+                    result.addonName = line.match(/^!([^!]*)/)[1];
+                }
                 break;
             case '#':
-                fields = result.fields; // this isn't an email header
-                var found = /^#\s*(T|FORMFILENAME):(.*)/.exec(line);
-                if (found) {
+                if (found = /^#\s*(T|FORMFILENAME):(.*)/.exec(line)) {
                     result.formType = found[2].trim();
                 }
-                var found = /^#\s*(V|VERSION):(.*)/.exec(line);
-                if (found) {
+                if (found = /^#\s*(V|VERSION):(.*)/.exec(line)) {
                     result.addonVersion = found[2].trim();
                 }
                 break;
             default:
-                if (fields === result.headers) {
-                    var found = /^(\S+)\s*:\s*/.exec(line);
-                    if (found) {
-                        fieldName = found[1];
-                        line = line.substring(found[0].length);
-                    }
-                } else {
-                    var found = /:\s*\[/.exec(line);
-                    if (found) {
-                        fieldName = line.substring(0, found.index);
-                        line = line.substring(found.index + found[0].length - 1);
-                    }
+                if (found = /:\s*\[/.exec(line)) {
+                    fieldName = line.substring(0, found.index);
+                    line = line.substring(found.index + found[0].length - 1);
                 }
             }
         }
         if (fieldName != null) {
             fieldValue += line;
-            if (fields === result.headers) {
-                fields[fieldName.toLowerCase()] = fieldValue;
+            var value = unbracket_data(fieldValue);
+            if (value != null) {
+                // Field is complete on this line
+                result.fields[toShortName(fieldName)] = value;
                 fieldName = null;
                 fieldValue = "";
-            } else {
-                var value = unbracket_data(fieldValue);
-                if (value != null) {
-                    // Field is complete on this line
-                    fields[toShortName(fieldName)] = value;
-                    fieldName = null;
-                    fieldValue = "";
-                }
             }
         }
-        return true; // continue parsing
     });
     // log('parseEmail(' + JSON.stringify(message) + ') = ' + JSON.stringify(result));
     return result;
@@ -2726,7 +2926,7 @@ function messageContainsAForm(message, environment) {
 }
 
 function parseMessage(email, environment) {
-    var result = parseEmail(email);
+    var result = parseEmail({message: email});
     if (!messageContainsAForm(result, environment)) {
         throw "I don't know what form to display, since the message doesn't"
             + ' contain a line that starts with "#T:" or "#FORMFILENAME:".\n'
@@ -2762,9 +2962,11 @@ function subjectFromMessage(parsed) {
     const meta = getMetaContents(formFile);
     const prefix = meta['pack-it-forms-subject-prefix'] || '{{field:MsgNo}}_{{field:5.handling}}';
     const suffix = meta['pack-it-forms-subject-suffix'] || '_{{field:10.subject}}';
-    return expandTemplate(prefix + suffix, fields).replace(/[^ -~]/g, function(found) {
+    const result = expandTemplate(prefix + suffix, fields).replace(/[^ -~]/g, function(found) {
         return '~';
     });
+    //log(`subjectFromMessage(${JSON.stringify(parsed)}) = ${result}`);
+    return result;
 }
 
 function copyHeaders(from) {

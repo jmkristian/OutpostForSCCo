@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html style="height:100%;">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <script type="text/javascript">
+      var command = {{command}};
+      window.onload = function onLoad() {
+          var textarea = document.getElementById("command");
+          textarea.value = command;
+          textarea.focus();
+          textarea.select();
+      };
+    </script>
+  </head>
+  <body style="height:100%;">
+    <textarea id="command" style="height:95%;width:100%;border:none;outline:none;resize:none"
+              readonly></textarea>
+  </body>
+</html>

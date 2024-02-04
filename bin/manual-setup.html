@@ -10,7 +10,6 @@
       form table.same-line-label-layout th {
           padding-left: 1ex;
           text-align: right;
-          vertical-align: center;
           width: 1px;
       }
       form table.same-line-label-layout td>input[type="text"] {
@@ -24,6 +23,12 @@
       }
       form input[type="text"]:read-only {
           background-color: #dddddd;
+      }
+      #encodingHelp {
+          background-color: white;
+          border: 1px solid black;
+          display: none;
+          position: fixed;
       }
     </style>
     <title>Setup PackItForms</title>
@@ -53,6 +58,47 @@
           require('tacCall', tactical);
           require('tacPrefix', tactical);
       }
+      function escapeHelp(event) {
+          if (event.key == 'Escape') {
+              event.currentTarget.style.display = 'none';
+              event.stopPropagation();
+          }
+      }
+      function toggleEncodingHelp() {
+          var help = document.getElementById('encodingHelp');
+          if (help.style.display == 'block') {
+              help.style.display = 'none';
+          } else {
+              help.style.display = 'block';
+              document.getElementById('closeEncodingHelp').focus();
+          }
+      }
+      function chooseArchiveFolder() {
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', "/manual-archive", true);
+          xhr.responseType = 'text';
+          xhr.timeout = 120000; // two minutes
+          xhr.ontimeout = function(event) {
+              chooseArchiveFolder(); // try again
+          }
+          xhr.onerror = function(event) {
+              alert('chooseArchiveFolder error ' + xhr.status + ' ' + xhr.responseText);
+          }
+          xhr.onload = function(event) {
+              if (xhr.status >= 400) {
+                  alert('chooseArchiveFolder status ' + xhr.status + ' ' + xhr.responseText);
+              } else {
+                  var chosen = xhr.responseText;
+                  if (chosen) {
+                      input = document.getElementById('archiveFolder');
+                      input.value = chosen;
+                      input.focus();
+                      input.setSelectionRange(chosen.length, chosen.length);
+                  }
+              }
+          }
+          xhr.send();
+      }
       window.onload = function onLoad() {
           document.getElementById('useTac').checked = {{useTac}};
           onChangeTactical({{useTac}});
@@ -62,12 +108,13 @@
               document.getElementById('nextPage').value = nextPage;
               document.getElementById('cancelButton').style.display = 'none';
           }
+          document.getElementById('encoding').value = '{{encoding}}';
       };
     </script>
   </head>
   <body style="padding-top:1em;background-color:#d0d0d0;">
     <span style="font-size:125%;font-weight:bold;">Santa Clara County ARES/RACES PackItForms</span>
-    <span style="float:right;text-align:right;">Version: {{addon_version}}<br/>PIF: 2.2</span>
+    <span style="float:right;text-align:right;">Version: {{addon_version}}<br/>PIF: 2.3</span>
     <form method="POST">
       <input type="text" id="nextPage" name="nextPage" style="display:none" value=""/>
       <table>
@@ -139,6 +186,57 @@
           </td>
         </tr><tr>
           <td style="padding-top:0.75em;">
+            <table class="same-line-label-layout">
+              <tr>
+                <th>
+                  Next Message Number:
+                </th><td>
+                  <input type="text" name="nextMessageNumber" value="{{nextMessageNumber}}"
+                         style="width:4em;" pattern="\d+" required/>
+                </td>
+              </tr>
+            </table>
+            <table class="same-line-label-layout">
+              <tr>
+                <th style="width:1px;">
+                  Terminal Encoding:
+                </th><td style="width:1px;">
+                  <select name="encoding" id="encoding">
+                    <option value="Windows-1252">Windows-1252</option>
+                    <option value="ISO 8859-1">ISO 8859-1</option>
+                    <option value="UTF-8">UTF-8</option>
+                  </select>
+                  <img alt="?" src="icon-question.png" style="width:1.1em;" onclick="toggleEncodingHelp();"/>
+                  <div id="encodingHelp" tabindex="-1" onkeydown="escapeHelp(event);">
+                    <div style="float:right;">
+                      <button type="button" id="closeEncodingHelp" style="font-weight:bold;font-size:125%;"
+                              onclick="document.getElementById('encodingHelp').style.display='none';">x</button>
+                    </div>
+                    <div style="padding-left:1em;padding-right:1em;">
+                      <p>This field indicates how your terminal software converts
+                        between characters and the binary data that it exchanges with the BBS.
+                        For best results, configure your terminal to match this encoding.
+                        For example:
+                        <ul>
+                          <li>In PuTTY, the configuration item is 'Window > Translation > Remote character set'.</li>
+                          <li>In QtTermTCP, the options are in the 'Setup' menu.</li>
+                          <li>In converse.js, the command line option is --encoding.
+                          </li>
+                        </ul>
+                        If your terminal isn't configurable, set this encoding to match your terminal's behavior.
+                      </p><p>
+                        The recommended values are
+                        <a href="https://en.wikipedia.org/wiki/Windows-1252">Windows-1252</a> (AKA CP-1252)
+                        or <a href="https://en.wikipedia.org/wiki/ISO/IEC_8859-1">ISO 8859-1</a> (AKA Latin-1).
+                        These convert each byte to a separate character, which makes it possible to
+                        correctly handle multi-byte characters
+                        despite line breaks that may be inserted by the BBS.
+                      </p>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </table>
             <table class="same-line-label-layout">
               <tr>
                 <th>

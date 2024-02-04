@@ -19,6 +19,7 @@
 /scco-pvt-forms
 /sh.exe.stackdump
 /signingCert.*
+/Thumbs.db
 /webToPDF/*.exe
 /webToPDF/built
 /webToPDF/bin/Chromium*
