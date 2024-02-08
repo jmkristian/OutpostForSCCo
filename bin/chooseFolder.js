@@ -8,7 +8,7 @@ try {
     var FS = new ActiveXObject("Scripting.FileSystemObject");
     var Shell = new ActiveXObject("shell.application");
     var folder = Shell.BrowseForFolder(
-        0, "Choose the folder where you want to store copies of all the messages you send or receive.", 0, ssfDRIVES);
+        0, "Choose the folder where you want to store copies of all the messages you send and receive.", 0, ssfDRIVES);
     var ts = FS.OpenTextFile("logs\\archiveFolder.txt", ForWriting, true);
     // WScript.Echo(folder.self.path);
     ts.Write((folder && folder.self) ? folder.self.path : '');
