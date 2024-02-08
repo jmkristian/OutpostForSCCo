@@ -81,8 +81,8 @@ function promiseSpawn(exe, args, options) {
     return new Promise(function spawnChild(resolve, reject) {
         try {
             const child = child_process.spawn(exe, args, options);
-            child.stdout.pipe(process.stdout);
-            child.stderr.pipe(process.stderr);
+            if (child.stdout) child.stdout.pipe(process.stdout);
+            if (child.stderr) child.stderr.pipe(process.stderr);
             child.on('error', reject);
             child.on('exit', function(code) {
                 if (code) reject(`${exe} exit code ${code}`);
@@ -121,6 +121,7 @@ const HTTP_OK = 200;
 const SEE_OTHER = 303;
 const FORBIDDEN = 403;
 const NOT_FOUND = 404;
+const INTERNAL_SERVER_ERROR = 500;
 
 const CHARSET = 'utf-8'; // for HTTP
 const TrimAddress = /^[^@]*(@[^.]*)?/;
@@ -944,6 +945,9 @@ function serve() {
     });
     app.get('/manual', function(req, res) {
         onManual(res);
+    });
+    app.get('/manual-archive', function(req, res) {
+        onGetManualArchive(req, res);
     });
     app.get('/manual-setup', function(req, res) {
         onGetManualSetup(req, res);
@@ -1881,6 +1885,7 @@ function getInitialManualSettings() {
 function onGetManualSetup(req, res) {
     res.set({'Content-Type': TEXT_HTML});
     return getManualSettings().then(function(settings) {
+        settings.archiveFolder = encodeHTML(settings.archiveFolder || '');
         return fsp.readFile(
             path.join('bin', 'manual-setup.html'), {encoding: ENCODING}
         ).then(function(template) {
@@ -1900,10 +1905,60 @@ function sendWindowClose(res) {
             CHARSET);
 }
 
+var manualArchiveChooser = null;
+
+function onGetManualArchive(req, res) {
+    res.set({'Content-Type': TEXT_PLAIN});
+    const chooser = manualArchiveChooser // if a chooser is already in progress
+          || // otherwise start a chooser:
+          promiseSpawn(
+              'wscript', [path.join('bin', 'chooseFolder.js')],
+              {shell: true, detached: true, stdio: 'ignore'}
+          ).then(function() {
+              // The script returns the chosen folder name in a file.
+              return fsp.readFile(
+                  path.join(LOG_FOLDER, 'archiveFolder.txt'),
+                  {encoding: ENCODING});
+          }).then(function(folderName) {
+              return folderName.replace(/^\s*([^\r\n]*)/, '$1');
+          });;
+    // In any case, complete the response after the user chooses something:
+    manualArchiveChooser = chooser.then(function(folderName) {
+        try {
+            manualArchiveChooser = null; // no longer in progress
+            res.end(folderName, CHARSET);
+        } catch(err) {}
+        return folderName; // chain to the next response
+    }).catch(function(err) { // Something went wrong.
+        try {
+            manualArchiveChooser = null; // no longer in progress
+            res.statusCode = INTERNAL_SERVER_ERROR;
+            res.end(err + '', CHARSET);
+        } catch(err) {}
+        throw err; // chain to the next response
+    });
+}
+
 function onPostManualSetup(req, res) {
     res.set({'Content-Type': TEXT_HTML});
     const id = {};
-    return getManualSettings().then(function(settings) {
+    const archiveFolder = req.body.archiveFolder;
+    (!archiveFolder
+     ? Promise.resolve()
+     : fsp.stat(archiveFolder).then(function(stats) {
+         if (!stats.isDirectory()) {
+             throw(`${archiveFolder} isn't a folder.`);
+         }
+         const testFile = path.join(archiveFolder, "`");
+         return fsp.writeFile(
+             testFile, `Just checking${EOL}`, {encoding: ENCODING}
+         ).then(function() {
+             fsp.unlink(testFile); // asynchronously
+         });
+     })
+    ).then(function OK() {
+        return getManualSettings();
+    }).then(function(settings) {
         for (field in req.body) {
             settings[field] = req.body[field];
         }
@@ -2099,41 +2154,45 @@ function onManualView(req, res) {
             // MSG_DATETIME_HEADER could be copied from parsed.headers.date.
             // But it's unnecessary.
         }
-        logManualView(settings, input, parsed); // asynchronously
-        if (messageContainsAForm(parsed, input)) {
-            if (input.addon_name) {
-                // Perhaps there's extra text at the beginning of the message,
-                // for example email headers like From or Subject.
-                var start = enquoteRegex('!' + input.addon_name + '!') + '[\r\n]';
-                var pattern = new RegExp(start);
-                var foundIt = pattern.exec(input.message);
-                if (foundIt) {
-                    // Comment out the text preceding start:
-                    var preamble = input.message.substring(0, foundIt.index);
-                    input.message = input.message.substring(foundIt.index);
-                    preamble = preamble.replace(/[\r\n]+$/, '');
-                    if (preamble) {
-                        preamble = ('# ' + preamble).replace(/([^\r]\n|\r\n?)/g, '$1# ');
-                        input.message = preamble + EOL + EOL + input.message;
+        return archiveManualMessage(
+            settings, subjectFromEmail(parsed), input.message
+        ).then(function() {
+            logManualView(settings, input, parsed); // asynchronously
+            if (messageContainsAForm(parsed, input)) {
+                if (input.addon_name) {
+                    // Perhaps there's extra text at the beginning of the message,
+                    // for example email headers like From or Subject.
+                    var start = enquoteRegex('!' + input.addon_name + '!') + '[\r\n]';
+                    var pattern = new RegExp(start);
+                    var foundIt = pattern.exec(input.message);
+                    if (foundIt) {
+                        // Comment out the text preceding start:
+                        var preamble = input.message.substring(0, foundIt.index);
+                        input.message = input.message.substring(foundIt.index);
+                        preamble = preamble.replace(/[\r\n]+$/, '');
+                        if (preamble) {
+                            preamble = ('# ' + preamble).replace(/([^\r]\n|\r\n?)/g, '$1# ');
+                            input.message = preamble + EOL + EOL + input.message;
+                        }
                     }
                 }
+                var args = ['--message_status-received', '--mode-readonly'];
+                for (var name in input) {
+                    args.push('--' + name + '-' + input[name]);
+                }
+                return onOpen(formId, args).then(function() {
+                    res.redirect('/form-' + formId);
+                });
+            } else { // message does not contain a form
+                openForms[formId] = {
+                    quietTime: 0,
+                    plainText: input.message || '',
+                };
+                const pageName = pageNameFromEmail(parsed);
+                res.redirect(SEE_OTHER, `/text-${formId}/${pageName}.txt`);
+                // redirects to onGetPlainText
             }
-            var args = ['--message_status-received', '--mode-readonly'];
-            for (var name in input) {
-                args.push('--' + name + '-' + input[name]);
-            }
-            return onOpen(formId, args).then(function() {
-                res.redirect('/form-' + formId);
-            });
-        } else { // message does not contain a form
-            openForms[formId] = {
-                quietTime: 0,
-                plainText: input.message || '',
-            };
-            const pageName = pageNameFromEmail(parsed);
-            res.redirect(SEE_OTHER, `/text-${formId}/${pageName}.txt`);
-            // redirects to onGetPlainText
-        }
+        });
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
         res.end(errorToHTML(err, JSON.stringify(req.body)), CHARSET);
@@ -2283,8 +2342,26 @@ function firstAddress(x) {
     return (found.length > 0) ? found[0] : '';
 }
 
+function archiveManualMessage(settings, subject, message) {
+    if (!settings.archiveFolder) {
+        return Promise.resolve();
+    }
+    const baseName = path.join(settings.archiveFolder, toFileName(subject));
+    var suffix = 0;
+    var attempt = function attempt(fileName) {
+        return fsp.stat(fileName).then(function fileExists(stats) {
+            // That file exists. Try again with a uniquified name:
+            ++suffix;
+            return attempt(baseName + ` (${suffix}).txt`);
+        }, function createFile(err) {
+            return fsp.writeFile(fileName, message, {encoding: ENCODING});
+        });
+    };
+    return attempt(baseName + '.txt');
+}
+
 function logManualView(settings, input, message) {
-    log('logManualView ' + JSON.stringify(message));
+    //log('logManualView ' + JSON.stringify(message));
     const sameButCase = function sameButCase(a, b) {
         return a.trim().toLowerCase() == b.trim().toLowerCase();
     };
@@ -2724,10 +2801,14 @@ function onPostManualCommand(formId, req, res) {
         form.environment.subject = subject;
         form.message = message;
         form.plainText = prefix + message + suffix;
-        logManualSend(form, addresses);
-        res.redirect(SEE_OTHER, `/manual-command-${formId}/`
-                     + encodeURIComponent(toFileName(subject))
-                     + '.txt'); // redirects to onGetManualCommand
+        return getManualSettings().then(function(settings) {
+            return archiveManualMessage(settings, subject, form.plainText);
+        }).then(function() {
+            logManualSend(form, addresses);
+            res.redirect(SEE_OTHER, `/manual-command-${formId}/`
+                         + encodeURIComponent(toFileName(subject))
+                         + '.txt'); // redirects to onGetManualCommand
+        });
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
         res.end(errorToHTML(err), CHARSET);

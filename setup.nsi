@@ -270,6 +270,7 @@ Function ${un}DeleteMyFiles
   ${Delete} README.*
   ${Delete} UserGuide.*
   ${Delete} launch.vbs
+  ${Delete} bin\chooseFolder.js
   ${Delete} bin\launch.vbs
   ${Delete} bin\launch.cmd
   ${Delete} launch.cmd
@@ -373,6 +374,7 @@ Section "Install"
 
   # Files to install:
   SetOutPath "$INSTDIR\bin"
+  File bin\chooseFolder.js
   File bin\fsp.js
   File bin\manual-log.csv
   File bin\message.html

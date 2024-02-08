@@ -189,10 +189,14 @@
             <table class="same-line-label-layout">
               <tr>
                 <th>
-                  Next Message Number:
-                </th><td>
-                  <input type="text" name="nextMessageNumber" value="{{nextMessageNumber}}"
-                         style="width:4em;" pattern="\d+" required/>
+                  Archive Folder:
+                </th><td style="padding-right:6px;">
+                  <input type="text" id="archiveFolder" name="archiveFolder" value="{{archiveFolder}}"
+                         style="width:100%;"
+                         placeholder="C:\...\&lt;Activation Number&gt;"
+                         title="Where to store copies of all the messages you send and receive"/>
+                </td><td style="padding-left:0px;width:1px;">
+                  <button type="button" onclick="chooseArchiveFolder(); return false;">...</button>
                 </td>
               </tr>
             </table>
@@ -200,8 +204,8 @@
               <tr>
                 <th style="width:1px;">
                   Terminal Encoding:
-                </th><td style="width:1px;">
-                  <select name="encoding" id="encoding">
+                </th><td>
+                  <select name="encoding" id="encoding" style="margin-bottom:1ex;">
                     <option value="Windows-1252">Windows-1252</option>
                     <option value="ISO 8859-1">ISO 8859-1</option>
                     <option value="UTF-8">UTF-8</option>
