@@ -48,7 +48,7 @@
           updateCheckboxes();
       }
       function selectAll(element) {
-          if ({{readOnly}}) {
+          if (!{{readOnly}}) {
               element.select();
               setTimeout(function() {
                   element.scrollTop = 0;
@@ -83,7 +83,8 @@
           <th>Subject:</th>
           <td>
             <textarea id="Subject" name="subject" rows="1" required tabindex="4"
-                      onfocus="selectAll(this);">{{Subject}}</textarea>
+                      onfocus="this.setSelectionRange(this.value.length, this.value.length);"
+                      >{{Subject}}</textarea>
           </td>
         </tr><tr>
           <th>Message:</th>
