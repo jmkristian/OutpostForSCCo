@@ -2917,7 +2917,14 @@ function parseEmail(input, encoding) {
             }
         }
     });
-    // log('parseEmail(' + JSON.stringify(message) + ') = ' + JSON.stringify(result));
+    if (result.formType) {
+        body = message;
+    } else {
+        // The body wasn't an addon message, it appears.
+        body = toENCODING(body, encoding); // simply transcode it
+    }
+    input.message = (headers ? (headers + EOL + EOL) : '') + body;
+    //log(`parseEmail = ${JSON.stringify(result)}`);
     return result;
 }
 
