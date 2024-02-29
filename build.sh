@@ -23,7 +23,7 @@ for REPO in jmkristian/pack-it-forms "$@"; do
     fi
     if [ ! -e "$FORMS" ]; then
         git clone https://github.com/"$REPO".git || exit $?
-        (cd "$FORMS" && git checkout vSCCo.47)
+        (cd "$FORMS" && git checkout vSCCo.48)
         rm -rf "$FORMS"/.git*
     fi
     "$FORMS"/resources/integration/scco/build.sh ./buildInstaller.sh\
