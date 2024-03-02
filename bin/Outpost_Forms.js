@@ -2476,6 +2476,36 @@ function logManualSend(form, addresses) {
     }).catch(log);
 }
 
+function isErased(fileName, backupName) {
+    return fsp.stat(fileName).then(
+        function hasFile() {
+            return false;
+        },
+        function noFile() {
+            return fsp.stat(backupName).then(
+                function hasBackup() {
+                    return true;
+                },
+                function noBackup() {
+                    return undefined;
+                }
+            );
+        }
+    );
+}
+
+function toBackupName(fileName) {
+    const lastDot = fileName.lastIndexOf('.');
+    const split = (lastDot >= 0) ? lastDot : fileName.length; 
+    return fileName.substring(0, split) + '-backup' + fileName.substring(split);
+}
+
+function isManualLogErased() {
+    return findManualLogFile().then(function(logName) {
+        return isErased(logName, toBackupName(logName));
+    });
+}
+
 function onGetManualEditLog(req, res) {
     return readManualLog().then(function(data) {
         return getManualSettings().then(function(settings) {
@@ -2553,19 +2583,28 @@ function onGetManualEditLog(req, res) {
         }
         data.messages = messageRows;
         data.afterLoad = '';
-        data.submitButtons = '<td style="width:1px;">'
-            + EOL + '  <button onclick="eraseAll()" style="background-color:#ffcccc;"'
-            + ' title="Clear all fields and delete all log entries!"'
-            + '>Erase All</button>'
-            + EOL + '</td><td style="width:1px;">'
-            + EOL + '  <input type="submit" name="csvButton" value="Download CSV File"/>'
-            + EOL + '</td><td style="width:1px;">'
-            + EOL + '  <input type="submit" name="printButton" value="Print"/>'
-            + EOL + '</td><td style="width:1px;">'
-            + EOL + '  <button onclick="save()">Save</button>'
-            + EOL + '</td>'
-            + EOL + '<input type="text" name="saveButton" id="saveButton" style="display:none;"/>';
-        return sendManualLog(res, data);
+        return isManualLogErased().then(function(erased) {
+            data.submitButtons = '<td style="width:1px;">'
+                + EOL + '  <button style="background-color:#ffcccc;"'
+                + EOL + '          onClick="'
+                + (erased
+                   ? ("submitDamnit('UndoErase')"
+                      + '" title="Restore all fields and log entries."'
+                      + '>Undo Erase All')
+                   : ("submitDamnit('EraseAll')"
+                      + '" title="Clear all fields and delete all log entries!"'
+                      + '>Erase All')
+                  ) + '</button>'
+                + EOL + '</td><td style="width:1px;">'
+                + EOL + '  <input type="submit" name="csvButton" value="Generate CSV File"/>'
+                + EOL + '</td><td style="width:1px;">'
+                + EOL + '  <input type="submit" name="printButton" value="Print"/>'
+                + EOL + '</td><td style="width:1px;">'
+                + EOL + '  <button onclick="submitDamnit(\'Save\')">Save</button>'
+                + EOL + '</td>'
+                + EOL + '<input type="text" name="submitValue" id="submitValue" style="display:none;"/>';
+            return sendManualLog(res, data);
+        });
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
         res.end(errorToHTML(err), CHARSET);
@@ -2573,6 +2612,31 @@ function onGetManualEditLog(req, res) {
 }
 
 function onPostManualEditLog(req, res) {
+    return function() {
+        switch(req.body && req.body.submitValue) {
+        case 'EraseAll':
+        case 'UndoErase':
+            return findManualLogFile().then(function(logName) {
+                const backupName = toBackupName(logName);
+                return isErased(logName, backupName).then(function(erased) {
+                    if (erased) { // Restore the entire log from the backup.
+                        return fsp.rename(backupName, logName);
+                    } else if (erased != undefined) { // Back up the entire log.
+                        return fsp.rename(logName, backupName);
+                    }
+                });
+            }).then(function() {
+                res.redirect(SEE_OTHER, req.headers.referer);
+            });
+        default:
+            return updateManualLog(req, res);
+        }
+    }().catch(function(err) {
+        res.end(errorToHTML(err), CHARSET);
+    });
+}
+
+function updateManualLog(req, res) {
     function getManualLogMessage(req, m, message) {
         var empty = true;
         manualLogMessageFieldNames.forEach(function(field) {
@@ -2588,7 +2652,7 @@ function onPostManualEditLog(req, res) {
         manualLogFieldNames.forEach(function(field) {
             data[field] = req.body[field];
         });
-        // Have messages been deleted, e.g. by the 'Erase All' button?
+        // m = number of messages (not counting the final placeholder):
         var m;
         for (m = data.messages.length; m > 0; --m) {
             if (req.body[`${m - 1}.time`] != null) {
@@ -2627,13 +2691,11 @@ function onPostManualEditLog(req, res) {
             res.redirect(SEE_OTHER, '/manual-log' + (req.body.withSignature ? '?withSignature=true' : ''));
         } else if (req.body.csvButton) {
             res.redirect(SEE_OTHER, '/ICS-309.csv');
-        } else if (req.body.saveButton) {
+        } else if (req.body.submitValue == 'Save') {
             sendWindowClose(res);
         } else {
             res.redirect(SEE_OTHER, req.headers.referer);
         }
-    }).catch(function(err) {
-        res.end(errorToHTML(err), CHARSET);
     });
 }
 
@@ -2754,7 +2816,7 @@ function readManualLog() {
         return theLog;
     }, function readFailed(err) {
         log(err);
-        return {messages: []};
+        return {messages: []}; // an empty log
     });
 }
 

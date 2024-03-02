@@ -87,21 +87,8 @@
           document.getElementById("delete-index").value = index + '';
           submitFormDamnit();
       }
-      function eraseAll() {
-          Array.prototype.forEach.call(
-              document.querySelectorAll('tr.message-edit'), // not message-blank
-              function(row) {
-                  row.remove();
-              });
-          Array.prototype.forEach.call(
-              document.querySelectorAll('input[type="text"]'),
-              function(input) {
-                  input.value = "";
-              });
-          submitFormDamnit();
-      }
-      function save() {
-          document.getElementById("saveButton").value = 'Save';
+      function submitDamnit(value) {
+          document.getElementById("submitValue").value = value;
           submitFormDamnit();
       }
       function onLoad() {
