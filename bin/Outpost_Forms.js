@@ -2468,20 +2468,6 @@ function logManualSend(form, addresses) {
             }
             data.messages.push(item);
         }
-        try {
-            var found = /^[A-Z0-9]{1,3}?-(\d+)/i.exec(fromNumber);
-            if (found) {
-                nextNumber = parseInt(found[1], 10) + 1;
-                getManualSettings().then(function(settings) {
-                    if (settings.nextMessageNumber != nextNumber) {
-                        settings.nextMessageNumber = nextNumber;
-                        setManualSettings(settings);
-                    }
-                });
-            }
-        } catch(err) {
-            log(err);
-        }
         return findManualLogFile().then(function(logFile) {
             return fsp.writeFile(
                 logFile, JSON.stringify(data), {encoding: ENCODING}
