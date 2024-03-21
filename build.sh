@@ -3,11 +3,15 @@
 cd `dirname "$0"` || exit $?
 export VersionMajor=3
 export VersionMinor=15
-export VersionBeta=
+export VersionBeta=a
 rm -rf built logs
 mkdir -p built/bin built/webToPDF
 if [ `node --version` != "v4.9.1" ]; then
     nvm use 4.9.1 32 || exit $? # https://github.com/coreybutler/nvm-windows
+    if [ `node --version` != "v4.9.1" ]; then
+        echo >&2 node version 4.9.1 is required, to package code compatible with Windows XP.
+        exit 1
+    fi
 fi
 if [ ! -e node_modules ]; then
     npm install || exit $? # https://docs.npmjs.com/cli/install
@@ -27,5 +31,5 @@ for REPO in jmkristian/pack-it-forms "$@"; do
         rm -rf "$FORMS"/.git*
     fi
     "$FORMS"/resources/integration/scco/build.sh ./buildInstaller.sh\
-            "$VersionMajor.$VersionMinor$VersionBeta" || exit
+            "$VersionMajor.$VersionMinor$VersionBeta" || exit $?
 done
