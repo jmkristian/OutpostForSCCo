@@ -2411,14 +2411,25 @@ function logManualView(settings, input, message) {
         theLog.messages.push(logEntry);
         var found = /^\s*DELIVERED:\s*(.*)/i.exec(subject);
         if (found) {
+            // Fill in the toNumber field of the message that was delivered.
             const deliveredNumber = getMessageNumberFromSubject(found[1]);
             input.message.split(/[\r\n]+/).forEach(function(line) {
+                var theirCall =  undefined;
+                var theirNumber = undefined;
                 found = /([^\s]+)\s+assigned Msg ID:\s*([^\s]+)/.exec(line);
                 if (found) {
+                    theirCall = found[1];
+                    theirNumber = found[2];
+                } else {
+                    found = /Recipient's Local Message ID:\s*([^\s]+)/.exec(line);
+                    if (found) {
+                        theirCall = logEntry.fromCall;
+                        theirNumber = found[1];
+                    }
+                }
+                if (theirCall && theirNumber) {
                     // Normally there's only one such line,
                     // so we search theLog only once.
-                    const theirCall = found[1];
-                    const theirNumber = found[2];
                     var myNumber = null;
                     theLog.messages.findIndex(function(message) {
                         if (message.fromNumber && !message.toNumber) {
