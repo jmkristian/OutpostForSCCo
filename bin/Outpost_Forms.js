@@ -1242,7 +1242,7 @@ function repairMessage(msg) {
     // Append lines into partial until a complete line is found;
     // then append partial to message.
     msg.split(EOL).every(function(line) {
-        log(`repairMessage line ${JSON.stringify(line)}`);
+        //log(`repairMessage line ${JSON.stringify(line)}`);
         /* Data should have the form name: [value]
            A ] within the value is escaped as `]
            The value part may end with any of:
@@ -1267,7 +1267,7 @@ function repairMessage(msg) {
             message += line + EOL;
         } else {
             partial += line;
-            log(`repairMessage partial ${JSON.stringify(partial)}`);
+            //log(`repairMessage partial ${JSON.stringify(partial)}`);
             if (/(`\]\]\]|[^`\]]\])\s*$/.test(partial)) { // a complete name: [value]
                 message += partial + EOL;
                 partial = '';
