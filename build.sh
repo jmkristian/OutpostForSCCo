@@ -3,7 +3,7 @@
 cd `dirname "$0"` || exit $?
 export VersionMajor=3
 export VersionMinor=15
-export VersionBeta=a
+export VersionBeta=
 rm -rf built logs
 mkdir -p built/bin built/webToPDF
 if [ `node --version` != "v4.9.1" ]; then
