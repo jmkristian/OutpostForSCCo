@@ -2,8 +2,8 @@
 # This script can be executed by the bash that's packaged with git for Windows.
 cd `dirname "$0"` || exit $?
 export VersionMajor=3
-export VersionMinor=15
-export VersionBeta=
+export VersionMinor=16
+export VersionBeta=a
 rm -rf built logs
 mkdir -p built/bin built/webToPDF
 if [ `node --version` != "v4.9.1" ]; then
@@ -27,7 +27,7 @@ for REPO in jmkristian/pack-it-forms "$@"; do
     fi
     if [ ! -e "$FORMS" ]; then
         git clone https://github.com/"$REPO".git || exit $?
-        (cd "$FORMS" && git checkout vSCCo.49)
+        (cd "$FORMS" && git checkout vSCCo.50)
         rm -rf "$FORMS"/.git*
     fi
     "$FORMS"/resources/integration/scco/build.sh ./buildInstaller.sh\

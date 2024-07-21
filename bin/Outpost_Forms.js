@@ -64,6 +64,7 @@ const fsp = require('./fsp.js');
 const http = require('http');
 const makeTemp = require('tmp');
 const morgan = require('morgan');
+const mustache = require('mustache');
 const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
@@ -76,6 +77,8 @@ const expandVariables = utilities.expandVariables;
 const expandVariablesInFile = utilities.expandVariablesInFile;
 const log = utilities.log;
 const toLogMessage = utilities.toLogMessage;
+
+mustache.tags = ['<%', '%>'];
 
 function promiseSpawn(exe, args, options) {
     return new Promise(function spawnChild(resolve, reject) {
@@ -1036,7 +1039,7 @@ function serve() {
         PortFileName, myServerPort + '', {encoding: ENCODING}
     ).catch(log);
     const deleteMySaveFiles = function deleteMySaveFiles() {
-        deleteOldFiles(SAVE_FOLDER, new RegExp('^form-' + myServerPort + '-\\d*.json$'), -seconds);
+        deleteOldFiles(SAVE_FOLDER, new RegExp('^form-' + myServerPort + '-\\d+.json$'), -seconds);
     };
     var idleTime = 0;
     const checkInterval = 5 * seconds;
@@ -1090,7 +1093,7 @@ function serve() {
             log(err);
         }
     }, checkInterval);
-    deleteOldFiles(SAVE_FOLDER, /^[^\.].*$/, 60 * seconds);
+    deleteOldFiles(SAVE_FOLDER, /^form-\d+-\d+\.json$/, 60 * seconds);
 }
 
 function onOpen(formId, args) {
@@ -1374,6 +1377,117 @@ function loadForm(formId, form) {
     });
 }
 
+function readJSON(fileName, defaultValue) {
+    return fsp.readFile(
+        fileName, ENCODING
+    ).then(function OK(json) {
+        return JSON.parse(json);
+    }).catch(function failed(err) {
+        if (defaultValue) {
+            log(err);
+            return defaultValue;
+        } else {
+            throw err;
+        }
+    });
+}
+
+/** A description of data that are stored in files for future use. */
+const savedData = {
+    'form-report-911.html': [ // data submitted from this form
+        {
+            fieldName: '33.',
+            savedName: 'recentReportingLocations',
+            recent: 8,
+        },
+        {
+            fieldName: '34.',
+            savedName: 'recentReportTakers',
+            recent: 8,
+        },
+    ],
+};
+
+function savedDataFileName(formType) {
+    return path.join(SAVE_FOLDER, formType.replace(/\.html$/, '.json'));
+}
+
+function readSavedData(formType, save) {
+    return readJSON(
+        savedDataFileName(formType), {}
+    ).then(function(data) {
+        save.forEach(function(spec) {
+            if (spec.recent) {
+                // This item should be an array of the most recently used values.
+                if (data[spec.savedName] == null) {
+                    data[spec.savedName] = [];
+                } else if ((typeof data[spec.savedName]) == 'string') {
+                    // Previous versions of this code stored stringified arrays.
+                    data[spec.savedName] = JSON.parse(data[spec.savedName]);
+                }
+            }
+        });
+        return data;
+    });
+}
+
+function saveSubmitted(formType, parsedMessage) {
+    const save = savedData[formType];
+    if (save) {
+        // log('saveSubmitted ' + formType);
+        // Update the saved data, asynchronously:
+        readSavedData(formType, save).then(function(data) {
+            save.forEach(function(spec) {
+                const newValue = parsedMessage.fields[spec.fieldName];
+                //log('saveSubmitted ' + spec.fieldName + ' ' + newValue);
+                if (newValue) {
+                    var recent = data[spec.savedName].filter(function(oldValue) {
+                        return oldValue != newValue;
+                    });
+                    recent.unshift(newValue);
+                    if (recent.length > spec.recent) recent.length = spec.recent;
+                    data[spec.savedName] = recent;
+                }
+            });
+            return JSON.stringify(data);
+        }).then(function(newData) {
+            //log('saveSubmitted newData ' + newData);
+            fsp.writeFile(savedDataFileName(formType), newData, {encoding: ENCODING});
+        }).catch(log);
+    }
+}
+
+function getHTML(form, formType) {
+    const readHTML = fsp.readFile(
+        path.join(PackItForms, formType), ENCODING
+    ).then(function OK(html) {
+        return html;
+    }, function failed(err) {
+        throw "I don't know about a form named "
+            + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
+            + " Perhaps the message came from a newer version of the "
+            + form.environment.addon_name + " add-on, "
+            + 'so it might help to install the latest version.'
+            + '\n\n' + err;
+    });
+    const saved = savedData[formType];
+    if (!saved) {
+        return readHTML;
+    }
+    return Promise.all([
+        readHTML,
+        readSavedData(formType, saved),
+    ]).then(function(results) {
+        const template = results[0];
+        const data = results[1];
+        //log('saved data ' + JSON.stringify(data));
+        for (key in data) {
+            data[key] = JSON.stringify(data[key]);
+        }
+        return mustache.render(template, data);
+    });
+}
+
 function getForm(form, res) {
     log('getForm ' + JSON.stringify(form.environment));
     if (!form.environment.addon_name) {
@@ -1396,9 +1510,7 @@ function getForm(form, res) {
             formType = readOnlyFileName;
         }
     }
-    return fsp.readFile(
-        path.join(PackItForms, formType), ENCODING
-    ).then(function(data) {
+    return getHTML(form, formType).then(function(data) {
         const template = data.replace(
             /<\s*script\b[^>]*\bsrc\s*=\s*"resources\/integration\/integration.js"/,
             '<script type="text/javascript">'
@@ -1410,13 +1522,6 @@ function getForm(form, res) {
         // So changes would be ignored by the browser, for example
         // the change to message_status after emailing a message.
         return expandDataIncludes(template, form);
-    }, function readFileFailed(err) {
-        throw "I don't know about a form named "
-            + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
-            + " Perhaps the message came from a newer version of the "
-            + form.environment.addon_name + " add-on, "
-            + 'so it might help to install the latest version.'
-            + '\n\n' + err;
     }).then(function(html) {
         if (form.environment.emailing) {
             form.environment.message_status = 'sent';
@@ -1546,8 +1651,10 @@ function onEmail(formId, reqBody, res) {
         form = foundForm;
         form.message = message;
         form.environment.emailing = true;
+        const parsed = parseMessage(message, form.environment);
         form.environment.subject =
-            reqBody.subject || subjectFromMessage(parseMessage(message, form.environment));
+            reqBody.subject || subjectFromMessage(parsed);
+        saveSubmitted(form.environment.ADDON_MSG_TYPE, parsed);
         form.environment.mode = 'readonly';
         res.redirect('/form-' + formId);
     }).catch(function(err) {
@@ -1567,8 +1674,9 @@ function toEOL(from) {
 function saveForm(form, req) {
     const reqBody = req.body;
     const message = reqBody.formtext;
-    form.environment.subject =
-        reqBody.subject || subjectFromMessage(parseMessage(message, form.environment));
+    const parsed = parseMessage(message, form.environment);
+    form.environment.subject = reqBody.subject || subjectFromMessage(parsed);
+    saveSubmitted(form.environment.ADDON_MSG_TYPE, parsed);
     // Outpost requires Windows-style line breaks:
     form.message = toEOL(message);
     log(`saveForm ${form.message.length}`);
