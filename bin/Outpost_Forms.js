@@ -65,6 +65,7 @@ const http = require('http');
 const makeTemp = require('tmp');
 const morgan = require('morgan');
 const mustache = require('mustache');
+// const nunjucks = require('nunjucks'); @3.1.2
 const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
@@ -1383,11 +1384,11 @@ function readJSON(fileName, defaultValue) {
     ).then(function OK(json) {
         return JSON.parse(json);
     }).catch(function failed(err) {
-        if (defaultValue) {
+        if (defaultValue == undefined) {
+            throw err;
+        } else {
             log(err);
             return defaultValue;
-        } else {
-            throw err;
         }
     });
 }
@@ -1412,19 +1413,17 @@ function savedDataFileName(formType) {
     return path.join(SAVE_FOLDER, formType.replace(/\.html$/, '.json'));
 }
 
-function readSavedData(formType, save) {
+function readSavedData(formType) {
+    //log(`readSavedData(${formType})`);
     return readJSON(
         savedDataFileName(formType), {}
     ).then(function(data) {
-        save.forEach(function(spec) {
-            if (spec.recent) {
+        const specs = savedData[formType];
+        if (specs) specs.forEach(function(spec) {
+            if (spec.savedName && (typeof data[spec.savedName]) == 'string') {
                 // This item should be an array of the most recently used values.
-                if (data[spec.savedName] == null) {
-                    data[spec.savedName] = [];
-                } else if ((typeof data[spec.savedName]) == 'string') {
-                    // Previous versions of this code stored stringified arrays.
-                    data[spec.savedName] = JSON.parse(data[spec.savedName]);
-                }
+                // Previous versions of this code stored stringified arrays.
+                data[spec.savedName] = JSON.parse(data[spec.savedName]);
             }
         });
         return data;
@@ -1432,16 +1431,16 @@ function readSavedData(formType, save) {
 }
 
 function saveSubmitted(formType, parsedMessage) {
-    const save = savedData[formType];
-    if (save) {
-        // log('saveSubmitted ' + formType);
+    const specs = savedData[formType];
+    if (specs) {
+        //log(`saveSubmitted(${formType})`);
         // Update the saved data, asynchronously:
-        readSavedData(formType, save).then(function(data) {
-            save.forEach(function(spec) {
+        readSavedData(formType).then(function(data) {
+            specs.forEach(function(spec) {
                 const newValue = parsedMessage.fields[spec.fieldName];
                 //log('saveSubmitted ' + spec.fieldName + ' ' + newValue);
                 if (newValue) {
-                    var recent = data[spec.savedName].filter(function(oldValue) {
+                    var recent = (data[spec.savedName] || []).filter(function(oldValue) {
                         return oldValue != newValue;
                     });
                     recent.unshift(newValue);
@@ -1457,11 +1456,97 @@ function saveSubmitted(formType, parsedMessage) {
     }
 }
 
-function getHTML(form, formType) {
-    const readHTML = fsp.readFile(
+/** Return a promise that resolves to the expansion of the template. */
+function renderFormTemplate(formType, template) {
+    //log(`renderFormTemplate(${formType})`);
+    const indirectEval = eval;
+    var nextTabIndex = 1;
+    var includedFiles = {};
+    var recalledData;
+    var fetchData;
+    // The templating engine is Mustache, extended with a fancy context:
+    const globalContext = { // These tags are available to the template and any included templates.
+        nextTabIndex: function getNextTabIndex() { // function tag
+            return `${nextTabIndex++}`;
+        },
+        include: function() { // section tag
+            /** Return the result of rendering another template. */
+            return function include(blockText, render) {
+                //log(`include(${blockText})`);
+                const text = render(blockText); // Expand any mustache tags within blockText.
+                var nestedContext = indirectEval(`var o = ${text}; o;`);
+                const fileName = path.join(PackItForms, 'resources', nestedContext.resource);
+                const nestedTemplate = includedFiles[fileName];
+                if ((typeof nestedTemplate) == 'string') {
+                    delete nestedContext.resource;
+                    if (nestedContext.nextTabIndex != undefined) {
+                        nextTabIndex = nestedContext.nextTabIndex;
+                        delete nestedContext.nextTabIndex;
+                    }
+                    // The nestedContext inherits the globalContext:
+                    nestedContext = Object.assign({}, globalContext, nestedContext);
+                    const result = mustache.render(nestedTemplate, nestedContext);
+                    //log(`mustache.render(${nestedTemplate}, ${JSON.stringify(nestedContext)})== ${result}`);
+                    return result;
+                } else {
+                    // We need to read the nestedTemplate from a file.
+                    if (includedFiles[fileName] == undefined) {
+                        includedFiles[fileName] = false; // We'll read it soon.
+                        //log(`fetchData.push(readFile(${fileName}))`);
+                        fetchData.push(fsp.readFile(
+                            fileName, ENCODING
+                        ).then(function(template) {
+                            //log(`includedFiles[${fileName}] = ${template}`);
+                            includedFiles[fileName] = template;
+                        }));
+                    }
+                    return "TBD";
+                }
+            };
+        },
+        recall: function() { // section tag
+            /** Return saved data. */
+            return function recall(blockText, render) {
+                if (recalledData) {
+                    const name = render(blockText); // Expand any mustache tags within blockText.
+                    return JSON.stringify(recalledData[name]);
+                } else {
+                    if (recalledData == undefined) {
+                        recalledData = false; // We'll read it soon.
+                        fetchData.push(readSavedData(formType).then(function(data) {
+                            //log(`recalledData = ${JSON.stringify(data)}`);
+                            recalledData = data;
+                        }));
+                    }
+                    return "TBD";
+                }
+            };
+        },
+    };
+    /* The template may require fetching data asynchronously. If so, we
+       make at least two attempts to render the template. The first attempt
+       discovers what data are required. All the data are fetched into
+       includedFiles or recalledData, and then we repeat the attempt. This
+       continues until all the data have been fetched. The last attempt
+       completes rendering.
+    */
+    const attempt = function attempt() {
+        fetchData = []; // a new array object
+        const result = mustache.render(template, globalContext);
+        if (fetchData.length > 0) {
+            return Promise.all(fetchData).then(attempt); // try again
+        } else {
+            return Promise.resolve(result);
+        }
+    };
+    return attempt();
+}
+
+function getFormHTML(form, formType) {
+    return fsp.readFile(
         path.join(PackItForms, formType), ENCODING
-    ).then(function OK(html) {
-        return html;
+    ).then(function OK(template) {
+        return renderFormTemplate(formType, template);
     }, function failed(err) {
         throw "I don't know about a form named "
             + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
@@ -1469,22 +1554,6 @@ function getHTML(form, formType) {
             + form.environment.addon_name + " add-on, "
             + 'so it might help to install the latest version.'
             + '\n\n' + err;
-    });
-    const saved = savedData[formType];
-    if (!saved) {
-        return readHTML;
-    }
-    return Promise.all([
-        readHTML,
-        readSavedData(formType, saved),
-    ]).then(function(results) {
-        const template = results[0];
-        const data = results[1];
-        //log('saved data ' + JSON.stringify(data));
-        for (key in data) {
-            data[key] = JSON.stringify(data[key]);
-        }
-        return mustache.render(template, data);
     });
 }
 
@@ -1510,7 +1579,7 @@ function getForm(form, res) {
             formType = readOnlyFileName;
         }
     }
-    return getHTML(form, formType).then(function(data) {
+    return getFormHTML(form, formType).then(function(data) {
         const template = data.replace(
             /<\s*script\b[^>]*\bsrc\s*=\s*"resources\/integration\/integration.js"/,
             '<script type="text/javascript">'
