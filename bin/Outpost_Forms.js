@@ -1460,14 +1460,17 @@ function saveSubmitted(formType, parsedMessage) {
 function renderFormTemplate(formType, template) {
     //log(`renderFormTemplate(${formType})`);
     const indirectEval = eval;
-    var nextTabIndex = 1;
+    var tabIndex = 0;
     var includedFiles = {};
     var recalledData;
     var fetchData;
     // The templating engine is Mustache, extended with a fancy context:
     const globalContext = { // These tags are available to the template and any included templates.
         nextTabIndex: function getNextTabIndex() { // function tag
-            return `${nextTabIndex++}`;
+            return `${++tabIndex}`;
+        },
+        sameTabIndex: function getSameTabIndex() { // function tag
+            return `${tabIndex}`;
         },
         include: function() { // section tag
             /** Return the result of rendering another template. */
@@ -1480,7 +1483,7 @@ function renderFormTemplate(formType, template) {
                 if ((typeof nestedTemplate) == 'string') {
                     delete nestedContext.resource;
                     if (nestedContext.nextTabIndex != undefined) {
-                        nextTabIndex = nestedContext.nextTabIndex;
+                        tabIndex = nestedContext.nextTabIndex - 1;
                         delete nestedContext.nextTabIndex;
                     }
                     // The nestedContext inherits the globalContext:
