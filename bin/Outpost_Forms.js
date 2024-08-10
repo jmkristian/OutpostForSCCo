@@ -71,6 +71,7 @@ const querystring = require('querystring');
 const stream = require('stream');
 const utf8 = require('utf8');
 const utilities = require('./utilities');
+const VM = require('vm');
 
 const errorToMessage = utilities.errorToMessage;
 const enquoteRegex = utilities.enquoteRegex;
@@ -1456,75 +1457,77 @@ function saveSubmitted(formType, parsedMessage) {
     }
 }
 
+const compiledScripts = {};
+
+function toScript(code) {
+    const script = compiledScripts[code];
+    if (script != undefined) return script;
+    return (compiledScripts[code] = new VM.Script(code));
+}
+
 /** Return a promise that resolves to the expansion of the template. */
-function renderFormTemplate(formType, template) {
+function renderFormTemplate(form, formType, template) {
     //log(`renderFormTemplate(${formType})`);
-    const indirectEval = eval;
-    var tabIndex = 0;
-    var includedFiles = {};
-    var recalledData;
-    var fetchData;
+    var sandbox;
+    var requiredPromises;
     // The templating engine is Mustache, extended with a fancy context:
     const globalContext = { // These tags are available to the template and any included templates.
         nextTabIndex: function getNextTabIndex() { // function tag
-            return `${++tabIndex}`;
+            return `${++sandbox.tabIndex}`;
         },
         sameTabIndex: function getSameTabIndex() { // function tag
-            return `${tabIndex}`;
+            return `${sandbox.tabIndex}`;
         },
-        include: function() { // section tag
-            /** Return the result of rendering another template. */
-            return function include(blockText, render) {
-                //log(`include(${blockText})`);
-                const text = render(blockText); // Expand any mustache tags within blockText.
-                var nestedContext = indirectEval(`var o = ${text}; o;`);
-                const fileName = path.join(PackItForms, 'resources', nestedContext.resource);
-                const nestedTemplate = includedFiles[fileName];
-                if ((typeof nestedTemplate) == 'string') {
-                    delete nestedContext.resource;
-                    if (nestedContext.nextTabIndex != undefined) {
-                        tabIndex = nestedContext.nextTabIndex - 1;
-                        delete nestedContext.nextTabIndex;
-                    }
-                    // The nestedContext inherits the globalContext:
-                    nestedContext = Object.assign({}, globalContext, nestedContext);
-                    const result = mustache.render(nestedTemplate, nestedContext);
-                    //log(`mustache.render(${nestedTemplate}, ${JSON.stringify(nestedContext)})== ${result}`);
-                    return result;
-                } else {
-                    // We need to read the nestedTemplate from a file.
-                    if (includedFiles[fileName] == undefined) {
-                        includedFiles[fileName] = false; // We'll read it soon.
-                        //log(`fetchData.push(readFile(${fileName}))`);
-                        fetchData.push(fsp.readFile(
-                            fileName, ENCODING
-                        ).then(function(template) {
-                            //log(`includedFiles[${fileName}] = ${template}`);
-                            includedFiles[fileName] = template;
-                        }));
-                    }
-                    return "TBD";
+        run: function() { // section tag
+            return function run(blockText, render) {
+                //log(`run(${blockText})`);
+                const code = render(blockText); // Expand any mustache tags within blockText.
+                const result = toScript(code).runInContext(sandbox);
+                if (result instanceof Promise) {
+                    requiredPromises.push(result);
+                    return 'TBD';
                 }
+                return `${result}`;
             };
         },
-        recall: function() { // section tag
-            /** Return saved data. */
-            return function recall(blockText, render) {
-                if (recalledData) {
-                    const name = render(blockText); // Expand any mustache tags within blockText.
-                    return JSON.stringify(recalledData[name]);
-                } else {
-                    if (recalledData == undefined) {
-                        recalledData = false; // We'll read it soon.
-                        fetchData.push(readSavedData(formType).then(function(data) {
-                            //log(`recalledData = ${JSON.stringify(data)}`);
-                            recalledData = data;
-                        }));
-                    }
-                    return "TBD";
-                }
-            };
-        },
+    };
+    var includedFiles = {};
+    var recalledData;
+    const include = function include(name, context) {
+        const fileName = path.join(PackItForms, name);
+        const nestedTemplate = includedFiles[fileName];
+        if ((typeof nestedTemplate) == 'string') {
+            // The nestedContext inherits the globalContext:
+            const nestedContext = Object.assign({}, globalContext, context || {});
+            const result = mustache.render(nestedTemplate, nestedContext);
+            //log(`mustache.render(${nestedTemplate}, ${JSON.stringify(nestedContext)}) == ${result}`);
+            return result;
+        }
+        // We need to read the nestedTemplate from a file.
+        if (includedFiles[fileName] == undefined) {
+            includedFiles[fileName] = false; // We'll read it soon.
+            //log(`requiredPromises.push(readFile(${fileName}))`);
+            return fsp.readFile(
+                fileName, ENCODING
+            ).then(function(template) {
+                //log(`includedFiles[${fileName}] = ${template}`);
+                includedFiles[fileName] = template;
+            });
+        }
+        return "TBD";
+    };
+    const recall = function recall(name) {
+        if (recalledData) {
+            return JSON.stringify(recalledData[name]);
+        }
+        if (recalledData == undefined) {
+            recalledData = false; // We'll read it soon.
+            return readSavedData(formType).then(function(data) {
+                //log(`recalledData = ${JSON.stringify(data)}`);
+                recalledData = data;
+            });
+        }
+        return "TBD";
     };
     /* The template may require fetching data asynchronously. If so, we
        make at least two attempts to render the template. The first attempt
@@ -1534,10 +1537,16 @@ function renderFormTemplate(formType, template) {
        completes rendering.
     */
     const attempt = function attempt() {
-        fetchData = []; // a new array object
+        requiredPromises = []; // a new array object
+        sandbox = VM.createContext({
+            environment: Object.assign({}, form.environment),
+            include: include,
+            recall: recall,
+            tabIndex: 0,
+        });
         const result = mustache.render(template, globalContext);
-        if (fetchData.length > 0) {
-            return Promise.all(fetchData).then(attempt); // try again
+        if (requiredPromises.length > 0) {
+            return Promise.all(requiredPromises).then(attempt); // try again
         } else {
             return Promise.resolve(result);
         }
@@ -1549,7 +1558,7 @@ function getFormHTML(form, formType) {
     return fsp.readFile(
         path.join(PackItForms, formType), ENCODING
     ).then(function OK(template) {
-        return renderFormTemplate(formType, template);
+        return renderFormTemplate(form, formType, template);
     }, function failed(err) {
         throw "I don't know about a form named "
             + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
