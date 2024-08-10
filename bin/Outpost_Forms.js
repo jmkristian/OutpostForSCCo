@@ -1472,6 +1472,13 @@ function renderFormTemplate(form, formType, template) {
     var requiredPromises;
     // The templating engine is Mustache, extended with a fancy context:
     const globalContext = { // These tags are available to the template and any included templates.
+        nextFieldNumber: function getNextFieldNumber() { // function tag
+            if (sandbox.fieldNumber >= 0) {
+                return `<span class="field-number">${++sandbox.fieldNumber}</span>`;
+            } else {
+                return '';
+            }
+        },
         nextTabIndex: function getNextTabIndex() { // function tag
             return `${++sandbox.tabIndex}`;
         },
@@ -1540,6 +1547,7 @@ function renderFormTemplate(form, formType, template) {
         requiredPromises = []; // a new array object
         sandbox = VM.createContext({
             environment: Object.assign({}, form.environment),
+            fieldNumber: -1,
             include: include,
             recall: recall,
             tabIndex: 0,
