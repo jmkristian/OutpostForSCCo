@@ -1494,7 +1494,7 @@ function renderFormTemplate(form, formType, template) {
                     requiredPromises.push(result);
                     return 'TBD';
                 }
-                return `${result}`;
+                return (result == undefined) ? '' : `${result}`;
             };
         },
     };
@@ -1546,7 +1546,10 @@ function renderFormTemplate(form, formType, template) {
     const attempt = function attempt() {
         requiredPromises = []; // a new array object
         sandbox = VM.createContext({
-            environment: Object.assign({}, form.environment),
+            envelope: {
+                viewer:  (form.environment.message_status == 'received') ? 'receiver' : 'sender',
+                readOnly: form.environment.mode == 'readonly',
+            },
             include: include,
             nextFieldNumber: -1,
             nextTabIndex: 1,
