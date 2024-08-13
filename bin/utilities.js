@@ -24,10 +24,12 @@ function enquoteRegex(text) {
 function errorToMessage(err) {
     if (err == null) {
         return null;
-    } else if (err instanceof Error && err.stack) {
-        return err.stack;
-    } else if (typeof err == 'string') {
+    } else if (err instanceof Error) {
+        return err.stack || JSON.stringify(err);
+    } else if ((typeof err) == 'string') {
         return err;
+    } else if (err.message && err.cause) {
+        return err.message + '\ncaused by ' + errorToMessage(err.cause);
     } else {
         return JSON.stringify(err);
     }

@@ -1460,14 +1460,20 @@ function saveSubmitted(formType, parsedMessage) {
 const compiledScripts = {};
 
 function toScript(code) {
-    const script = compiledScripts[code];
-    if (script != undefined) return script;
-    return (compiledScripts[code] = new VM.Script(code));
+    try {
+        var script = compiledScripts[code];
+        if (script != undefined) return script;
+        script = new VM.Script(code);
+        compiledScripts[code] = script;
+        return script;
+    } catch(err) {
+        throw {message:`toScript(${code}) failed`, cause: err};
+    }
 }
 
-/** Return a promise that resolves to the expansion of the template. */
-function renderFormTemplate(form, formType, template) {
-    //log(`renderFormTemplate(${formType})`);
+/** Return a promise that resolves to the HTML for this form. */
+function getFormHTML(form, formType) {
+    //log(`getFormHTML(${formType})`);
     var sandbox;
     var requiredPromises;
     // The templating engine is Mustache, extended with a fancy context:
@@ -1484,6 +1490,18 @@ function renderFormTemplate(form, formType, template) {
         },
         sameTabIndex: function getSameTabIndex() { // function tag
             return `${sandbox.nextTabIndex - 1}`;
+        },
+        include: function() { // section tag
+            return function include(blockText, render) {
+                log(`include(${blockText})`);
+                const fileName = render(blockText).trim();
+                const result = sandbox.include(fileName);
+                if (result instanceof Promise) {
+                    requiredPromises.push(result);
+                    return 'TBD';
+                }
+                return (result == undefined) ? '' : `${result}`;
+            };
         },
         run: function() { // section tag
             return function run(blockText, render) {
@@ -1504,11 +1522,15 @@ function renderFormTemplate(form, formType, template) {
         const fileName = path.join(PackItForms, name);
         const nestedTemplate = includedFiles[fileName];
         if ((typeof nestedTemplate) == 'string') {
-            // The nestedContext inherits the globalContext:
-            const nestedContext = Object.assign({}, globalContext, context || {});
-            const result = mustache.render(nestedTemplate, nestedContext);
-            //log(`mustache.render(${nestedTemplate}, ${JSON.stringify(nestedContext)}) == ${result}`);
-            return result;
+            try {
+                // The nestedContext inherits the globalContext:
+                const nestedContext = Object.assign({}, globalContext, context || {});
+                const result = mustache.render(nestedTemplate, nestedContext);
+                //log(`mustache.render(${nestedTemplate}, ${JSON.stringify(nestedContext)}) == ${result}`);
+                return result;
+            } catch(err) {
+                throw {message: `include(${fileName}, ${JSON.stringify(context)}) failed`, cause: err};
+            }
         }
         // We need to read the nestedTemplate from a file.
         if (includedFiles[fileName] == undefined) {
@@ -1536,13 +1558,15 @@ function renderFormTemplate(form, formType, template) {
         }
         return "TBD";
     };
-    /* The template may require fetching data asynchronously. If so, we
+    /* The form template may require fetching data asynchronously. If so, we
        make at least two attempts to render the template. The first attempt
        discovers what data are required. All the data are fetched into
        includedFiles or recalledData, and then we repeat the attempt. This
        continues until all the data have been fetched. The last attempt
        completes rendering.
     */
+    const formFileName = path.join(PackItForms, formType);
+    var formTemplate;
     const attempt = function attempt() {
         requiredPromises = []; // a new array object
         sandbox = VM.createContext({
@@ -1555,28 +1579,30 @@ function renderFormTemplate(form, formType, template) {
             nextTabIndex: 1,
             recall: recall,
         });
-        const result = mustache.render(template, globalContext);
-        if (requiredPromises.length > 0) {
-            return Promise.all(requiredPromises).then(attempt); // try again
-        } else {
-            return Promise.resolve(result);
+        try {
+            const result = mustache.render(formTemplate, globalContext);
+            if (requiredPromises.length > 0) {
+                return Promise.all(requiredPromises).then(attempt); // try again
+            } else {
+                return Promise.resolve(result);
+            }
+        } catch(err) {
+            throw {message: `render(${formFileName}) failed`, cause: err};
         }
     };
-    return attempt();
-}
-
-function getFormHTML(form, formType) {
     return fsp.readFile(
-        path.join(PackItForms, formType), ENCODING
-    ).then(function OK(template) {
-        return renderFormTemplate(form, formType, template);
+        formFileName, ENCODING
+    ).then(function OK(fileContents) {
+        formTemplate = fileContents;
+        return attempt();
     }, function failed(err) {
-        throw "I don't know about a form named "
-            + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
-            + " Perhaps the message came from a newer version of the "
-            + form.environment.addon_name + " add-on, "
-            + 'so it might help to install the latest version.'
-            + '\n\n' + err;
+        throw {message: "I don't know about a form named "
+               + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
+               + " Perhaps the message came from a newer version of the "
+               + form.environment.addon_name + " add-on, "
+               + 'so it might help to install the latest version.',
+               cause: err,
+              };
     });
 }
 
@@ -1603,7 +1629,7 @@ function getForm(form, res) {
         }
     }
     return getFormHTML(form, formType).then(function(data) {
-        const template = data.replace(
+        return data.replace(
             /<\s*script\b[^>]*\bsrc\s*=\s*"resources\/integration\/integration.js"/,
             '<script type="text/javascript">'
                 + '\n      var integrationEnvironment = ' + JSON.stringify(form.environment)
@@ -1613,7 +1639,6 @@ function getForm(form, res) {
         // but sadly that file is cached by the Chrome browser.
         // So changes would be ignored by the browser, for example
         // the change to message_status after emailing a message.
-        return expandDataIncludes(template, form);
     }).then(function(html) {
         if (form.environment.emailing) {
             form.environment.message_status = 'sent';
@@ -1666,68 +1691,6 @@ function updateSettings() {
     }).then(function(newSettings) {
         settings = newSettings;
     }).catch(log);
-}
-
-/* Expand data-include-html elements, for example:
-  <div data-include-html="ics-header">
-    {
-      "5.": "PRIORITY",
-      "9b.": "_.msgno2name(_.query.msgno)"
-    }
-  </div>
-*/
-function expandDataIncludes(template, form) {
-    const target = /<\s*div\s+data-include-html\s*=\s*"[^"]*"\s*>[^<]*<\/\s*div\s*>/gi;
-    const includes = [];
-    var found;
-    while(found = target.exec(template)) {
-        includes.push(found);
-    }
-    if (includes.length <= 0) {
-        // There's nothing here to expand.
-        return Promise.resolve(template);
-    }
-    const readers = includes.map(function(found) {
-        const matches = found[0].match(/"([^"]*)"\s*>([^<]*)/);
-        const name = matches[1];
-        const formDefaults = htmlEntities.decode(matches[2].trim());
-        log('data-include-html ' + name + ' ' + formDefaults);
-        // Read a file from pack-it-forms:
-        const fileName = path.join(PackItForms, 'resources', 'html', name + '.html')
-        return fsp.readFile(
-            fileName, ENCODING
-        ).then(function(data) {
-            // Remove the enclosing <div></div>:
-            var result = data
-                .replace(/^\s*<\s*div\s*>\s*/i, '')
-                .replace(/<\/\s*div\s*>\s*$/i, '');
-            if (formDefaults) {
-                result += `<script type="text/javascript">
-  add_form_default_values(${formDefaults});
-</script>
-`;
-            }
-            return { // one replacement
-                first: found.index,
-                newData: result,
-                next: found.index + found[0].length
-            };
-        });
-    });
-    return Promise.all(
-        readers
-    ).then(function(replacements) {
-        var next = 0;
-        var chunks = [];
-        replacements.forEach(function(replacement) {
-            chunks.push(template.substring(next, replacement.first));
-            chunks.push(replacement.newData);
-            next = replacement.next;
-        });
-        chunks.push(template.substring(next));
-        // Try it again, in case there are nested includes:
-        return expandDataIncludes(chunks.join(''), form);
-    });
 }
 
 function noCache(res) {
