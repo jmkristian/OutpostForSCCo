@@ -64,14 +64,11 @@ const fsp = require('./fsp.js');
 const http = require('http');
 const makeTemp = require('tmp');
 const morgan = require('morgan');
-const mustache = require('mustache');
-// const nunjucks = require('nunjucks'); @3.1.2
 const path = require('path');
 const querystring = require('querystring');
 const stream = require('stream');
 const utf8 = require('utf8');
 const utilities = require('./utilities');
-const VM = require('vm');
 
 const errorToMessage = utilities.errorToMessage;
 const enquoteRegex = utilities.enquoteRegex;
@@ -79,8 +76,6 @@ const expandVariables = utilities.expandVariables;
 const expandVariablesInFile = utilities.expandVariablesInFile;
 const log = utilities.log;
 const toLogMessage = utilities.toLogMessage;
-
-mustache.tags = ['<%', '%>'];
 
 function promiseSpawn(exe, args, options) {
     return new Promise(function spawnChild(resolve, reject) {
@@ -1380,18 +1375,17 @@ function loadForm(formId, form) {
 }
 
 function readJSON(fileName, defaultValue) {
-    return fsp.readFile(
-        fileName, ENCODING
-    ).then(function OK(json) {
+    try {
+        const json = fs.readFileSync(fileName, ENCODING);
         return JSON.parse(json);
-    }).catch(function failed(err) {
+    } catch(err) {
         if (defaultValue == undefined) {
             throw err;
         } else {
             log(err);
             return defaultValue;
         }
-    });
+    }
 }
 
 /** A description of data that are stored in files for future use. */
@@ -1416,19 +1410,17 @@ function savedDataFileName(formType) {
 
 function readSavedData(formType) {
     //log(`readSavedData(${formType})`);
-    return readJSON(
-        savedDataFileName(formType), {}
-    ).then(function(data) {
-        const specs = savedData[formType];
-        if (specs) specs.forEach(function(spec) {
-            if (spec.savedName && (typeof data[spec.savedName]) == 'string') {
-                // This item should be an array of the most recently used values.
-                // Previous versions of this code stored stringified arrays.
-                data[spec.savedName] = JSON.parse(data[spec.savedName]);
-            }
-        });
-        return data;
+    const specs = savedData[formType];
+    if (!specs) return {};
+    const data = readJSON(savedDataFileName(formType), {});
+    specs.forEach(function(spec) {
+        if (spec.savedName && (typeof data[spec.savedName]) == 'string') {
+            // This item should be an array of the most recently used values.
+            // Previous versions of this code stored stringified arrays.
+            data[spec.savedName] = JSON.parse(data[spec.savedName]);
+        }
     });
+    return data;
 }
 
 function saveSubmitted(formType, parsedMessage) {
@@ -1436,166 +1428,34 @@ function saveSubmitted(formType, parsedMessage) {
     if (specs) {
         //log(`saveSubmitted(${formType})`);
         // Update the saved data, asynchronously:
-        readSavedData(formType).then(function(data) {
-            specs.forEach(function(spec) {
-                const newValue = parsedMessage.fields[spec.fieldName];
-                //log('saveSubmitted ' + spec.fieldName + ' ' + newValue);
-                if (newValue) {
-                    var recent = (data[spec.savedName] || []).filter(function(oldValue) {
-                        return oldValue != newValue;
-                    });
-                    recent.unshift(newValue);
-                    if (recent.length > spec.recent) recent.length = spec.recent;
-                    data[spec.savedName] = recent;
-                }
-            });
-            return JSON.stringify(data);
-        }).then(function(newData) {
-            //log('saveSubmitted newData ' + newData);
-            fsp.writeFile(savedDataFileName(formType), newData, {encoding: ENCODING});
-        }).catch(log);
-    }
-}
-
-const compiledScripts = {};
-
-function toScript(code) {
-    try {
-        var script = compiledScripts[code];
-        if (script != undefined) return script;
-        script = new VM.Script(code);
-        compiledScripts[code] = script;
-        return script;
-    } catch(err) {
-        throw {message:`toScript(${code}) failed`, cause: err};
+        const data = readSavedData(formType);
+        specs.forEach(function(spec) {
+            const newValue = parsedMessage.fields[spec.fieldName];
+            //log('saveSubmitted ' + spec.fieldName + ' ' + newValue);
+            if (newValue) {
+                var recent = (data[spec.savedName] || []).filter(function(oldValue) {
+                    return oldValue != newValue;
+                });
+                recent.unshift(newValue);
+                if (recent.length > spec.recent) recent.length = spec.recent;
+                data[spec.savedName] = recent;
+            }
+        });
+        const newData = JSON.stringify(data);
+        //log('saveSubmitted newData ' + newData);
+        fsp.writeFile(
+            savedDataFileName(formType), newData, {encoding: ENCODING}
+        ).catch(log);
     }
 }
 
 /** Return a promise that resolves to the HTML for this form. */
 function getFormHTML(form, formType) {
     //log(`getFormHTML(${formType})`);
-    var sandbox;
-    var requiredPromises;
-    // The templating engine is Mustache, extended with a fancy context:
-    const globalContext = { // These tags are available to the template and any included templates.
-        nextFieldNumber: function getNextFieldNumber() { // function tag
-            if (sandbox.nextFieldNumber >= 0) {
-                return `<span class="field-number">${sandbox.nextFieldNumber++}</span>`;
-            } else {
-                return '';
-            }
-        },
-        nextTabIndex: function getNextTabIndex() { // function tag
-            return `${sandbox.nextTabIndex++}`;
-        },
-        sameTabIndex: function getSameTabIndex() { // function tag
-            return `${sandbox.nextTabIndex - 1}`;
-        },
-        include: function() { // section tag
-            return function include(blockText, render) {
-                log(`include(${blockText})`);
-                const fileName = render(blockText).trim();
-                const result = sandbox.include(fileName);
-                if (result instanceof Promise) {
-                    requiredPromises.push(result);
-                    return 'TBD';
-                }
-                return (result == undefined) ? '' : `${result}`;
-            };
-        },
-        run: function() { // section tag
-            return function run(blockText, render) {
-                //log(`run(${blockText})`);
-                const code = render(blockText); // Expand any mustache tags within blockText.
-                const result = toScript(code).runInContext(sandbox);
-                if (result instanceof Promise) {
-                    requiredPromises.push(result);
-                    return 'TBD';
-                }
-                return (result == undefined) ? '' : `${result}`;
-            };
-        },
-    };
-    var includedFiles = {};
-    var recalledData;
-    const include = function include(name, context) {
-        const fileName = path.join(PackItForms, name);
-        const nestedTemplate = includedFiles[fileName];
-        if ((typeof nestedTemplate) == 'string') {
-            try {
-                // The nestedContext inherits the globalContext:
-                const nestedContext = Object.assign({}, globalContext, context || {});
-                const result = mustache.render(nestedTemplate, nestedContext);
-                //log(`mustache.render(${nestedTemplate}, ${JSON.stringify(nestedContext)}) == ${result}`);
-                return result;
-            } catch(err) {
-                throw {message: `include(${fileName}, ${JSON.stringify(context)}) failed`, cause: err};
-            }
-        }
-        // We need to read the nestedTemplate from a file.
-        if (includedFiles[fileName] == undefined) {
-            includedFiles[fileName] = false; // We'll read it soon.
-            //log(`requiredPromises.push(readFile(${fileName}))`);
-            return fsp.readFile(
-                fileName, ENCODING
-            ).then(function(template) {
-                //log(`includedFiles[${fileName}] = ${template}`);
-                includedFiles[fileName] = template;
-            });
-        }
-        return "TBD";
-    };
-    const recall = function recall(name) {
-        if (recalledData) {
-            return JSON.stringify(recalledData[name]);
-        }
-        if (recalledData == undefined) {
-            recalledData = false; // We'll read it soon.
-            return readSavedData(formType).then(function(data) {
-                //log(`recalledData = ${JSON.stringify(data)}`);
-                recalledData = data;
-            });
-        }
-        return "TBD";
-    };
-    /* The form template may require fetching data asynchronously. If so, we
-       make at least two attempts to render the template. The first attempt
-       discovers what data are required. All the data are fetched into
-       includedFiles or recalledData, and then we repeat the attempt. This
-       continues until all the data have been fetched. The last attempt
-       completes rendering.
-    */
     const formFileName = path.join(PackItForms, formType);
-    var formTemplate;
-    const attempt = function attempt() {
-        requiredPromises = []; // a new array object
-        sandbox = VM.createContext({
-            envelope: {
-                viewer:  (form.environment.message_status == 'received') ? 'receiver' : 'sender',
-                readOnly: form.environment.mode == 'readonly',
-            },
-            include: include,
-            nextFieldNumber: -1,
-            nextTabIndex: 1,
-            recall: recall,
-        });
-        try {
-            const result = mustache.render(formTemplate, globalContext);
-            if (requiredPromises.length > 0) {
-                return Promise.all(requiredPromises).then(attempt); // try again
-            } else {
-                return Promise.resolve(result);
-            }
-        } catch(err) {
-            throw {message: `render(${formFileName}) failed`, cause: err};
-        }
-    };
     return fsp.readFile(
         formFileName, ENCODING
-    ).then(function OK(fileContents) {
-        formTemplate = fileContents;
-        return attempt();
-    }, function failed(err) {
+    ).catch(function failed(err) {
         throw {message: "I don't know about a form named "
                + JSON.stringify(form.environment.ADDON_MSG_TYPE) + "."
                + " Perhaps the message came from a newer version of the "
@@ -1629,7 +1489,13 @@ function getForm(form, res) {
         }
     }
     return getFormHTML(form, formType).then(function(data) {
-        return data.replace(
+        var savedData;
+        return data.replace(/{{recall:([^}]*)}}/g, function(found, fieldName) {
+            if (savedData == undefined) {
+                savedData = readSavedData(formType);
+            }
+            return JSON.stringify(savedData[fieldName]);
+        }).replace(
             /<\s*script\b[^>]*\bsrc\s*=\s*"resources\/integration\/integration.js"/,
             '<script type="text/javascript">'
                 + '\n      var integrationEnvironment = ' + JSON.stringify(form.environment)
