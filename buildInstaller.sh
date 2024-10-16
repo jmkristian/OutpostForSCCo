@@ -10,4 +10,5 @@ mkdir -p built/addons built/bin built/webToPDF || exit $?
 node ./buildInstaller.js "$VersionMajor.$VersionMinor$VersionBeta" "$1" "$2" "$3" || exit $?
 cp -p webToPDF/built/WebToPDF.exe built/webToPDF/WebToPDF.exe
 cp -p "$FORMS"/resources/integration/scco/"$1".nsi built/addon.nsi || exit $?
+cp -p "$FORMS"/resources/integration/scco/"$1".launch built/addons || exit $?
 ./setup.cmd "$1" "$2" "bin\\$3" "$4" || exit $?

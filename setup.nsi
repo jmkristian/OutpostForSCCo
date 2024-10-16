@@ -277,6 +277,7 @@ Function ${un}DeleteMyFiles
   ${Delete} launch-v.cmd
   ${Delete} version.txt
   ${RMDir} "$INSTDIR\bin"
+  ${RMDir} "$INSTDIR\built"
   ${RMDir} "$INSTDIR\converted"
   ${RMDir} "$INSTDIR\notes"
   ${RMDir} "$INSTDIR\pdf"
@@ -370,8 +371,6 @@ Section "Install"
   FileWrite $R0 "${VersionMajor}.${VersionMinor}${VersionBeta}"
   FileClose $R0
 
-  CreateDirectory "$INSTDIR\addons"
-
   # Files to install:
   SetOutPath "$INSTDIR\bin"
   File bin\chooseFolder.js
@@ -390,14 +389,20 @@ Section "Install"
      File /r webToPDF\bin\*.*
   ${EndIf}
   SetOutPath "$INSTDIR\addons"
-  File /r built\addons\*.*
+  File built\addons\*.*
   SetOutPath "$INSTDIR"
   File built\manual.cmd
   File built\UserGuide.html
   Call ChooseAddonFiles
   SetOutPath "$INSTDIR\pack-it-forms"
   File icon-*.png
-  File /oname=resources\integration\integration.js pack-it-forms\resources\integration\scco\integration.js
+  File pack-it-forms\*.png
+  SetOutPath "$INSTDIR\pack-it-forms\resources"
+  File /r /x *~ pack-it-forms\resources\js
+  File /r /x *~ pack-it-forms\resources\css
+  SetOutPath "$INSTDIR\pack-it-forms\resources\integration"
+  File pack-it-forms\resources\integration\scco\integration.js
+  CreateDirectory "$INSTDIR\pack-it-forms\msgs"
   SetOutPath "$INSTDIR"
 
   # define uninstaller:
