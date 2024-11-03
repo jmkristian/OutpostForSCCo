@@ -129,7 +129,13 @@
           return decodeLatin1(s);
       }
       var specialCP1252 = new RegExp('[' + Object.keys(decodeCP1252Map).join('') + ']', 'g');
+      var notCP1252 = new RegExp('[\u0081\u008d\u008f\u0090\u009d]', 'g');
       function decodeCP1252(s) {
+          var errors = '';
+          for (var c of s.matchAll(notCP1252)) {
+              errors += (errors ? '\n' : '') + (decodeHex(c[0]) + " isn't CP-1252.");
+          }
+          if (errors) alert(errors);
           return s && s.replace(specialCP1252, function(c) {
               return decodeCP1252Map[c] || c;
           });
@@ -419,6 +425,24 @@
         <td>&#xee;</td>
         <td>&#xef;</td>
       </tr><tr>
+        <th>200</th>
+        <td title="en quad">&#x2000;</td>
+        <td title="em quad">&#x2001;</td>
+        <td title="en space">&#x2002;</td>
+        <td title="em space">&#x2003;</td>
+        <td title="three-per-em space">&#x2004;</td>
+        <td title="four-per-em space">&#x2005;</td>
+        <td title="six-per-em space">&#x2006;</td>
+        <td title="figure space">&#x2007;</td>
+        <td title="punctuation space">&#x2008;</td>
+        <td title="thin space">&#x2009;</td>
+        <td title="hair space">&#x200a;</td>
+        <td title="zero-width space">&#x200b;</td>
+        <td title="zero-width non-joiner">&#x200c;</td>
+        <td title="zero-width joiner">&#x200d;</td>
+        <td title="left-to-right mark">&#x200e;</td>
+        <td title="right-to-left mark">&#x200f;</td>
+      </tr><tr>
         <th>201</th>
         <td>&#x2010;</td>
         <td>&#x2011;</td>
@@ -441,11 +465,73 @@
         <td>&#x2040;</td>
         <td>&#x2041;</td>
         <td>&#x2042;</td>
+        <td>&#x2043;</td>
+        <td>&#x2044;</td>
+        <td>&#x2045;</td>
+        <td>&#x2046;</td>
+        <td>&#x2047;</td>
+        <td>&#x2048;</td>
+        <td>&#x2049;</td>
+        <td>&#x204a;</td>
+        <td>&#x204b;</td>
+        <td>&#x204c;</td>
+        <td>&#x204d;</td>
+        <td>&#x204e;</td>
+        <td>&#x204f;</td>
       </tr><tr>
         <th>208</th>
         <td>&#x2080;</td>
         <td>&#x2081;</td>
         <td>&#x2082;</td>
+        <td>&#x2083;</td>
+        <td>&#x2084;</td>
+        <td>&#x2085;</td>
+        <td>&#x2086;</td>
+        <td>&#x2087;</td>
+        <td>&#x2088;</td>
+        <td>&#x2089;</td>
+        <td>&#x208a;</td>
+        <td>&#x208b;</td>
+        <td>&#x208c;</td>
+        <td>&#x208d;</td>
+        <td>&#x208e;</td>
+        <td>&#x208f;</td>
+      </tr><tr>
+        <th>240</th>
+        <td>&#x2400;</td>
+        <td>&#x2401;</td>
+        <td>&#x2402;</td>
+        <td>&#x2403;</td>
+        <td>&#x2404;</td>
+        <td>&#x2405;</td>
+        <td>&#x2406;</td>
+        <td>&#x2407;</td>
+        <td>&#x2408;</td>
+        <td>&#x2409;</td>
+        <td>&#x240a;</td>
+        <td>&#x240b;</td>
+        <td>&#x240c;</td>
+        <td>&#x240d;</td>
+        <td>&#x240e;</td>
+        <td>&#x240f;</td>
+      </tr><tr>
+        <th>274</th>
+        <td>&#x2740;</td>
+        <td>&#x2741;</td>
+        <td>&#x2742;</td>
+        <td>&#x2743;</td>
+        <td>&#x2744;</td>
+        <td>&#x2745;</td>
+        <td>&#x2746;</td>
+        <td>&#x2747;</td>
+        <td>&#x2748;</td>
+        <td>&#x2749;</td>
+        <td>&#x274a;</td>
+        <td>&#x274b;</td>
+        <td>&#x274c;</td>
+        <td>&#x274d;</td>
+        <td>&#x274e;</td>
+        <td>&#x274f;</td>
       </tr><tr>
         <th>4E0</th>
         <td>&#x4e00;</td>
