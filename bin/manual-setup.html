@@ -209,7 +209,7 @@
                   <select name="encoding" id="encoding" style="margin-bottom:1ex;"
                           title="How your terminal converts between characters and bytes">
                     <option value="Windows-1252">Windows-1252</option>
-                    <option value="ISO 8859-1">ISO 8859-1</option>
+                    <option value="Latin-1">ISO 8859-1</option>
                     <option value="UTF-8">UTF-8</option>
                   </select>
                   <img alt="?" src="icon-question.png" style="width:1.1em;" onclick="toggleEncodingHelp();"/>
@@ -232,8 +232,10 @@
                         If your terminal isn't configurable, set this encoding to match your terminal's behavior.
                       </p><p>
                         The recommended values are
-                        <a href="https://en.wikipedia.org/wiki/Windows-1252">Windows-1252</a> (AKA CP-1252)
-                        or <a href="https://en.wikipedia.org/wiki/ISO/IEC_8859-1">ISO 8859-1</a> (AKA Latin-1).
+                        <a href="https://en.wikipedia.org/wiki/Windows-1252#Codepage_layout">Windows-1252</a>
+                        (AKA CP-1252)
+                        or <a href="https://en.wikipedia.org/wiki/ISO/IEC_8859-1#Code_page_layout">ISO 8859-1</a>
+                        (AKA Latin-1).
                         These convert each byte to a separate character, which makes it possible to
                         correctly handle multi-byte characters
                         despite line breaks that may be inserted by the BBS.

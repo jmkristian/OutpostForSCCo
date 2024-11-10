@@ -58,6 +58,7 @@ const AllHtmlEntities = require('html-entities').AllHtmlEntities;
 const bodyParser = require('body-parser');
 const child_process = require('child_process');
 const concat_stream = require('concat-stream');
+const encoding = require('./encoding');
 const express = require('express');
 const fs = require('fs');
 const fsp = require('./fsp.js');
@@ -76,6 +77,15 @@ const expandVariables = utilities.expandVariables;
 const expandVariablesInFile = utilities.expandVariablesInFile;
 const log = utilities.log;
 const toLogMessage = utilities.toLogMessage;
+
+const encode = encoding.encode;
+const decode = encoding.decode;
+const transEncode = encoding.transEncode;
+const transDecode = encoding.transDecode;
+const findBadBytes = encoding.findBadBytes;
+const UTF8 = encoding.LATIN_1;
+const LATIN_1 = encoding.LATIN_1;
+const WINDOWS = encoding.WINDOWS_1252;
 
 function promiseSpawn(exe, args, options) {
     return new Promise(function spawnChild(resolve, reject) {
@@ -126,24 +136,6 @@ const INTERNAL_SERVER_ERROR = 500;
 const CHARSET = 'utf-8'; // for HTTP
 const TrimAddress = /^[^@]*(@[^.]*)?/;
 const ENCODING = CHARSET; // for files
-const ISO_8859_1 = 'ISO 8859-1'; // I mean ISO/IEC 8859-1:1998 <https://en.wikipedia.org/wiki/ISO/IEC_8859-1>
-const WINDOWS_1252 = 'Windows-1252';
-const encodingAliases = {
-    'windows-1252': WINDOWS_1252,
-    'cp1252': WINDOWS_1252,
-    'cp-1252': WINDOWS_1252,
-    // https://www.rfc-editor.org/rfc/rfc1345.html
-    'iso 8859-1': ISO_8859_1,
-    'iso-8859-1': ISO_8859_1,
-    'iso_8859-1': ISO_8859_1,
-    'iso8859-1': ISO_8859_1,
-    'latin-1': ISO_8859_1,
-    'latin1': ISO_8859_1,
-    'cp-819': ISO_8859_1,
-    'cp819': ISO_8859_1,
-    'utf-8': 'UTF-8',
-    'utf8': 'UTF-8',
-};
 const EOL = '\r\n';
 const htmlEntities = new AllHtmlEntities();
 const INI = { // patterns that match lines from a .ini file.
@@ -190,10 +182,11 @@ const OpenOutpostMessage = '/openOutpostMessage';
 const PackItForms = 'pack-it-forms';
 const PackItMsgs = path.join(PackItForms, 'msgs');
 const PortFileName = path.join(LOG_FOLDER, 'server-port.txt');
+const WARNING_ICON = '<img src="/icon-warning.png" alt="warning"'
+      + ' style="width:24pt;height:24pt;vertical-align:middle;margin-right:1em;"/>'
 const PROBLEM_HEADER = '<html><head><title>Problem</title></head><body>'
-      + EOL + '<h3 id="something-went-wrong"><img src="/icon-warning.png" alt="warning"'
-      + ' style="width:24pt;height:24pt;vertical-align:middle;margin-right:1em;">'
-      + 'Something went wrong.</h3>';
+      + EOL + WARNING_ICON + EOL
+      + '<h3 id="something-went-wrong">Something went wrong.</h3>';
 const SAVE_FOLDER = 'saved';
 const SEQUENCE_MARK = '^'; // must be OK in a file name, and come after '.' in lexical order
 const SEQUENCE_REGEX = /\^/g; // matches all occurrences of SEQUENCE_MARK
@@ -585,7 +578,7 @@ function convertMessageToFiles() {
     return fsp.readFile(
         path.resolve(PackItMsgs, environment.MSG_FILENAME), ENCODING
     ).then(function(message) {
-        const parsed = parseMessage(message, environment);
+        const parsed = parseEmail({message: message});
         const subject = environment.subject || subjectFromMessage(parsed);
         const spoolFilePrefix = toFileName(subject)
               .replace(SEQUENCE_REGEX, '~');
@@ -1228,7 +1221,9 @@ function parseArgs(args) {
     return environment;
 }
 
-/** Remove line breaks that the BBS inserted into the message. */
+/** Remove any line breaks that the BBS might have inserted into
+    lines that look like form data. Don't transDecode the message.
+ */
 function repairMessage(msg) {
     //log(`repairMessage(${JSON.stringify(msg)})`);
     if (!msg) {
@@ -1285,20 +1280,8 @@ function repairMessage(msg) {
     return message;
 }
 
-/** Transcode s from the given encoding to ENCODING. */
-function toENCODING(s, encoding) {
-    switch(encoding) {
-    case WINDOWS_1252:
-        return Buffer.from(windowsToLatin1(s), 'binary').toString(ENCODING);
-    case ISO_8859_1:
-        return Buffer.from(s, 'binary').toString(ENCODING);
-    default:
-        // Already ENCODING, we suppose.
-    }
-    return s;
-}
-
-function getMessage(environment) {
+/** Fetch form data from a file that was provided by Outpost. */
+function readFormDataFile(environment) {
     if (environment.message) {
         return Promise.resolve(environment.message);
     } else if (!environment.MSG_FILENAME) {
@@ -1306,12 +1289,13 @@ function getMessage(environment) {
     }
     const msgFileName = path.resolve(PackItMsgs, environment.MSG_FILENAME);
     return fsp.readFile(
-        msgFileName, {encoding: 'binary'}
+        msgFileName, {encoding: 'binary'} // Read the bytes, unmodified.
     ).then(function(msg) {
         fs.unlink(msgFileName, function(err) {
             log(err ? err : ("Deleted " + msgFileName));
         });
-        return toENCODING(repairMessage(msg.replace(/[^\r]\n|\r[^\n]/g, EOL)), ISO_8859_1);
+        // Repair the bytes and then decode them.
+        return decode[ENCODING](repairMessage(toEOL(msg)));
     });
 }
 
@@ -1352,7 +1336,7 @@ function loadForm(formId, form) {
     if (form.message != null) {
         return Promise.resolve();
     }
-    return getMessage(
+    return readFormDataFile(
         form.environment
     ).then(function(message) {
         form.message = message;
@@ -1424,7 +1408,8 @@ function readSavedData(formType) {
 }
 
 function saveSubmitted(formType, parsedMessage) {
-    const specs = savedData[formType];
+    const t = formType || parsedMessage.formType;
+    const specs = t && savedData[t];
     if (specs) {
         //log(`saveSubmitted(${formType})`);
         // Update the saved data, asynchronously:
@@ -1587,20 +1572,20 @@ function onEmail(formId, reqBody, res) {
 /** Change Unix style line endings to Windows style. */
 function toEOL(from) {
     return from && from
-        .replace(/([^\r])\n/g, '$1' + EOL)
-        .replace(/([^\r])\n/g, '$1' + EOL);
+        .replace(/^\n|([^\r])\n|\r\n?/g, `$1${EOL}`)
+        .replace(/^\n|([^\r])\n|\r\n?/g, `$1${EOL}`);
     // You have to do it twice to handle multiple consecutive blank lines.
 }
 
-function saveForm(form, req) {
+function saveMessage(form, req) {
     const reqBody = req.body;
     const message = reqBody.formtext;
-    const parsed = parseMessage(message, form.environment);
-    form.environment.subject = reqBody.subject || subjectFromMessage(parsed);
+    const parsed = parseEmail({message: message});
+    form.environment.subject = reqBody.subject || subjectFromMessage(parsed) || form.environment.subject;
     saveSubmitted(form.environment.ADDON_MSG_TYPE, parsed);
     // Outpost requires Windows-style line breaks:
     form.message = toEOL(message);
-    log(`saveForm ${form.message.length}`);
+    log(`saveMessage ${form.message.length}`);
 }
 
 function isUrgent(message) {
@@ -1617,7 +1602,7 @@ function onSubmit(formId, req, res) {
     return requireForm(formId).then(function(foundForm) {
         form = foundForm;
         const message = req.body.formtext;
-        saveForm(form, req);
+        saveMessage(form, req);
         const submission = {
             formId: formId,
             form: form,
@@ -1662,6 +1647,26 @@ function onSubmit(formId, req, res) {
     });
 }
 
+function asciifySubject(subject) {
+    return subject && subject.replace(/[\r\n]/g, ' ').replace(/[^ -~]/g, '~');
+}
+
+const reservedURI = ":/?#[]@!$&'()*+,;="; // https://datatracker.ietf.org/doc/html/rfc3986#section-2.2
+function encodeWindowsURI(s) {
+    if (!s) return s;
+    var into = '';
+    for (c of encode[WINDOWS](s)) {
+        var code = c.charCodeAt(0);
+        if (code <= 0x20 || code >= 0x7f || reservedURI.indexOf(c) >= 0) {
+            into += ('%' + ('0' + code.toString(16)).slice(-2));
+        } else {
+            into += c;
+        }
+    }
+    //log(`encodeWindowsURI(${s}) = ${into}`);
+    return into;
+}
+
 function messageForOpdirect(submission) {
     if (!submission.addonName) throw 'addonName is required.\n'; 
     // Outpost requires parameters to appear in a specific order.
@@ -1671,11 +1676,15 @@ function messageForOpdirect(submission) {
         body += '&' + querystring.stringify({upd: (submission.form.environment.MSG_INDEX)});
     }
     if (submission.subject) {
-        body += '&' + querystring.stringify({sub: (submission.subject)});
+        body += '&' + querystring.stringify({sub: asciifySubject(submission.subject)});
     }
     body += '&' + querystring.stringify({urg: submission.urgent ? 'TRUE' : 'FALSE'});
     if (submission.form.message) {
-        body += '&' + querystring.stringify({msg: submission.form.message});
+        body += '&' + (bodyContainsAForm(submission.form.message)
+                       ? querystring.stringify({msg: submission.form.message}) // UTF8
+                       : querystring.stringify({msg: submission.form.message}, // WINDOWS
+                                               '&', '=', {encodeURIComponent: encodeWindowsURI})
+                      );
     }
     return body;
 }
@@ -1858,7 +1867,7 @@ function getManualSettings() {
             return settings;
         });
     }).then(function(settings) {
-        settings.encoding = (settings.encoding && encodingAliases[settings.encoding.toLowerCase()]) || WINDOWS_1252;
+        settings.encoding = encoding.normalize(settings.encoding) || WINDOWS;
         if (settings.useTac) {
             settings.call = settings.tacCall;
             settings.name = settings.tacName;
@@ -1874,7 +1883,7 @@ function getManualSettings() {
 
 function getInitialManualSettings() {
     const settings = {
-        encoding: WINDOWS_1252,
+        encoding: WINDOWS,
         nextMessageNumber: 1,
         opName: '',
         opCall: '',
@@ -1991,6 +2000,7 @@ function onPostManualSetup(req, res) {
         for (field in req.body) {
             settings[field] = req.body[field];
         }
+        settings.encoding = encoding.normalize(settings.encoding) || WINDOWS;
         settings.useTac = !!req.body.useTac; // coerce to boolean
         setManualSettings(settings);
         log('onPostManualSetup ' + JSON.stringify(settings));
@@ -2093,62 +2103,6 @@ function onManualCreate(req, res) {
     });
 }
 
-// Windows-1252 is the same as ISO 8859-1, except for:
-const windowsToLatin1Map = {
-    '\u20AC': '\u0080', // EURO SIGN
-    '\u201A': '\u0082', // SINGLE LOW-9 QUOTATION MARK
-    '\u0192': '\u0083', // LATIN SMALL LETTER F WITH HOOK
-    '\u201E': '\u0084', // DOUBLE LOW-9 QUOTATION MARK
-    '\u2026': '\u0085', // HORIZONTAL ELLIPSIS
-    '\u2020': '\u0086', // DAGGER
-    '\u2021': '\u0087', // DOUBLE DAGGER
-    '\u02C6': '\u0088', // MODIFIER LETTER CIRCUMFLEX ACCENT
-    '\u2030': '\u0089', // PER MILLE SIGN
-    '\u0160': '\u008A', // LATIN CAPITAL LETTER S WITH CARON
-    '\u2039': '\u008B', // SINGLE LEFT-POINTING ANGLE QUOTATION MARK
-    '\u0152': '\u008C', // LATIN CAPITAL LIGATURE OE
-    '\u017D': '\u008E', // LATIN CAPITAL LETTER Z WITH CARON
-    '\u2018': '\u0091', // LEFT SINGLE QUOTATION MARK
-    '\u2019': '\u0092', // RIGHT SINGLE QUOTATION MARK
-    '\u201C': '\u0093', // LEFT DOUBLE QUOTATION MARK
-    '\u201D': '\u0094', // RIGHT DOUBLE QUOTATION MARK
-    '\u2022': '\u0095', // BULLET
-    '\u2013': '\u0096', // EN DASH
-    '\u2014': '\u0097', // EM DASH
-    '\u02DC': '\u0098', // SMALL TILDE
-    '\u2122': '\u0099', // TRADE MARK SIGN
-    '\u0161': '\u009A', // LATIN SMALL LETTER S WITH CARON
-    '\u203A': '\u009B', // SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
-    '\u0153': '\u009C', // LATIN SMALL LIGATURE OE
-    '\u017E': '\u009E', // LATIN SMALL LETTER Z WITH CARON
-    '\u0178': '\u009F', // LATIN CAPITAL LETTER Y WITH DIAERESIS
-};
-const windowsToLatin1RegEx = new RegExp('[' + enquoteRegex(Object.keys(windowsToLatin1Map).join('')) + ']', 'g');
-const latin1ToWindowsMap = function invert(m) {
-    var result = {};
-    for (var key in m) {
-        result[m[key]] = key;
-    }
-    return result;
-}(windowsToLatin1Map);
-const latin1ToWindowsRegEx = new RegExp('[\u0080-\u009F]', 'g');
-
-/** Convert a Windows-1252 string to an ISO 8859-1 string. */
-function windowsToLatin1(s) {
-    if (!s) return s;
-    return s.replace(windowsToLatin1RegEx, function(c) {
-        return windowsToLatin1Map[c] || c;
-    });
-}
-
-/** Convert an ISO 8859-1 string to a Windows-1252 string. */
-function latin1ToWindows(s) {
-    if (!s) return s;
-    return s.replace(latin1ToWindowsRegEx, function(c) {
-        return latin1ToWindowsMap[c] || c;
-    });
-}
-
 function onManualView(req, res) {
     const formId = '' + nextFormId++;
     return getManualSettings().then(function(settings) {
@@ -2233,7 +2187,7 @@ function onManualSubmit(formId, req, res) {
     return requireForm(formId).then(function(foundForm) {
         form = foundForm;
         form.environment.readOnly = true;
-        saveForm(form, req);
+        saveMessage(form, req);
         res.redirect('/manual-message-' + formId);
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
@@ -2489,9 +2443,9 @@ function logManualView(settings, input, message) {
 function logManualSend(form, addresses) {
     log('logManualSend(' + JSON.stringify(form) + ', ' + JSON.stringify(addresses) + ')');
     return readManualLog().then(function(data) {
-        const message = parseEmail({message: form.message});
-        const subject = form.environment.subject || subjectFromEmail(message);
-        const fromNumber = message.fields.MsgNo || getMessageNumberFromSubject(subject);
+        const parsed = parseEmail(form);
+        const subject = form.environment.subject || subjectFromEmail(parsed);
+        const fromNumber = parsed.fields.MsgNo || getMessageNumberFromSubject(subject);
         for (a in addresses) {
             var item = {toCall: trimAddress(addresses[a])};
             if (a > 0) {
@@ -2884,13 +2838,13 @@ function onPostManualCommand(formId, req, res) {
             prefix = 'SC ' + addresses[0] + EOL + addresses.slice(1).join(',');
             break;
         }
-        const subject = req.body.subject.replace(/\r?\n/g, ' ');
+        const subject = asciifySubject(req.body.subject);
         prefix += `${EOL}${subject}${EOL}` + (urgent ? '!URG!' : '');
         form.environment.subject = subject;
         form.message = message;
-        form.plainText = prefix + message + suffix;
+        form.command = prefix + message + suffix;
         return getManualSettings().then(function(settings) {
-            return archiveManualMessage(settings, subject, form.plainText);
+            return archiveManualMessage(settings, subject, form.command);
         }).then(function() {
             logManualSend(form, addresses);
             res.redirect(SEE_OTHER, `/manual-command-${formId}/`
@@ -2903,9 +2857,95 @@ function onPostManualCommand(formId, req, res) {
     });
 }
 
+function bytesToHex(from) {
+    var into = '';
+    for (var f = 0; f < from.length; ++f) {
+        into += ('0' + from.charCodeAt(f).toString(16)).slice(-2) + ' ';
+    }
+    return into;
+}
+
+function highlight(charSet, from) {
+    return from.replace(/./g, function(c) {
+        if (charSet.hasOwnProperty(c)) {
+            return `<span class="highlight">${encodeHTML(c)}</span>`;
+        } else if (c == '\r' || c == '\n') {
+            return `${EOL}<br/>`;
+        }
+        return c;
+    });
+}
+
+function notPastableProblem(encoding, from, bad) {
+    var badSet = {};
+    for (var c of decode[WINDOWS](bad)) {
+        badSet[c] = true;
+    }
+    const badChars = Object.keys(badSet);
+    return {
+        message: highlight(badSet, from),
+        problems: [
+            '<span class="highlight monospace">'
+                + encodeHTML(badChars.join(' '))
+                + '</span> '
+                + (badChars.length == 1
+                   ? `isn't a ${encoding} character.`
+                   : `aren't ${encoding} characters.`),
+        ],
+    };
+}
+
+function notPastable(encoding, from) {
+    const winBytes = encode[WINDOWS](from);
+    var bad = findBadBytes[WINDOWS](winBytes);
+    if (bad) {
+        return notPastableProblem(WINDOWS, from, bad);
+    } else if (encoding != WINDOWS) {
+        bad = findBadBytes[encoding](winBytes);
+        if (bad) {
+            return notPastableProblem(encoding, from, bad);
+        }
+    }
+    return null;
+}
+
+function notTranscodable(encoding, from) {
+    if (findBadBytes[encoding](encode[CHARSET](from))) {
+        // Find the set of problematic characters:
+        var badChars = {};
+        for (var c of from) {
+            if (!badChars[c]) {
+                var bytes = encode[CHARSET](c);
+                var badBytes = findBadBytes[encoding](bytes);
+                if (badBytes) {
+                    badChars[c] = [bytesToHex(bytes), badBytes];
+                }
+            }
+        }
+        // Warn about each problematic character:
+        var problems = [];
+        for (var b in badChars) {
+            var value = badChars[b];
+            problems.push(
+                `<span class="highlight">${b}</span> is encoded as ${value[0]}`
+                    + `and ` + bytesToHex(value[1])
+                    + (value[1].length == 1
+                       ? `doesn't represent a ${encoding} character.`
+                       : `don't represent ${encoding} characters.`));
+        }
+        if (problems.length) {
+            return {
+                problems: problems,
+                message: highlight(badChars, from),
+            };
+        }
+    }
+    return null;
+}
+
 function onGetManualCommand(formId, req, res) {
     return requireForm(formId).then(function(form) {
-        var command = form.plainText;
+        const command = form.command;
         if (!command || !/[^\u0000-\u007F]/.test(command)) {
             // These characters are the same in any encoding.
             res.set({'Content-Type': TEXT_PLAIN});
@@ -2916,22 +2956,39 @@ function onGetManualCommand(formId, req, res) {
         // show it to the user inside a textarea. For one thing, this works
         // around https://bugzilla.mozilla.org/show_bug.cgi?id=359303
         return getManualSettings().then(function(settings) {
-            switch(settings.encoding) {
-            case ISO_8859_1:
-                command = Buffer.from(command, ENCODING).toString('binary');
-                break;
-            case WINDOWS_1252:
-                command = latin1ToWindows(Buffer.from(command, ENCODING).toString('binary'));
-                break;
-            default:
+            var warning = null;
+            var transcoded = command;
+            if (bodyContainsAForm(form.message)) {
+                warning = notTranscodable(settings.encoding, command);
+                transcoded = transEncode[settings.encoding](command); 
+            } else {
+                warning = notPastable(settings.encoding, command);
             }
             return fsp.readFile(
                 path.join('bin', 'manual-command.html'), {encoding: ENCODING}
-            );
-        }).then(function(template) {
-            const page = expandVariables(template, {command: JSON.stringify(command)});
-            res.set({'Content-Type': TEXT_HTML});
-            res.end(page, CHARSET);
+            ).then(function(template) {
+                if (warning) {
+                    return fsp.readFile(
+                        path.join('bin', 'manual-warning.html'), {encoding: ENCODING}
+                    ).then(function(warningTemplate) {
+                        return expandVariables(template, {
+                            command: JSON.stringify(transcoded),
+                            warning: expandVariables(warningTemplate, {
+                                problems: warning.problems.join(`${EOL}<br/>`),
+                                message: warning.message,
+                            })
+                        });
+                    });
+                } else {
+                    return expandVariables(template, {
+                        command: JSON.stringify(transcoded),
+                        warning: '',
+                    });
+                }
+            }).then(function(page) {
+                res.set({'Content-Type': TEXT_HTML});
+                res.end(page, CHARSET);
+            });
         });
     }).catch(function(err) {
         res.set({'Content-Type': TEXT_HTML});
@@ -3004,30 +3061,28 @@ function toShortName(fieldName) {
     return fieldName;
 }
 
-/** Parse an email message. Don't check to see if it contains form data. */
+/** Parse an email message. Don't require it to contain a form. */
 function parseEmail(input, encoding) {
     log(`parseEmail(${JSON.stringify(input)}, ${encoding})`);
     var result = {headers: {}, fields: {}};
     if (!input.message) return result;
-    var email = input.message.replace(/[^\r]\n|\r[^\n]/g, EOL);
-    //log(`parseEmail email ${JSON.stringify(email)}`);
+    var email = toEOL(input.message);
+    // Split the message into a headers string and a body string:
     var headers = '';
     var body = email;
     var found;
     if ((found = email.indexOf(EOL + EOL)) >= 0) {
-        // An empty line separates the headers from the body.
-        //log(`parseEmail line empty`);
+        // This empty line separates the headers from the body.
         headers = email.substring(0, found);
         body = email.substring(found + (2 * EOL.length));
     }
     if (found = /(^|\r\n)[!#]/.exec(headers)) {
         // That can't be a header. Maybe there are no headers.
-        //log(`parseEmail line ${JSON.stringify(found[0])}`);
         headers = email.substring(0, found.index);
         body = email.substring(found.index + found[1].length);
     }
-    //log(`parseEmail headers ${JSON.stringify(headers)}`);
-    headers = toENCODING(headers, encoding);
+    headers = transDecode[encoding || UTF8](headers);
+    // Parse the headers into result.headers:
     var fieldName = null;
     var fieldValue = '';
     headers.split(EOL).forEach(function(line) {
@@ -3047,17 +3102,23 @@ function parseEmail(input, encoding) {
     if (fieldName != null) {
         result.headers[fieldName] = fieldValue;
     }
-    //log(`parseEmail body ${JSON.stringify(body)}`);
+    // Assume the body contains a form, and transcode it.
+    const message = transDecode[encoding || UTF8](repairMessage(body));
+    // Parse it into result.addonName, addonVersion, formType and fields:
     fieldName = null;
     fieldValue = '';
-    const message = toENCODING(repairMessage(body), encoding);
-    message.split(EOL).forEach(function(line) {
+    message.split(EOL).every(function(line) {
         if (fieldName == null) {
             switch(line.charAt(0)) {
             case '!':
-                if (!result.addonName
-                    && !line.startsWith('!/ADDON!')) {
-                    result.addonName = line.match(/^!([^!]*)/)[1];
+                if (line.startsWith('!/ADDON!')) {
+                    return false; // Ignore the rest of the message.
+                }
+                if (line.indexOf('!URG!') >= 0) {
+                    result.urgent = true;
+                }
+                if (!result.addonName) {
+                    result.addonName = (line.match(/!([^!]*)!$/) || [null, null])[1];
                 }
                 break;
             case '#':
@@ -3085,12 +3146,13 @@ function parseEmail(input, encoding) {
                 fieldValue = "";
             }
         }
+        return true; // Continue parsing lines.
     });
-    if (result.formType) {
+    if (messageContainsAForm(result)) {
         body = message;
-    } else {
-        // The body wasn't an addon message, it appears.
-        body = toENCODING(body, encoding); // simply transcode it
+    } else { // It didn't contain a form, after all.
+        // body is not repaired and not transDecoded.
+        result.fields = {};
     }
     input.message = (headers ? (headers + EOL + EOL) : '') + body;
     //log(`parseEmail = ${JSON.stringify(result)}`);
@@ -3099,6 +3161,10 @@ function parseEmail(input, encoding) {
 
 function messageContainsAForm(message, environment) {
     return (message && message.formType) || (environment && environment.ADDON_MSG_TYPE);
+}
+
+function bodyContainsAForm(body) {
+    return /^[^\r\n]*![^!\r\n]+![\r\n]/.test(body);
 }
 
 function parseMessage(email, environment) {
@@ -3132,15 +3198,14 @@ function expandTemplate(template, fields) {
 }
 
 function subjectFromMessage(parsed) {
+    if (!parsed.formType) return '';
     const fields = parsed.fields;
     fields['5.'] = fields['5.'] ? fields['5.'].charAt(0) : 'R';
     const formFile = fs.readFileSync(path.join(PackItForms, parsed.formType), ENCODING);
     const meta = getMetaContents(formFile);
     const prefix = meta['pack-it-forms-subject-prefix'] || '{{field:MsgNo}}_{{field:5.handling}}';
     const suffix = meta['pack-it-forms-subject-suffix'] || '_{{field:10.subject}}';
-    const result = expandTemplate(prefix + suffix, fields).replace(/[^ -~]/g, function(found) {
-        return '~';
-    });
+    const result = asciifySubject(expandTemplate(prefix + suffix, fields));
     //log(`subjectFromMessage(${JSON.stringify(parsed)}) = ${result}`);
     return result;
 }

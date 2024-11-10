@@ -1,0 +1,20 @@
+<div id="warning">
+  <table style="width:100%;">
+    <tr>
+      <td style="padding:1em 1em 0em 1em;width:1px;">
+        <img src="/icon-warning.png" alt="warning" style="width:24pt;height:24pt;"/>
+      </td><td style="padding-bottom:0.5em;vertical-align:bottom;">
+        This message will be garbled, because:
+      </td><td style="padding:10pt;vertical-align:top;width:1px;"
+               onclick="document.getElementById('warning').style.display='none';">
+        <img src="/icon-close.png" alt="close" style="width:10pt;height:10pt;"/>
+      </td>
+    </tr><tr>
+      <td colspan="3" style="padding:0em 1em;">
+        {{problems}}
+      </td>
+    </tr>
+  </table>
+  <hr/>
+  <div class="monospace" style="font-size:10pt;padding:0em 1em 1em 1em;">{{message}}</div>
+</div>

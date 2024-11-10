@@ -376,6 +376,7 @@ Section "Install"
   File bin\chooseFolder.js
   File bin\fsp.js
   File bin\manual-log.csv
+  File bin\manual-warning.html
   File bin\message.html
   File bin\Outpost_Forms.js
   File bin\server.ini

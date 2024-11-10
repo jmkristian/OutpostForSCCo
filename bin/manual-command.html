@@ -11,9 +11,28 @@
           textarea.select();
       };
     </script>
+    <style>
+      .highlight {
+          background-color: yellow;
+      }
+      .monospace {
+          font-family: consolas,monaco,profont,monospace;
+          white-space: pre-wrap;
+      }
+      #warning {
+          background-color: white;
+          border: 2px solid black;
+          box-shadow: #aaaaaa 6px 6px 2px;
+          position: fixed;
+          left: 0px;
+          top: 0px;
+          margin: 2em;
+      }
+    </style>
   </head>
   <body style="height:100%;">
-    <textarea id="command" style="height:95%;width:100%;border:none;outline:none;resize:none"
+    <textarea id="command" style="height:95%;width:100%;border:none;outline:none;resize:none;"
               readonly></textarea>
+    {{warning}}
   </body>
 </html>
