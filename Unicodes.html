@@ -32,15 +32,17 @@
     <script type="text/javascript">
       const exports = {};
     </script>
-    <script type="text/javascript" src="bin/encoding.js"></script>
+    <script type="text/javascript" src="bin/encodings.js"></script>
     <script type="text/javascript">
-      const encoding = exports;
+      const encodings = exports;
       const HEX = 'hexadecimal';
+      const decoder = encodings.decode;
+      const encoder = encodings.encode;
 
-      encoding.encode[encoding.UTF8] = function encodeUtf8(s) {
+      encoder[encodings.UTF8] = function encodeUtf8(s) {
           return unescape(encodeURIComponent(s));
       };
-      encoding.decode[encoding.UTF8] = function decodeUtf8(bytes) {
+      decoder[encodings.UTF8] = function decodeUtf8(bytes) {
           try {
               return decodeURIComponent(escape(bytes));
           } catch(err) {
@@ -52,7 +54,7 @@
           a: 0xa, b: 0xb, c: 0xc, d: 0xd, e: 0xe, f: 0xf,
           A: 0xa, B: 0xb, C: 0xc, D: 0xd, E: 0xe, F: 0xf};
 
-      encoding.decode[HEX] = function decodeHex(bytes) {
+      decoder[HEX] = function decodeHex(bytes) {
           var into = '';
           for (var f = 0; f < bytes.length; ++f) {
               if (into) into += ' ';
@@ -62,7 +64,7 @@
           }
           return into;
       }
-      encoding.encode[HEX] = function encodeHex(text) {
+      encoder[HEX] = function encodeHex(text) {
           var into = '';
           var b = 0;
           var b0 = true;
@@ -104,7 +106,7 @@
       /** Something changed. Update everything else. */
       function updateFrom(target) {
           const from = boxes[target.id];
-          const bytes = encoding.encode[from.encoding](target.value);
+          const bytes = encoder[from.encoding](target.value);
           const valid = !from.invalid(bytes);
           if (valid) {
               for (var id in boxes) {
@@ -114,7 +116,7 @@
                   if (into === from) {
                       value = into.box.value;
                   } else {
-                      var decode = encoding.decode[into.encoding];
+                      var decode = decoder[into.encoding];
                       if (decode) {
                           value = decode(bytes);
                       }
@@ -143,32 +145,30 @@
               const from = boxes[target.id];
               var nextFocus = event.w6jmkNextFocus || from.nextFocus;
               var errors = [];
-              const invalid = from.invalid(bytes);
-              if (invalid) {
+              if (from.invalid(bytes)) {
                   target.style.backgroundColor = errorColor;
-                  errors.push(invalid);
-                  nextFocus = target;
+                  errors.push(target.value + " isn't " + from.encoding + '.');
               } else {
-                  ["textBox", "byteBox", "latin1Box", "cp1252Box"].forEach(function(id) {
+                  for (id in boxes) {
                       var into = boxes[id];
                       if (into !== from) {
                           var invalid = into.invalid(bytes);
                           if (invalid) {
                               errors.push(invalid);
                               into.box.style.backgroundColor = errorColor;
-                          } else {
-                              into.box.style.backgroundColor = null;
                           }
                       }
-                  });
+                  }
               }
               if (errors.length) {
                   nextFocus = target;
                   warn(errors);
               }
               if (nextFocus) {
-                  nextFocus.focus();
-                  nextFocus.select(); // makes it easy to copy or cut
+                  setTimeout(function() {
+                      nextFocus.focus();
+                      nextFocus.select(); // makes it easy to copy or cut
+                  }, 10);
               }
           } catch(err) {
               alert(err);
@@ -181,7 +181,7 @@
           if (value) {
               var target = boxes.textBox.box;;
               if (value.match(/[\u0080-\u009f]/)) {
-                  value = encoding.decode[encoding.WINDOWS_1252](value);
+                  value = decoder[encodings.WINDOWS_1252](value);
                   target = boxes.cp1252Box.box;
               }
               target.value = (target.value || '') + value;
@@ -209,7 +209,7 @@
               box.addEventListener('change', onChange);
           });
 
-          boxes.textBox.encoding = encoding.UTF8;
+          boxes.textBox.encoding = encodings.UTF8;
           boxes.textBox.nextFocus = boxes.byteBox.box;
           boxes.textBox.codes = document.getElementById("textCodes");
 
@@ -230,18 +230,18 @@
           };
           [boxes.textBox, boxes.latin1Box, boxes.cp1252Box].forEach(function(box) {
               box.invalid = function(b) {
-                  var invalid = encoding.findBadBytes[box.encoding](b);
-                  return invalid && (encoding.decode[HEX](invalid)
+                  var invalid = encodings.findBadBytes[box.encoding](b);
+                  return invalid && (decoder[HEX](invalid)
                                      + (invalid.length == 1 ? " isn't " : " aren't ")
                                      + box.encoding + '.');
               };
           });
 
-          boxes.latin1Box.encoding = encoding.LATIN_1;
+          boxes.latin1Box.encoding = encodings.LATIN_1;
           boxes.latin1Box.nextFocus = boxes.textBox.box;
           boxes.latin1Box.codes = document.getElementById("latin1Codes");
 
-          boxes.cp1252Box.encoding = encoding.WINDOWS_1252;
+          boxes.cp1252Box.encoding = encodings.WINDOWS_1252;
           boxes.cp1252Box.nextFocus = boxes.textBox.box;
           boxes.cp1252Box.codes = document.getElementById("cp1252Codes");
 

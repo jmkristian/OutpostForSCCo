@@ -58,7 +58,7 @@ const AllHtmlEntities = require('html-entities').AllHtmlEntities;
 const bodyParser = require('body-parser');
 const child_process = require('child_process');
 const concat_stream = require('concat-stream');
-const encoding = require('./encoding');
+const encodings = require('./encodings');
 const express = require('express');
 const fs = require('fs');
 const fsp = require('./fsp.js');
@@ -78,14 +78,14 @@ const expandVariablesInFile = utilities.expandVariablesInFile;
 const log = utilities.log;
 const toLogMessage = utilities.toLogMessage;
 
-const encode = encoding.encode;
-const decode = encoding.decode;
-const transEncode = encoding.transEncode;
-const transDecode = encoding.transDecode;
-const findBadBytes = encoding.findBadBytes;
-const UTF8 = encoding.LATIN_1;
-const LATIN_1 = encoding.LATIN_1;
-const WINDOWS = encoding.WINDOWS_1252;
+const encode = encodings.encode;
+const decode = encodings.decode;
+const transEncode = encodings.transEncode;
+const transDecode = encodings.transDecode;
+const findBadBytes = encodings.findBadBytes;
+const UTF8 = encodings.UTF8;
+const LATIN_1 = encodings.LATIN_1;
+const WINDOWS = encodings.WINDOWS_1252;
 
 function promiseSpawn(exe, args, options) {
     return new Promise(function spawnChild(resolve, reject) {
@@ -1647,7 +1647,7 @@ function onSubmit(formId, req, res) {
     });
 }
 
-function asciifySubject(subject) {
+function asciifyHeader(subject) {
     return subject && subject.replace(/[\r\n]/g, ' ').replace(/[^ -~]/g, '~');
 }
 
@@ -1676,7 +1676,7 @@ function messageForOpdirect(submission) {
         body += '&' + querystring.stringify({upd: (submission.form.environment.MSG_INDEX)});
     }
     if (submission.subject) {
-        body += '&' + querystring.stringify({sub: asciifySubject(submission.subject)});
+        body += '&' + querystring.stringify({sub: asciifyHeader(submission.subject)});
     }
     body += '&' + querystring.stringify({urg: submission.urgent ? 'TRUE' : 'FALSE'});
     if (submission.form.message) {
@@ -1867,7 +1867,7 @@ function getManualSettings() {
             return settings;
         });
     }).then(function(settings) {
-        settings.encoding = encoding.normalize(settings.encoding) || WINDOWS;
+        settings.encoding = encodings.normalize(settings.encoding) || WINDOWS;
         if (settings.useTac) {
             settings.call = settings.tacCall;
             settings.name = settings.tacName;
@@ -2000,7 +2000,7 @@ function onPostManualSetup(req, res) {
         for (field in req.body) {
             settings[field] = req.body[field];
         }
-        settings.encoding = encoding.normalize(settings.encoding) || WINDOWS;
+        settings.encoding = encodings.normalize(settings.encoding) || WINDOWS;
         settings.useTac = !!req.body.useTac; // coerce to boolean
         setManualSettings(settings);
         log('onPostManualSetup ' + JSON.stringify(settings));
@@ -2825,7 +2825,7 @@ function onPostManualCommand(formId, req, res) {
         req.body.to.split(/[,;]/).forEach(function(item) {
             var address = item.trim();
             if (address) {
-                addresses.push(address);
+                addresses.push(asciifyHeader(address));
             }
         });
         var prefix = '';
@@ -2838,7 +2838,7 @@ function onPostManualCommand(formId, req, res) {
             prefix = 'SC ' + addresses[0] + EOL + addresses.slice(1).join(',');
             break;
         }
-        const subject = asciifySubject(req.body.subject);
+        const subject = asciifyHeader(req.body.subject);
         prefix += `${EOL}${subject}${EOL}` + (urgent ? '!URG!' : '');
         form.environment.subject = subject;
         form.message = message;
@@ -2943,10 +2943,16 @@ function notTranscodable(encoding, from) {
     return null;
 }
 
+const embeddedEX = new RegExp('(^|[\r\n])\/EX([\r\n]|$)', 'g');
+
 function onGetManualCommand(formId, req, res) {
     return requireForm(formId).then(function(form) {
+        var warning = embeddedEX.test(form.message)
+            ? {problems: ['It contains /EX on a line by itself (the end-of-message marker).'],
+               message: form.message.replace(embeddedEX, '$1<span class="highlight">/EX</span>$2')}
+            : null;
         const command = form.command;
-        if (!command || !/[^\u0000-\u007F]/.test(command)) {
+        if (!command || (!warning && !/[^\u0000-\u007F]/.test(command))) {
             // These characters are the same in any encoding.
             res.set({'Content-Type': TEXT_PLAIN});
             res.end(command, CHARSET);
@@ -2956,14 +2962,15 @@ function onGetManualCommand(formId, req, res) {
         // show it to the user inside a textarea. For one thing, this works
         // around https://bugzilla.mozilla.org/show_bug.cgi?id=359303
         return getManualSettings().then(function(settings) {
-            var warning = null;
             var transcoded = command;
             if (bodyContainsAForm(form.message)) {
-                warning = notTranscodable(settings.encoding, command);
-                transcoded = transEncode[settings.encoding](command); 
+                warning = notTranscodable(settings.encoding, command) || warning;
+                return transEncode[settings.encoding](command); 
             } else {
-                warning = notPastable(settings.encoding, command);
+                warning = notPastable(settings.encoding, command) || warning;
+                return command;
             }
+        }).then(function(transcoded) {
             return fsp.readFile(
                 path.join('bin', 'manual-command.html'), {encoding: ENCODING}
             ).then(function(template) {
@@ -3063,7 +3070,7 @@ function toShortName(fieldName) {
 
 /** Parse an email message. Don't require it to contain a form. */
 function parseEmail(input, encoding) {
-    log(`parseEmail(${JSON.stringify(input)}, ${encoding})`);
+    //log(`parseEmail(${JSON.stringify(input)}, ${encoding})`);
     var result = {headers: {}, fields: {}};
     if (!input.message) return result;
     var email = toEOL(input.message);
@@ -3155,7 +3162,7 @@ function parseEmail(input, encoding) {
         result.fields = {};
     }
     input.message = (headers ? (headers + EOL + EOL) : '') + body;
-    //log(`parseEmail = ${JSON.stringify(result)}`);
+    //log(`parseEmail(${JSON.stringify(input)}, ${encoding})`)${EOL} = ${JSON.stringify(result)}`);
     return result;
 }
 
@@ -3205,7 +3212,7 @@ function subjectFromMessage(parsed) {
     const meta = getMetaContents(formFile);
     const prefix = meta['pack-it-forms-subject-prefix'] || '{{field:MsgNo}}_{{field:5.handling}}';
     const suffix = meta['pack-it-forms-subject-suffix'] || '_{{field:10.subject}}';
-    const result = asciifySubject(expandTemplate(prefix + suffix, fields));
+    const result = asciifyHeader(expandTemplate(prefix + suffix, fields));
     //log(`subjectFromMessage(${JSON.stringify(parsed)}) = ${result}`);
     return result;
 }
