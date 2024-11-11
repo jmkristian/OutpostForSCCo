@@ -28,6 +28,7 @@
           background-color: white;
           border: 1px solid black;
           display: none;
+          margin-right: 1em;
           position: fixed;
       }
     </style>
@@ -70,7 +71,7 @@
               help.style.display = 'none';
           } else {
               help.style.display = 'block';
-              document.getElementById('closeEncodingHelp').focus();
+              help.focus();
           }
       }
       function chooseArchiveFolder() {
@@ -214,21 +215,23 @@
                   </select>
                   <img alt="?" src="icon-question.png" style="width:1.1em;" onclick="toggleEncodingHelp();"/>
                   <div id="encodingHelp" tabindex="-1" onkeydown="escapeHelp(event);">
-                    <div style="float:right;">
-                      <button type="button" id="closeEncodingHelp" style="font-weight:bold;font-size:125%;"
-                              onclick="document.getElementById('encodingHelp').style.display='none';">x</button>
+                    <div style="float:right;padding:10pt;"
+                         onclick="document.getElementById('encodingHelp').style.display='none';">
+                      <img src="/icon-close.png" alt="close" style="width:10pt;height:10pt;"/>
                     </div>
-                    <div style="padding-left:1em;padding-right:1em;">
+                    <div style="padding-left:1em;padding-right:0.5em;"> 
                       <p>This field indicates how your terminal software converts
                         between characters and the binary data that it exchanges with the BBS.
                         For best results, configure your terminal to match this encoding.
                         For example:
-                        <ul>
-                          <li>In PuTTY, the configuration item is 'Window > Translation > Remote character set'.</li>
-                          <li>In QtTermTCP, the options are in the 'Setup' menu.</li>
-                          <li>In converse.js, the command line option is --encoding.
-                          </li>
-                        </ul>
+                      </p>
+                      <ul>
+                        <li>In PuTTY, the configuration item is 'Window > Translation > Remote character set'.</li>
+                        <li>In QtTermTCP, the options are in the 'Setup' menu.</li>
+                        <li>In converse.js, the command line option is --encoding.
+                        </li>
+                      </ul>
+                      <p>
                         If your terminal isn't configurable, set this encoding to match your terminal's behavior.
                       </p><p>
                         The recommended values are

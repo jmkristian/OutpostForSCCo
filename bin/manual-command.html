@@ -3,6 +3,12 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
     <script type="text/javascript">
+      function escapeHide(event, id) {
+          if (event.key == 'Escape') {
+              element = document.getElementById(id);
+              if (element) element.style.display = 'none';
+          }
+      }
       var command = {{command}};
       window.onload = function onLoad() {
           var textarea = document.getElementById("command");
@@ -30,7 +36,7 @@
       }
     </style>
   </head>
-  <body style="height:100%;">
+  <body style="height:100%;" onkeydown="escapeHide(event, 'warning');">
     <textarea id="command" style="height:95%;width:100%;border:none;outline:none;resize:none;"
               readonly></textarea>
     {{warning}}
