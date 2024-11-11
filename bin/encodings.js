@@ -61,7 +61,7 @@ findBadBytes[UTF8] = function findBadUTF8(b) {
         decodeURIComponent(escape(b));
         return null;
     } catch(err) {
-        return uniqueCharacters(b);
+        return b;
     }
 };
 findBadBytes[LATIN_1] = function findBadLatin1(b) {
