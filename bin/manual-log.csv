@@ -4,7 +4,7 @@ Prepared Date:,{{datePrepared}}  {{timePrepared}}
 Operational Period:,{{fromDate}} {{fromTime}}  to  {{toDate}} {{toTime}}
 Task Name:,{{incidentName}}
 Radio Operator Name:,{{opName}}
-Station ID:,{{opCall}}
+Station ID:,{{netName}}
 
 Includes:,"Sent, Received, Private, NTS, Bulletin messages"
 Excludes:,No exclusions

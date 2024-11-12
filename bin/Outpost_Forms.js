@@ -880,7 +880,8 @@ function serve() {
     });
     app.use(morgan('[:date[iso]] :method :url :status :res[content-length] - :response-time'));
     app.use(bodyParser.json({type: JSON_TYPE}));
-    app.use(bodyParser.urlencoded({extended: false}));
+    app.use(bodyParser.urlencoded({extended: false, parameterLimit: 10000, limit: 1000000}));
+    // A request to save or print a manual ICS-309 comm log will be large if the log is long.
     app.post(OpenOutpostMessage, function(req, res) {
         const args = req.body; // an array, thanks to bodyParser.json
         if (!args || !args.length) { // a dry run
@@ -2758,6 +2759,9 @@ function onGetManualLog(req, res) {
 function onGetManualCSV(res) {
     return readManualLog().then(function(data) {
         log(`onGetManualCSV data ${data}`);
+        if (data.opCall) {
+            data.opName = (data.opName ? data.opName + ', ' : '') + data.opCall;
+        }
         manualLogFieldNames.forEach(function(field) {
             data[field] = enquoteCSV(data[field]);
         });
@@ -2789,7 +2793,7 @@ function onGetManualCSV(res) {
 }
 
 function enquoteCSV(value) {
-    if (value && value.match(/[,"]/)) {
+    if (value && /[,"]/.test(value)) {
         return '"' + value.replace(/"/g, '""') + '"';
     } else {
         return value || '';
