@@ -73,23 +73,23 @@
     </style>
     <title>ICS-309</title>
     <script type="text/javascript">
-      /** Submit the-form, regardless of whether it's valid. */
-      function submitFormDamnit() {
-          var form = document.getElementById("the-form");
-          form.noValidate = true;
-          form.submit();
-      }
       function insertMessage(index) {
           document.getElementById("insert-index").value = index + '';
-          submitFormDamnit();
+          document.getElementById("insert-form").submit();
       }
       function deleteMessage(index) {
           document.getElementById("delete-index").value = index + '';
-          submitFormDamnit();
+          document.getElementById("delete-form").submit();
       }
+      function eraseAll() {
+          document.getElementById("erase-all-form").submit();
+      }
+      /** Submit the-form, regardless of whether it's valid. */
       function submitDamnit(value) {
           document.getElementById("submitValue").value = value;
-          submitFormDamnit();
+          var form = document.getElementById("the-form");
+          form.noValidate = true;
+          form.submit();
       }
       function onLoad() {
           if (/\?goBack/.exec(window.location)) {
@@ -127,9 +127,16 @@
     </script>
   </head>
   <body style="background-color:#ffffff;padding-top:1em;">
+    <form id="delete-form" method="POST" style="display:none;">
+      <input type="text" id="delete-index" name="deleteIndex" value=""/>
+    </form>
+    <form id="insert-form" method="POST" style="display:none;">
+      <input type="text" id="insert-index" name="insertIndex" value=""/>
+    </form>
+    <form id="erase-all-form" method="POST" style="display:none;">
+      <input type="text" name="submitValue" value="EraseAll"/>
+    </form>
     <form id="the-form" method="POST"><!-- action="/manual-edit-log" -->
-      <input type="text" style="display:none;" name="insertIndex" id="insert-index" value=""/>
-      <input type="text" style="display:none;" name="deleteIndex" id="delete-index" value=""/>
       <table style="border-top:2px solid;">
         <tr>
           <td class="label">

@@ -2564,28 +2564,30 @@ function onGetManualEditLog(req, res) {
             messageRows += '  <td style="width:1px;">'
             if (message != null) {
                 messageRows +=
-                    `<button onclick="deleteMessage(${m})" title="Delete this row"`
+                    `<button type="button" onclick="deleteMessage(${m})" title="Delete this row"`
                     + ' style="background-color:#ffcccc;">'
                     + '<img alt="-" src="icon-delete.png"/>'
                     + '</button>';
             }
             messageRows += `</td>${EOL}`
                 + '  <td style="width:1px;">'
-                + `<button onclick="insertMessage(${m})" title="Insert a row">`
+                + `<button type="button" onclick="insertMessage(${m})" title="Insert a row">`
                 + '<img alt="+" src="icon-insert.png"/></button>'
                 + `</td>${EOL}`;
         }
         data.messages = messageRows;
-        data.afterLoad = '';
         return isManualLogErased().then(function(erased) {
+            data.afterLoad = "document.getElementById('"
+                + (erased ? 'undo-button' : 'save-button')
+                + "').focus();";
             data.submitButtons = '<td style="width:1px;">'
-                + EOL + '  <button style="background-color:#ffcccc;"'
+                + EOL + '  <button type="button" id="undo-button" style="background-color:#ffcccc;"'
                 + EOL + '          onClick="'
                 + (erased
                    ? ("submitDamnit('UndoErase')"
                       + '" title="Restore all fields and log entries."'
                       + '>Undo Erase All')
-                   : ("submitDamnit('EraseAll')"
+                   : ("eraseAll()"
                       + '" title="Clear all fields and delete all log entries!"'
                       + '>Erase All')
                   ) + '</button>'
@@ -2594,7 +2596,7 @@ function onGetManualEditLog(req, res) {
                 + EOL + '</td><td style="width:1px;">'
                 + EOL + '  <input type="submit" name="printButton" value="Print"/>'
                 + EOL + '</td><td style="width:1px;">'
-                + EOL + '  <button onclick="submitDamnit(\'Save\')">Save</button>'
+                + EOL + '  <button type="button" id="save-button" onclick="submitDamnit(\'Save\')">Save</button>'
                 + EOL + '</td>'
                 + EOL + '<input type="text" name="submitValue" id="submitValue" style="display:none;"/>';
             return sendManualLog(res, data);
@@ -2643,6 +2645,19 @@ function updateManualLog(req, res) {
         return !empty;
     }
     return readManualLog().then(function(data) {
+        if (req.body.deleteIndex) {
+            data.messages.splice(parseInt(req.body.deleteIndex), 1);
+            return data;
+        }
+        if (req.body.insertIndex) {
+            var i = parseInt(req.body.insertIndex);
+            // If we just added a message and inserted at the new message index,
+            // don't insert another item into data.messages.
+            if (i < data.messages.length + (addedMessage ? -1 : 1)) {
+                data.messages.splice(i, 0, {});
+            }
+            return data;
+        }
         manualLogFieldNames.forEach(function(field) {
             data[field] = req.body[field];
         });
@@ -2664,17 +2679,8 @@ function updateManualLog(req, res) {
         if (addedMessage) {
             data.messages.push(newMessage);
         }
-        if (req.body.insertIndex) {
-            var i = parseInt(req.body.insertIndex);
-            // If we just added a message and inserted at the new message index,
-            // don't insert another item into data.messages.
-            if (i < data.messages.length + (addedMessage ? -1 : 1)) {
-                data.messages.splice(i, 0, {});
-            }
-        }
-        if (req.body.deleteIndex) {
-            data.messages.splice(parseInt(req.body.deleteIndex), 1);
-        }
+        return data;
+    }).then(function(data) {
         const newData = JSON.stringify(data);
         log(`onPostManualEditLog data ${newData}`);
         return findManualLogFile().then(function(logFile) {
