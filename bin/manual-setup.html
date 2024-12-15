@@ -78,7 +78,7 @@
           var xhr = new XMLHttpRequest();
           xhr.open('GET', "/manual-archive", true);
           xhr.responseType = 'text';
-          xhr.timeout = 120000; // two minutes
+          xhr.timeout = 300000; // five minutes
           xhr.ontimeout = function(event) {
               chooseArchiveFolder(); // try again
           }
