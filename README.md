@@ -42,6 +42,8 @@ In your PATH environment variable, add the folder that contains SignTool.exe
 1. Create a file signingCert.pfx,
    which contains your code signing certificate and private key,
    in PKCS#12 format with no password.
+1. Download [Chromium](https://www.chromium.org/getting-involved/download-chromium/)
+   version 81.0.4044.92 to webToPDF/bin/Chromium-81.0.4044.92.
 1. Use bash to run webToPDF/build.sh
 1. Use bash to run ./build.sh,
    which will create several installer .exe files, one for each add-on.
