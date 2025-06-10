@@ -73,7 +73,7 @@ Developing Forms
 ================
 
 Most changes to forms will be done in
-[pack-it-forms](https://github.com/jmkristian/pack-it-forms/blob/SCCo.2/README.md)
+[pack-it-forms](https://github.com/jmkristian/pack-it-forms)
 (not this repository).
 To get started, replace the pack-it-forms sub-folder with a clone of the pack-it-forms repository.
 Run build.sh to create installers, and install the add-on you wish to develop.
