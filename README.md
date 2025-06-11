@@ -23,7 +23,11 @@ To build it, you'll need:
   which is included in the
   [Windows SDK](https://developer.microsoft.com/en-us/windows/downloads/sdk-archive/)
   feature Windows App Certification Kit.
-* a code signing certificate and private key
+* a trusted code signing certificate and private key.
+  These are available from several vendors, for example
+  [CheapSSLSecurity](https://cheapsslsecurity.com/sslproducts/codesigningcertificate.html) or
+  [Sectigo](https://sectigostore.com/code-signing/sectigo-code-signing-certificate).
+  Follow the vendor's directions to create your CSR (Certificate Signing Request).
 * a bash shell.
   The bash shell included with Git for Windows is sufficient.
 
