@@ -261,7 +261,7 @@ function install() {
     return getAddonNames().then(function(addonNames) {
         log('install addons ' + JSON.stringify(addonNames));
         return Promise.all([
-            installCmdConvert().then(function(cmdConvert) {
+            findCmdConvert().then(function(cmdConvert) {
                 return installConfigFiles(myDirectory, addonNames, cmdConvert);
             }),
             installIncludes(myDirectory, addonNames),
@@ -328,26 +328,21 @@ function uninstallCoverSheet() {
     }
 }
 
-function installCmdConvert() {
+function findCmdConvert() {
     const cmdConvertFile = path.join('bin', 'cmd-convert.ini');
-    return fsp.stat(
-        cmdConvertFile
-    ).then(function(stats) {
+    return fsp.readFile(
+        cmdConvertFile, ENCODING
+    ).then(function(cmdConvert) {
+        // The file exists. So we're not running on Windows XP.
+        fs.unlink(cmdConvertFile, log);
         // Dry run WEB_TO_PDF:
         return promiseSpawn(
             WEB_TO_PDF, ['bin'], {stdio: ['ignore', 'pipe', 'pipe']}
         ).then(function() {
-            return fsp.readFile(cmdConvertFile, ENCODING)
-        }).then(function(data) {
-            // Success! Add cmd-convert to the addon.ini files.
-            fs.unlink(cmdConvertFile, log);
-            return data;
+            // That went well.
+            return cmdConvert;
         });
-    }, function statFailed(err) {
-        // cmdConvertFile doesn't exist.
-        // We're running on Windows XP, presumably.
-        log(err);
-    });
+    }).catch(log); // and return undefined
 }
 
 function installConfigFiles(myDirectory, addonNames, cmdConvert) {
