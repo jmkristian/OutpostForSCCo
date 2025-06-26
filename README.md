@@ -85,7 +85,7 @@ To get started, replace the pack-it-forms sub-folder with a clone of the pack-it
 Run build.sh to create installers, and install the add-on you wish to develop.
 
 To test your changes, you can build and run a new installer.
-If you've only changed HTML files, you can update the installed files by executing
+If you've only changed existing HTML files, you can update the installed files by executing
 
 `    node buildHTML.js pack-it-forms <installed folder>/pack-it-forms`
 
@@ -109,7 +109,8 @@ Copy a form-\*.html file,
 find the `<form>` element with `id="the-form"` and edit its contents.
 The rest of the file is mostly boilerplate that you need not change.
 Assuming you start with all the boilerplate in place, you should:
- 
+
+* Install the form
 * Change the title
 * Edit input elements
 * Set up default and on-submit behavior on fields
@@ -117,6 +118,16 @@ Assuming you start with all the boilerplate in place, you should:
 * Clean up Javascript
 
 The next sections cover each of these in detail.
+
+Install the Form
+----------------
+
+In pack-it-forms/resources/integration/scco, edit `<plugin name>.launch` and `<plugin name>.nsi`.
+* The .launch file defines items that will appear in the Outpost Forms menu.
+  Add a line that describes your form.
+* The .nsi customizes the NSIS installer.
+  Edit the ChooseAddonFiles function to make the installer install your form
+  and matching PDF form (if any).
 
 Change the Title
 ----------------
