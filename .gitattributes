@@ -1,1 +1,3 @@
 *.png binary
+# Use CRLF on Windows and LF on Unix:
+* text=auto
