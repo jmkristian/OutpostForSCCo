@@ -62,6 +62,15 @@ The source for most of the installed code is bin/Outpost\_Forms.js.
 The installer configures Outpost to execute launch.js.
 For debugging, you might change the configuration to execute launch-v.cmd instead.
 
+Developing Forms
+================
+
+Most changes will be done in
+[pack-it-forms](https://github.com/jmkristian/pack-it-forms)
+(not this repository).
+To get started, replace the pack-it-forms sub-folder with a clone of the pack-it-forms repository.
+Run build.sh to create installers, and install the add-on you wish to develop.
+
 To develop a new add-on:
 * create form-\*.html files in pack-it-forms.
 * create Addon.nsi and Addon.launch files in pack-it-forms/resources/integration/scco,
@@ -77,15 +86,6 @@ and a resources/integration/scco folder that contains build.sh, Addon.nsi and Ad
 Use the files from pack-it-forms as models.
 Pass the name of your private repository to ./build.sh on the command line.
 
-Developing Forms
-================
-
-Most changes to forms will be done in
-[pack-it-forms](https://github.com/jmkristian/pack-it-forms)
-(not this repository).
-To get started, replace the pack-it-forms sub-folder with a clone of the pack-it-forms repository.
-Run build.sh to create installers, and install the add-on you wish to develop.
-
 To test your changes, you can build and run a new installer.
 If you've only changed existing HTML files, you can update the installed files by executing
 
@@ -95,7 +95,8 @@ For example:
 
 `    node buildHTML.js pack-it-forms C:/PackItForms/Outpost/SCCo/pack-it-forms`
 
-When you've finished form development, release pack-it-forms and then use the new released version here.
+When you've finished form development, release pack-it-forms and then
+build installers using the new released version.
 That is:
 1. Commit changes to pack-it-forms and push them to GitHub.
 1. Release pack-it-forms on GitHub and create a new release tag for it.
